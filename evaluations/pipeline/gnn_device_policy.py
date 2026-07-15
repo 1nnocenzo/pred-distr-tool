@@ -4,9 +4,9 @@ Core contribution: device selection from a unified circuit queue using
 per-circuit, per-device fidelity predictions from the trained GNN.
 
 Each pending circuit is assigned to the device that maximises its predicted
-fidelity, subject to a spread-scaled load penalty that prevents all circuits
-from piling onto a single device.  Within each device, circuits are ordered
-by descending fidelity score (secondary role).
+fidelity, subject to a load-share penalty that prevents all circuits from
+piling onto a single device.  Within each device, circuits are ordered by
+descending fidelity score (secondary role).
 
 - There is **one shared queue** for all devices.
 - QMS calls ``select()`` once per dispatch tick and receives back a
@@ -132,9 +132,9 @@ class GNNDevicePolicy(MultiDevicePolicy):
 
     Primary — device selection:
         Each circuit is scored against every available device using its
-        predicted fidelity, penalised by a spread-scaled load term so that
-        circuits with a strong device preference resist redistribution while
-        device-agnostic circuits absorb load freely.
+        raw predicted fidelity, penalised by the device's current share of
+        dispatched load, so a device attracts circuits in proportion to
+        its genuine fidelity edge over the alternatives.
 
     Secondary — within-device ordering:
         Circuits assigned to the same device are ordered by descending
@@ -231,29 +231,23 @@ class GNNDevicePolicy(MultiDevicePolicy):
         """Assign pending circuits to devices and order within each device.
 
         Device selection (primary):
-            For each circuit, both fidelity and load are min-max normalised
-            across the available devices **at the moment of decision** into
-            [0, 1].  Let::
+            Each circuit is assigned to::
 
-                fid_norm[d]  = (fid[d]  - fid_min ) / (fid_max  - fid_min )
-                load_norm[d] = (load[d] - load_min) / (load_max - load_min)
+                argmax_d  w * fid[d] - (1 - w) * load_share[d]
 
-            (spans < 1e-9 collapse to 0.)  The circuit is assigned to::
-
-                argmax_d  w * fid_norm[d] - (1 - w)**4 * load_norm[d]
-
-            Both terms live on the same [0, 1] scale, and the load
-            coefficient ``(1-w)**4`` is asymmetric on purpose: it decays
-            faster than the linear fidelity coefficient ``w``, which shifts
-            the crossover for the anti-correlated case (best-fid device is
-            also most-loaded) towards lower weights, so even the low end of
-            the sweep shows a visible departure from pure round-robin.
+            where ``fid[d]`` is the raw predicted fidelity (in [0, 1]) and
+            ``load_share[d]`` is the fraction of circuits dispatched to
+            ``d`` so far in this pass (0 while nothing has been
+            dispatched).  See the inline comment in the loop for why this
+            trades off fidelity against balance smoothly across the whole
+            weight range.
 
             - At w=0: picks the least-loaded device (pure round-robin).
-            - At w=1: picks the highest-fidelity device (pure oracle).
-            - Intermediate w: the crossover weight per circuit depends on
-              where its preferred device sits in the current load order at
-              the moment of decision.
+            - At w=1: picks the highest-fidelity device (argmax of the
+              policy's own predictions).
+            - Intermediate w: devices fill until per-device load shares
+              offset the fidelity gaps, so the allocation moves
+              continuously from balanced to fidelity-optimal as w grows.
 
         Within-device ordering (secondary):
             Circuits assigned to a device are sorted by descending fidelity
@@ -308,21 +302,34 @@ class GNNDevicePolicy(MultiDevicePolicy):
             if max(dev_fids.values()) < self._fidelity_threshold:
                 continue
 
-            # Min-max normalise fidelity and load across available devices so
-            # both terms share the [0, 1] range regardless of absolute scale.
-            fid_vals = list(dev_fids.values())
-            fid_min, fid_max = min(fid_vals), max(fid_vals)
-            fid_span = fid_max - fid_min
+            # Score:  w * fid[d] - (1 - w) * load_share[d]
+            #
+            # Raw fidelities (already in [0, 1]) trade off against the
+            # device's share of the circuits dispatched so far, so both
+            # terms live on the same scale without per-circuit min-max
+            # normalisation.  Keeping raw magnitudes matters: a device with
+            # a 0.001 fidelity edge barely outbids the load term, while a
+            # 0.3 edge dominates it.  (The previous formula normalised
+            # fidelity per circuit, which erased those magnitudes and made
+            # every circuit's decision a step function of w; combined with
+            # the quartic (1-w)**4 coefficient this confined the entire
+            # balance→fidelity transition to w ≈ 0.28–0.55.)
+            #
+            # Because the penalty grows with the actual share imbalance,
+            # devices fill until the marginal share gap offsets the fidelity
+            # gap — at equilibrium, for any two devices a, b::
+            #
+            #     share[a] - share[b]  ≈  w / (1 - w) * (fid[a] - fid[b])
+            #
+            # so the allocation shifts continuously across the whole
+            # w ∈ (0, 1) range instead of flipping en masse in a narrow
+            # band.  Dividing by the dispatched total also makes the
+            # penalty scale-invariant in queue length.
+            total_load = dispatched_count
 
-            load_vals = [load[d] for d in dev_fids]
-            load_min, load_max = min(load_vals), max(load_vals)
-            load_span = load_max - load_min
-
-            load_coef = (1.0 - w) ** 4 # used to be 3
             def _score(d: str) -> float:
-                fid_norm = (dev_fids[d] - fid_min) / fid_span if fid_span > 0.0 else 0.0
-                load_norm = (load[d] - load_min) / load_span if load_span > 1e-9 else 0.0
-                return w * fid_norm - load_coef * load_norm
+                share = load[d] / total_load if total_load > 0 else 0.0
+                return w * dev_fids[d] - (1.0 - w) * share
 
             best_dev = max(dev_fids, key=_score)
 

@@ -51,8 +51,8 @@ from createDevice import EQE1TopBackend, EQE1BottomBackend, QExa20Backend
 # Configuration
 # -------------------------------
 
-IN_DIR = "benchmark_dataset_30k"                                # folder with .qasm inputs (recursive)
-RESULTS_JSON = "compilation_time_results_benchmark_30k.json"    # final JSON path
+IN_DIR = "data/benchmark_dataset_30k"                                # folder with .qasm inputs (recursive)
+RESULTS_JSON = "evaluations/pipeline/timing_results/compilation_time_results_benchmark_30k.json"    # final JSON path
 OPT_LEVEL = 2                                                   # single compilation level
 
 

@@ -22,8 +22,8 @@ src/
     test_circuit_names.json     # held-out test split (evaluation subset)
   qms/                          # minimal extract of QMS (policy engine only)
     policy/                     # MultiDevicePolicy base, registry, round-robin baseline
-  predictor-gnn/                # mqt-predictor fork (model training only; the
-                                # evaluation pipeline does not import from it)
+  predictor-gnn/                # (not tracked) local mqt-predictor fork, model
+                                # training only; the pipeline does not import from it
 evaluations/
   pipeline/
     gnn_device_policy.py        # GNN device-selection policy (registers "gnn_device")

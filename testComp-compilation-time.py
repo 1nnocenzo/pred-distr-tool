@@ -37,7 +37,7 @@ import json
 import time
 from datetime import datetime, timezone
 import sys
-sys.path.insert(0, "../predictor-gnn/src")
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src" / "predictor-gnn" / "src"))
 
 from qiskit import qasm3
 from qiskit.transpiler import generate_preset_pass_manager

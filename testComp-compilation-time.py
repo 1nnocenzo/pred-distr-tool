@@ -217,10 +217,13 @@ pass_managers = {
 qasm_files = list_qasm_files(IN_DIR)
 
 if not qasm_files:
-    print(f"[INFO] No .qasm files in '{IN_DIR}'. Writing empty results and exiting.")
-    with open(RESULTS_JSON, "w", encoding="utf-8") as f:
-        json.dump({}, f, indent=2)
-    raise SystemExit(0)
+    # Do NOT write an empty results file here: the usual cause is running from
+    # the wrong working directory, and truncating a completed run to {} loses
+    # hours of compute.
+    raise SystemExit(
+        f"[FATAL] No .qasm files under '{IN_DIR}' (cwd={os.getcwd()}). "
+        f"Run from the repository root, with the dataset extracted to '{IN_DIR}'."
+    )
 
 # One-time global warm-up: the very first pm.run() in the process pays a one-off
 # import/JIT cost (~15ms) that has nothing to do with any circuit's real compile

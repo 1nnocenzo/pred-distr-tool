@@ -47,15 +47,22 @@ from encoding import create_dag
 # Configuration (mirrors sister script)
 # -------------------------------
 
-IN_DIR = "benchmark_dataset_30k"
-RESULTS_JSON = "inference_time_results_benchmark_30k.json"
+IN_DIR = "data/benchmark_dataset_30k"
+RESULTS_JSON = "evaluations/pipeline/timing_results/inference_time_results_benchmark_30k.json"
+
+# Must match testComp-compilation-time.py: a circuit measured on only one side
+# of the comparison is dropped by timing_analysis.py anyway.
+EXCLUDED_FAMILIES = {"grover"}
 
 
 def list_qasm_files(folder: str):
     root = Path(folder)
     if not root.is_dir():
         return []
-    return sorted(p.relative_to(root) for p in root.rglob("*.qasm"))
+    return sorted(
+        p.relative_to(root) for p in root.rglob("*.qasm")
+        if p.relative_to(root).parts[0] not in EXCLUDED_FAMILIES
+    )
 
 
 # -------------------------------
@@ -64,10 +71,13 @@ def list_qasm_files(folder: str):
 
 qasm_files = list_qasm_files(IN_DIR)
 if not qasm_files:
-    print(f"[INFO] No .qasm files in '{IN_DIR}'. Writing empty results and exiting.")
-    with open(RESULTS_JSON, "w", encoding="utf-8") as f:
-        json.dump({}, f, indent=2)
-    raise SystemExit(0)
+    # Do NOT write an empty results file here: the usual cause is running from
+    # the wrong working directory, and truncating a completed run to {} loses
+    # hours of compute.
+    raise SystemExit(
+        f"[FATAL] No .qasm files under '{IN_DIR}' (cwd={os.getcwd()}). "
+        f"Run from the repository root, with the dataset extracted to '{IN_DIR}'."
+    )
 
 # Model built once, outside the loop (analogous to the prebuilt pass managers).
 predictor = _GNNPredictor()

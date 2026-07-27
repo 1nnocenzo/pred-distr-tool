@@ -35,7 +35,10 @@ from statistics import mean, median
 DEVICE_NAMES = ["EQE1_Top", "EQE1_Bottom", "QExa20"]
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+_RESULTS_DIR = Path(__file__).resolve().parent / "timing_results"
 DEFAULT_TEST_NAMES = _REPO_ROOT / "src" / "model" / "test_circuit_names.json"
+DEFAULT_COMP = _RESULTS_DIR / "compilation_time_results_benchmark_30k.json"
+DEFAULT_INF = _RESULTS_DIR / "inference_time_results_benchmark_30k.json"
 
 
 # -------------------------------
@@ -217,9 +220,9 @@ def self_test() -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    ap.add_argument("--comp", default="compilation_time_results_benchmark_30k.json",
+    ap.add_argument("--comp", default=str(DEFAULT_COMP),
                     help="JSON from testComp-compilation-time.py")
-    ap.add_argument("--inf", default="inference_time_results_benchmark_30k.json",
+    ap.add_argument("--inf", default=str(DEFAULT_INF),
                     help="JSON from testComp-inference-time.py")
     ap.add_argument("--test-names", default=str(DEFAULT_TEST_NAMES),
                     help="JSON list of test-split circuit tags")

@@ -51,6 +51,18 @@ def _fill_edge_mean(
     return out
 
 
+# ── gate durations (seconds) ────────────────────────────────────────────────
+# Neither calibration source (IQM JSON / QExa20 CSV) reports gate durations —
+# they carry only fidelities and T1/T2 — so these are fixed nominal values,
+# identical across the three devices. They reproduce exactly the
+# expected_runtime values in src/model/expected_fidelity_results_benchmark.json
+# (all 24070 distinct values are integer combinations of these three, with no
+# exceptions), so runtime labels stay comparable with that reference run.
+# Retune here if per-device pulse timings become available.
+R_DURATION = 42e-9        # PRX / r single-qubit gate
+CZ_DURATION = 130e-9      # CZ two-qubit gate
+MEASURE_DURATION = 15e-6  # readout
+
 # ── paths ───────────────────────────────────────────────────────────────────
 BASE = Path(__file__).resolve().parent
 JSON_PATH = BASE / "data" / "2026-03-02T04_14_02.290607Z.json"
@@ -164,14 +176,14 @@ def _build_target(
     all_qubits = list(range(NUM_QUBITS))
 
     # -- id gate (no error) --------------------------------------------------
-    id_props = {(q,): InstructionProperties(error=0.0) for q in all_qubits}
+    id_props = {(q,): InstructionProperties(error=0.0, duration=0.0) for q in all_qubits}
     target.add_instruction(IGate(), id_props, name="id")
 
     # -- r gate (1-qubit rotation, error from RB) ----------------------------
     r_props = {}
     for q in all_qubits:
         err = r_gate_error.get(q)          # None if not calibrated
-        r_props[(q,)] = InstructionProperties(error=err)
+        r_props[(q,)] = InstructionProperties(error=err, duration=R_DURATION)
     target.add_instruction(RGate(0, 0), r_props, name="r")
 
     # -- cz gate (2-qubit, error from Clifford RB) --------------------------
@@ -179,7 +191,7 @@ def _build_target(
     for edge in COUPLING_MAP:
         q0, q1 = edge
         err = cz_gate_error.get((q0, q1)) or cz_gate_error.get((q1, q0))
-        cz_props[(q0, q1)] = InstructionProperties(error=err)
+        cz_props[(q0, q1)] = InstructionProperties(error=err, duration=CZ_DURATION)
     target.add_instruction(CZGate(), cz_props, name="cz")
 
     # -- measure (readout error = average of e01 and e10) --------------------
@@ -191,7 +203,7 @@ def _build_target(
             err = (e01 + e10) / 2.0
         else:
             err = e01 or e10              # use whichever is available
-        meas_props[(q,)] = InstructionProperties(error=err)
+        meas_props[(q,)] = InstructionProperties(error=err, duration=MEASURE_DURATION)
     target.add_instruction(Measure(), meas_props, name="measure")
 
     return target
@@ -355,11 +367,11 @@ def _build_eqe1_sub_target(
     """
     target = Target(num_qubits=num_qubits)
 
-    id_props = {(q,): InstructionProperties(error=0.0) for q in active_qubits}
+    id_props = {(q,): InstructionProperties(error=0.0, duration=0.0) for q in active_qubits}
     target.add_instruction(IGate(), id_props, name="id")
 
     r_props = {
-        (q,): InstructionProperties(error=r_gate_error.get(q))
+        (q,): InstructionProperties(error=r_gate_error.get(q), duration=R_DURATION)
         for q in active_qubits
     }
     target.add_instruction(RGate(0, 0), r_props, name="r")
@@ -368,7 +380,7 @@ def _build_eqe1_sub_target(
     for edge in coupling_map:
         q0, q1 = edge
         err = cz_gate_error.get((q0, q1)) or cz_gate_error.get((q1, q0))
-        cz_props[(q0, q1)] = InstructionProperties(error=err)
+        cz_props[(q0, q1)] = InstructionProperties(error=err, duration=CZ_DURATION)
     target.add_instruction(CZGate(), cz_props, name="cz")
 
     meas_props = {}
@@ -379,7 +391,7 @@ def _build_eqe1_sub_target(
             err = (e01 + e10) / 2.0
         else:
             err = e01 or e10
-        meas_props[(q,)] = InstructionProperties(error=err)
+        meas_props[(q,)] = InstructionProperties(error=err, duration=MEASURE_DURATION)
     target.add_instruction(Measure(), meas_props, name="measure")
 
     return target
@@ -636,13 +648,13 @@ def _build_qexa20_target(
     all_qubits = list(range(QEXA20_NUM_QUBITS))
 
     # -- id gate --------------------------------------------------------------
-    id_props = {(q,): InstructionProperties(error=0.0) for q in all_qubits}
+    id_props = {(q,): InstructionProperties(error=0.0, duration=0.0) for q in all_qubits}
     target.add_instruction(IGate(), id_props, name="id")
 
     # -- r gate (1-qubit, error from RB) --------------------------------------
     r_props = {}
     for q in all_qubits:
-        r_props[(q,)] = InstructionProperties(error=r_gate_error.get(q))
+        r_props[(q,)] = InstructionProperties(error=r_gate_error.get(q), duration=R_DURATION)
     target.add_instruction(RGate(0, 0), r_props, name="r")
 
     # -- cz gate (2-qubit, error from CZ gate fidelity) ----------------------
@@ -650,7 +662,7 @@ def _build_qexa20_target(
     for edge in QEXA20_COUPLING_MAP:
         q0, q1 = edge
         err = cz_gate_error.get((q0, q1)) or cz_gate_error.get((q1, q0))
-        cz_props[(q0, q1)] = InstructionProperties(error=err)
+        cz_props[(q0, q1)] = InstructionProperties(error=err, duration=CZ_DURATION)
     target.add_instruction(CZGate(), cz_props, name="cz")
 
     # -- measure (readout error = average of e01 and e10) ---------------------
@@ -662,7 +674,7 @@ def _build_qexa20_target(
             err = (e01 + e10) / 2.0
         else:
             err = e01 or e10
-        meas_props[(q,)] = InstructionProperties(error=err)
+        meas_props[(q,)] = InstructionProperties(error=err, duration=MEASURE_DURATION)
     target.add_instruction(Measure(), meas_props, name="measure")
 
     return target

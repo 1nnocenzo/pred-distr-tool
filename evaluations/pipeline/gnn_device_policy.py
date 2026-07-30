@@ -18,7 +18,11 @@ descending fidelity score (secondary role).
 Configuration keys (via ``configure()``):
     fidelity_weight    float  0 = max load balance, 1 = pure fidelity. Default 0.7.
     fidelity_threshold float  Hard minimum fidelity; circuit is skipped if all
-                              devices score below this. Default 0.0.
+                              devices score below this. Default -inf (admit
+                              every circuit).  Note the model is an unbounded
+                              regressor and can emit small negative fidelities
+                              on circuits that are dead anyway, so a threshold
+                              of 0.0 would silently drop them.
     max_batch_size     int    Max circuits dispatched per select() call
                               (summed across all devices). Default 8.
     checkpoint_path    str    Path to GNN weights (optional).
@@ -147,7 +151,7 @@ class GNNDevicePolicy(MultiDevicePolicy):
 
     def __init__(self) -> None:
         self._fidelity_weight: float = 0.7
-        self._fidelity_threshold: float = 0.0
+        self._fidelity_threshold: float = float("-inf")
         self._max_batch_size: int = 8
         self._checkpoint_path: str | None = None
         self._params_path: str | None = None
@@ -155,7 +159,7 @@ class GNNDevicePolicy(MultiDevicePolicy):
 
     def configure(self, config: dict[str, Any]) -> None:
         self._fidelity_weight = float(config.get("fidelity_weight", 0.7))
-        self._fidelity_threshold = float(config.get("fidelity_threshold", 0.0))
+        self._fidelity_threshold = float(config.get("fidelity_threshold", float("-inf")))
         self._max_batch_size = int(config.get("max_batch_size", 8))
         self._checkpoint_path = config.get("checkpoint_path")
         self._params_path = config.get("params_path")

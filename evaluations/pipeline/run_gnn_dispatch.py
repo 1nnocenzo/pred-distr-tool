@@ -315,7 +315,11 @@ def _run_single_weight(
     """
     _policy_cfg = {
         "fidelity_weight": fidelity_weight,
-        "fidelity_threshold": 0.0,
+        # -inf, not 0.0: the regressor can predict small negative fidelities
+        # for circuits that are dead on every device, and a 0.0 threshold
+        # dropped 16 of them, scoring the GNN on 5101 circuits against the
+        # other policies' 5117.
+        "fidelity_threshold": float("-inf"),
         "max_batch_size": len(fidelities),
     }
 

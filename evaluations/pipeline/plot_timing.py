@@ -98,11 +98,13 @@ def load_rows(path: Path) -> list[dict]:
     return rows
 
 
-def load_joined(comp_path: Path, inf_path: Path) -> list[dict]:
+def load_joined(comp_path: Path, inf_path: Path,
+                keep: set[str] | None = None) -> list[dict]:
     """One row per circuit measured on BOTH sides of the comparison.
 
     Circuits present in only one file are dropped: the head-to-head is
-    meaningless without both halves.
+    meaningless without both halves.  If `keep` is given, only those tags are
+    retained, so the figures cover the same population as timing_analysis.py.
     """
     with open(comp_path, encoding="utf-8") as f:
         comp = json.load(f)
@@ -111,6 +113,8 @@ def load_joined(comp_path: Path, inf_path: Path) -> list[dict]:
 
     rows = []
     for tag, entry in inf.items():
+        if keep is not None and tag not in keep:
+            continue
         c = comp.get(tag)
         if c is None:
             continue
@@ -350,6 +354,10 @@ def main() -> None:
                     help="JSON from testComp-inference-time.py; head-to-head "
                          "figures are skipped if it is absent")
     ap.add_argument("--out-dir", default=None, help="default: <results dir>/plots")
+    ap.add_argument("--test-names", default=None,
+                    help="JSON list of test-split circuit tags; restricts the "
+                         "head-to-head figures to that split so they match the "
+                         "numbers timing_analysis.py reports")
     args = ap.parse_args()
 
     results = Path(args.results)
@@ -369,11 +377,16 @@ def main() -> None:
     if not inf_path.exists():
         print(f"[PLOT] {inf_path} not found; skipping head-to-head figures.")
         return
-    joined = load_joined(results, inf_path)
+    keep = None
+    if args.test_names:
+        with open(args.test_names, encoding="utf-8") as f:
+            keep = set(json.load(f))
+    joined = load_joined(results, inf_path, keep)
     if not joined:
         print("[PLOT] no circuits measured on both sides; skipping head-to-head figures.")
         return
-    print(f"[PLOT] head-to-head on {len(joined)} circuits measured on both sides")
+    scope = f"test split of {len(keep)}" if keep else "all circuits"
+    print(f"[PLOT] head-to-head on {len(joined)} circuits measured on both sides ({scope})")
     plot_compile_vs_inference(joined, out_dir)
     plot_speedup(joined, out_dir)
     plot_cost_composition(joined, out_dir)

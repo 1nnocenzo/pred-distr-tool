@@ -1,4 +1,4 @@
-# Fidelity-Aware Scheduling of Quantum Circuits on Heterogeneous Multi-QPU Systems
+# Fidelity-Aware Scheduling of Quantum Circuits on Multi-QPU Systems
 
 Minimal, cleaned-up version of the research repository: a GNN predicts the
 expected fidelity of a circuit on each device of a multi-QPU system

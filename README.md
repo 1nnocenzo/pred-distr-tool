@@ -55,6 +55,23 @@ python evaluations/pipeline/run_gnn_dispatch.py --min-best-fidelity 0.01 --fidel
 python evaluations/pipeline/plot_benchmark.py
 ```
 
+By default the queue is sorted by circuit name, which delivers each family as a
+contiguous block and penalizes the greedy scheduler. The thesis sweep
+(`results_v4_shuffled/`) uses a shuffled queue and reuses saved predictions:
+
+```bash
+python evaluations/pipeline/run_gnn_dispatch.py --fidelity-weights 0.0:1.0:0.1 \
+    --predictions-path evaluations/pipeline/results_v3_dense/fidelity_gnn_predicted.json \
+    --shuffle-seed 0 --output-dir evaluations/pipeline/results_v4_shuffled
+
+# Greedy vs optimal assignment under the same per-device load
+python evaluations/pipeline/optimal_assignment.py \
+    --results-dir evaluations/pipeline/results_v4_shuffled --queue-seed 0 --n-perm 0
+python evaluations/pipeline/optimal_assignment.py \
+    --results-dir evaluations/pipeline/results_v3_dense        # sorted queue + 20 permutations
+python evaluations/pipeline/plot_optimal_assignment.py
+```
+
 Results (JSON + CSV + log) land in `evaluations/pipeline/results/`; plots in
 `evaluations/pipeline/results/plots/`.
 

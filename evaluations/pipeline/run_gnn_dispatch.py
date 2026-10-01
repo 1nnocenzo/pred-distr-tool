@@ -20,6 +20,11 @@ Usage::
 
     # Keep only circuits whose best ground-truth fidelity is >= 0.01
     python evaluations/pipeline/run_gnn_dispatch.py --min-best-fidelity 0.01
+
+    # Reuse saved predictions and dispatch a shuffled queue
+    python evaluations/pipeline/run_gnn_dispatch.py --fidelity-weights 0.0:1.0:0.1 \
+        --predictions-path evaluations/pipeline/results_v3_dense/fidelity_gnn_predicted.json \
+        --shuffle-seed 0
 """
 from __future__ import annotations
 
@@ -27,6 +32,7 @@ import argparse
 import csv
 import json
 import logging
+import random
 import statistics
 import sys
 import time
@@ -711,6 +717,16 @@ def main() -> None:
         "--fidelity-weights", type=str, default="0.7",
         help="Comma-separated or start:stop:step (default: 0.7)",
     )
+    parser.add_argument(
+        "--predictions-path", type=Path, default=None,
+        help="Reuse GNN predictions from a fidelity_gnn_predicted.json instead of "
+             "running inference.",
+    )
+    parser.add_argument(
+        "--shuffle-seed", type=int, default=None,
+        help="Dispatch the queue in a random order drawn with this seed. By default "
+             "the queue is sorted by circuit name, which groups circuits by family.",
+    )
     args = parser.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -730,18 +746,32 @@ def main() -> None:
         sys.exit(1)
 
     # GNN predictions: what the GNN policy sees when making decisions
-    logger.info(
-        "Running GNN inference on circuits in %s "
-        "(GNN policy will use its own predictions, not ground truth)",
-        args.circuit_dir,
-    )
-    gnn_fidelities = predict_all_fidelities(args.circuit_dir, sorted(fidelities))
+    if args.predictions_path is not None:
+        with open(args.predictions_path) as f:
+            gnn_fidelities = {k: [float(x) for x in v] for k, v in json.load(f).items()}
+        logger.info(
+            "Loaded GNN predictions for %d circuits from %s",
+            len(gnn_fidelities), args.predictions_path,
+        )
+    else:
+        logger.info(
+            "Running GNN inference on circuits in %s "
+            "(GNN policy will use its own predictions, not ground truth)",
+            args.circuit_dir,
+        )
+        gnn_fidelities = predict_all_fidelities(args.circuit_dir, sorted(fidelities))
 
     # Restrict both to the intersection of available circuits, in a canonical
     # (sorted) order so the unified-queue iteration is the same across both
     # dicts — otherwise RR-style cycling desyncs and produces different
     # per-device assignments at low weights.
     common = sorted(set(fidelities) & set(gnn_fidelities))
+    if args.shuffle_seed is not None:
+        # A name-sorted queue delivers each circuit family as a contiguous
+        # block, which biases the load-share term of the greedy policy; a
+        # shuffled queue interleaves families as an arrival stream would.
+        random.Random(args.shuffle_seed).shuffle(common)
+        logger.info("Queue shuffled with seed %d", args.shuffle_seed)
     if len(common) < len(fidelities) or len(common) < len(gnn_fidelities):
         logger.info(
             "Restricted to %d circuits present in both ground truth and circuit dir "

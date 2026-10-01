@@ -157,7 +157,7 @@ def plot_sweep(data: dict, policies: list[str], out_dir: Path) -> None:
         )
 
     ax.set_xlabel("Fidelity weight")
-    ax.set_ylabel("Mean predicted fidelity")
+    ax.set_ylabel("Mean ground-truth fidelity")
     ax.xaxis.set_major_locator(mticker.MultipleLocator(0.1))
 
     # Auto-zoom y-axis to data range with 15% padding so small differences are visible

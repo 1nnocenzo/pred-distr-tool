@@ -1,0 +1,17 @@
+# RUN EXPERIMENT SPLIT MODEL ALPHA SEED EXTRA
+# v5b = v5 sinkhorn + fixed 150-epoch budget, cosine LR, SWA (last 25%), tau 1.0 -> 0.3. 3 seeds on the unstable splits + control (for the calibration-shift test).
+v5b_sinkhorn control random_seed5 sinkhorn 0 5 --loss mixed --val-mode random --epoch-budget 150 --swa-frac 0.25 --tau-start 1.0
+v5b_sinkhorn logo variational sinkhorn 0 5 --loss mixed --val-mode random --epoch-budget 150 --swa-frac 0.25 --tau-start 1.0
+v5b_sinkhorn lofo qaoa sinkhorn 0 5 --loss mixed --val-mode random --epoch-budget 150 --swa-frac 0.25 --tau-start 1.0
+v5b_sinkhorn lofo qnn sinkhorn 0 5 --loss mixed --val-mode random --epoch-budget 150 --swa-frac 0.25 --tau-start 1.0
+v5b_sinkhorn_s6 control random_seed6 sinkhorn 0 6 --loss mixed --val-mode random --epoch-budget 150 --swa-frac 0.25 --tau-start 1.0
+v5b_sinkhorn_s6 logo variational sinkhorn 0 6 --loss mixed --val-mode random --epoch-budget 150 --swa-frac 0.25 --tau-start 1.0
+v5b_sinkhorn_s6 lofo qaoa sinkhorn 0 6 --loss mixed --val-mode random --epoch-budget 150 --swa-frac 0.25 --tau-start 1.0
+v5b_sinkhorn_s6 lofo qnn sinkhorn 0 6 --loss mixed --val-mode random --epoch-budget 150 --swa-frac 0.25 --tau-start 1.0
+v5b_sinkhorn_s7 control random_seed7 sinkhorn 0 7 --loss mixed --val-mode random --epoch-budget 150 --swa-frac 0.25 --tau-start 1.0
+v5b_sinkhorn_s7 logo variational sinkhorn 0 7 --loss mixed --val-mode random --epoch-budget 150 --swa-frac 0.25 --tau-start 1.0
+v5b_sinkhorn_s7 lofo qaoa sinkhorn 0 7 --loss mixed --val-mode random --epoch-budget 150 --swa-frac 0.25 --tau-start 1.0
+v5b_sinkhorn_s7 lofo qnn sinkhorn 0 7 --loss mixed --val-mode random --epoch-budget 150 --swa-frac 0.25 --tau-start 1.0
+# v5 (unchanged protocol) control models, seeds 6-7, for the calibration-shift comparison
+v5_sinkhorn_s6 control random_seed6 sinkhorn 0 6 --loss mixed --val-mode random
+v5_sinkhorn_s7 control random_seed7 sinkhorn 0 7 --loss mixed --val-mode random

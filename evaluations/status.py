@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+"""Write a human-readable status page of the generalization runs (v3/v4/v5).
+
+Reads only plan files, SLURM logs, metrics.json and ``squeue``: cheap, safe on the
+login node.  Usage::
+
+    python3 evaluations/status.py                 # print to stdout
+    python3 evaluations/status.py --out evaluations/STATUS.md
+    sbatch evaluations/status_loop.sh             # rewrite STATUS.md every 5 minutes
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+EVAL = Path(__file__).resolve().parent
+V3 = EVAL / "generalization_v3"
+sys.path.insert(0, str(V3 / "scripts"))
+
+import pending  # noqa: E402
+import summarize  # noqa: E402
+
+PLANS = [  # (label, plan file, results root, supervisor log glob)
+    ("LOGO + seed (v1, v3)", V3 / "results/plan_logo.txt", V3 / "results",
+     V3 / "results/slurm", "babysit_*.log"),
+    ("v4 (phys, xattn_mixed)", EVAL / "generalization_v4/results/plan_v4.txt",
+     EVAL / "generalization_v4/results", EVAL / "generalization_v4/results/slurm", "babysit_*.log"),
+    ("v5b + control seeds", EVAL / "generalization_v5/results/plan_v5b.txt",
+     EVAL / "generalization_v5/results", EVAL / "generalization_v5/results/slurm", "babysit_*.log"),
+    ("v4 control seeds", EVAL / "generalization_v4/results/plan_v4_ctrl.txt",
+     EVAL / "generalization_v4/results", EVAL / "generalization_v4/results/slurm", "babysit_*.log"),
+    ("v5 pilot (sinkhorn)", EVAL / "generalization_v5/results/plan_v5_pilot.txt",
+     EVAL / "generalization_v5/results", EVAL / "generalization_v5/results/slurm", "babysit_*.log"),
+]
+TRAIN_LOGS = V3 / "results/slurm"
+KEY_SPLITS = [("control", "random_seed5", None), ("lofo", "qaoa", None), ("lofo", "qnn", None),
+              ("lofo", "iqpe", None), ("lofo", "randomcircuit", None), ("logo", "vqe", None),
+              ("logo", "fourier", None), ("logo", "variational", None),
+              ("logo", "variational", "qnn"), ("logo", "fourier", "iqpe")]
+CONFIGS = ["v1", "xattn_a00", "xattn_a05", "v4_xattn_mixed", "v4_phys", "v5_sinkhorn", "v5b_sinkhorn"]
+EPOCH_RE = re.compile(r"^(\S+ \S+),\d+ .*\] epoch (\d+) .*val_mse=([\d.e-]+).*patience=(\d+)/(\d+)")
+
+
+def plan_counts(plan: Path, root: Path) -> tuple[int, int, int, int]:
+    pending.RESULTS = root
+    done = busy = free = 0
+    rows = pending.read_plan(plan)
+    for run, exp, split, *_ in rows:
+        d = root / run / pending.EXP_DIRS[exp] / split
+        if (d / "metrics.json").is_file():
+            done += 1
+        elif d.is_dir() and pending.is_locked(d):
+            busy += 1
+        else:
+            free += 1
+    return done, busy, free, len(rows)
+
+
+def last_line(log_dir: Path, pattern: str) -> str:
+    logs = sorted(log_dir.glob(pattern), key=lambda p: p.stat().st_mtime)
+    if not logs:
+        return "-"
+    lines = [l for l in logs[-1].read_text().splitlines() if l.strip()]
+    return lines[-1][:140] if lines else "-"
+
+
+def running_jobs() -> list[tuple[str, str, str, str]]:
+    out = subprocess.run(["squeue", "-u", os.environ.get("USER", ""), "-h", "-t", "R",
+                          "-o", "%i|%j|%P|%M"], capture_output=True, text=True).stdout
+    return [tuple(l.split("|")) for l in out.splitlines() if l.startswith(tuple("0123456789"))]
+
+
+def job_progress(job_id: str) -> str:
+    errs = list(TRAIN_LOGS.glob(f"cpu_*_{job_id}.err"))
+    if not errs:
+        return ""
+    lines = [l for l in errs[0].read_text(errors="replace").splitlines() if "] epoch " in l]
+    if not lines:
+        return "loading / starting"
+    parsed = [EPOCH_RE.match(l) for l in lines[-3:]]
+    parsed = [m for m in parsed if m]
+    if not parsed:
+        return ""
+    t = [dt.datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S") for m in parsed]
+    spe = (t[-1] - t[0]).total_seconds() / max(1, len(t) - 1)
+    last = parsed[-1]
+    return (f"epoch {int(last.group(2)):4d}  patience {last.group(4):>2}/{last.group(5)}"
+            f"  {spe:4.0f}s/epoch  val_mse {float(last.group(3)):.5f}")
+
+
+def results_table(metric: str) -> list[str]:
+    values = summarize.collect()
+    head = "| split | family | " + " | ".join(CONFIGS) + " |"
+    lines = [head, "|" + "---|" * (len(CONFIGS) + 2)]
+    for exp, split, fam in KEY_SPLITS:
+        cells = []
+        for c in CONFIGS:
+            vals = [v[metric] for v in values.get((exp, split, fam), {}).get(c, {}).values()
+                    if v.get(metric) is not None]
+            cells.append(summarize.fmt(vals))
+        lines.append(f"| {exp} {split} | {fam or ''} | " + " | ".join(cells) + " |")
+    return lines
+
+
+def render() -> str:
+    from zoneinfo import ZoneInfo
+    now = dt.datetime.now(ZoneInfo("Europe/Rome")).strftime("%Y-%m-%d %H:%M:%S")
+    out = [f"# Generalization runs — status at {now} (ora italiana, aggiornato ogni 5 minuti)", "",
+           "Auto-generated by `evaluations/status.py`; do not edit.", "", "## Plans", "",
+           "| plan | done | running | waiting | total | last supervisor line |",
+           "|---|---|---|---|---|---|"]
+    for label, plan, root, log_dir, pattern in PLANS:
+        if not plan.is_file():
+            continue
+        d, b, f, n = plan_counts(plan, root)
+        out.append(f"| {label} | {d} | {b} | {f} | {n} | `{last_line(log_dir, pattern)}` |")
+    jobs = running_jobs()
+    train = sorted((j for j in jobs if j[1].startswith("cpu_")), key=lambda j: j[1])
+    others = [j for j in jobs if not j[1].startswith("cpu_")]
+    out += ["", f"## Running training jobs ({len(train)})", "", "```"]
+    for jid, name, part, elapsed in train:
+        out.append(f"{name[4:]:38} {elapsed:>9}  {job_progress(jid)}")
+    out += ["```", "", "Other jobs: " + (", ".join(f"{n} ({e})" for _, n, _, e in others) or "-")]
+    for metric, title in (("r2", "R²"), ("mae", "MAE"), ("fidelity_regret_mean", "regret")):
+        out += ["", f"## Key results — {title} (mean±std(n seeds); one value = 1 seed)", ""]
+        out += results_table(metric)
+    return "\n".join(out) + "\n"
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    p.add_argument("--out", type=Path, default=None)
+    args = p.parse_args()
+    text = render()
+    if args.out:
+        tmp = args.out.with_suffix(".tmp")
+        tmp.write_text(text)
+        tmp.replace(args.out)
+    else:
+        print(text)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

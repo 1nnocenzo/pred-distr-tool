@@ -34,6 +34,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -61,7 +62,7 @@ XATTN_DEFAULTS: dict[str, Any] = {
     "cost_bias_init": -6.0,   # softplus(-6) ≈ 2.5e-3 per gate at initialisation
 }
 
-MODEL_KINDS = ("pooled", "xattn", "phys", "sinkhorn", "phys_uniform")
+MODEL_KINDS = ("pooled", "xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route")
 
 
 def load_hparams(params_path: Path | str | None = None) -> dict[str, Any]:
@@ -170,9 +171,12 @@ class QubitCrossAttentionPredictor(nn.Module):
     # -- device side -------------------------------------------------------
 
     def _devices(self, devices):
-        x = F.leaky_relu(self.dev_in(devices.x))
+        x_in, e_in = devices.x, devices.edge_attr
+        if getattr(self, "relative_dev", False):
+            x_in, e_in = relative_device_features(devices)
+        x = F.leaky_relu(self.dev_in(x_in))
         for conv in self.dev_convs:
-            x = x + F.leaky_relu(conv(x, devices.edge_index, devices.edge_attr))
+            x = x + F.leaky_relu(conv(x, devices.edge_index, e_in))
         dense, mask = to_dense_batch(x, devices.batch)            # (D, P, d), (D, P)
         glob = scatter(x, devices.batch, dim=0, reduce="mean")     # (D, d)
         return dense, mask, glob
@@ -332,9 +336,18 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
     """
 
     def __init__(self, params: dict[str, Any], dev_node_dim: int, dev_edge_dim: int,
-                 devices) -> None:
+                 devices, routing_flag: bool = False, routing_est: bool = False) -> None:
         super().__init__(params, dev_node_dim, dev_edge_dim)
         d = params["fusion_dim"]
+        # ``sinkhorn_rf``: one more count-head input per (circuit, device), 1 if the circuit's
+        # interaction graph embeds in the device coupling graph (no routing SWAP needed).
+        self.routing_flag = routing_flag
+        self._rf_cache: dict = {}
+        # ``sinkhorn_rf_route`` (v8s): + a cheap routing-cost estimate per (circuit, device):
+        # greedy placement of the interaction graph on the coupling map, then
+        # log1p(Σ_pairs count · max(hops − 1, 0) / multi-qubit gates).
+        self.routing_est = routing_est
+        self._re_cache: dict = {}
         self.tau = params.get("sinkhorn_tau", SINKHORN_DEFAULTS["sinkhorn_tau"])
         self.iters = params.get("sinkhorn_iters", SINKHORN_DEFAULTS["sinkhorn_iters"])
         self.w_q = nn.Linear(d, d)
@@ -342,7 +355,7 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         self.dummy_score = nn.Parameter(torch.zeros(()))
         # Count head: v4 inputs + [expected distance, log1p(expected distance)].
         layers: list[nn.Module] = []
-        last = 5 * d + 2
+        last = 5 * d + 2 + int(routing_flag) + int(routing_est)
         for width in params["mlp"]:
             layers += [nn.Linear(last, width), nn.LeakyReLU()]
             last = width
@@ -434,22 +447,197 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
 
         g_e = g.unsqueeze(1).expand(-1, n_dev, -1)
         d_e = dev_glob.unsqueeze(0).expand(g.size(0), -1, -1)
-        z = torch.cat([g_e, c_mean, c_range, d_e, g_e * c_mean,
-                       dist.unsqueeze(-1), torch.log1p(dist).unsqueeze(-1)], dim=-1)
+        feats = [g_e, c_mean, c_range, d_e, g_e * c_mean,
+                 dist.unsqueeze(-1), torch.log1p(dist).unsqueeze(-1)]
+        if self.routing_flag:
+            rf = routing_free(circuits, devices, self._rf_cache).to(g.device)   # (B, D)
+            feats.append(rf[gb].unsqueeze(-1))
+        if self.routing_est:
+            re_ = routing_estimate(circuits, devices, self._re_cache).to(g.device)  # (B, D)
+            feats.append(re_[gb].unsqueeze(-1))
+        z = torch.cat(feats, dim=-1)
         n_ops = F.softplus(self.cost(z))                             # (G, D, 3)
         cost = (n_ops * g_eps * self.log_scale.exp()).sum(-1)
         self.last_counts = scatter(n_ops, gb, dim=0, dim_size=n_circ, reduce="sum")   # v8
         return -scatter(cost, gb, dim=0, dim_size=n_circ, reduce="sum")
 
 
+N_RELATIVE = 5   # per-device z-scores of the first 5 qubit features (1q err, readout, T1, T2, degree)
+
+
+def relative_device_features(devices):
+    """v9: append to each qubit its first ``N_RELATIVE`` features as z-scores WITHIN its own
+    device, and to each coupler its CZ error as a z-score within its device.  The compiler
+    picks qubits by relative quality ("the better ones of this chip"); relative features give
+    the same signal whatever the absolute calibration, so they should transfer to calibrations
+    the model has never seen.  Affine-invariant, so standardised inputs give the same values."""
+    b = devices.batch
+    x = devices.x[:, :N_RELATIVE]
+    mean = scatter(x, b, dim=0, reduce="mean")
+    std = (scatter((x - mean[b]) ** 2, b, dim=0, reduce="mean")).sqrt().clamp(min=1e-6)
+    xr = (x - mean[b]) / std[b]
+    eb = b[devices.edge_index[0]]
+    e = devices.edge_attr
+    emean = scatter(e, eb, dim=0, reduce="mean", dim_size=int(b.max()) + 1)
+    estd = (scatter((e - emean[eb]) ** 2, eb, dim=0, reduce="mean", dim_size=int(b.max()) + 1)).sqrt().clamp(min=1e-6)
+    er = (e - emean[eb]) / estd[eb]
+    return torch.cat([devices.x, xr], dim=1), torch.cat([e, er], dim=1)
+
+
+def _greedy_route_cost(pairs: dict, H, pdeg) -> float:
+    """Σ count · max(hops − 1, 0) of the interaction graph under a greedy placement."""
+    w: dict = {}
+    for (a, b), c in pairs.items():
+        w.setdefault(a, {})[b] = c
+        w.setdefault(b, {})[a] = c
+    pos, free = {}, set(range(len(pdeg)))
+    for q in sorted(w, key=lambda q: -sum(w[q].values())):
+        placed = [(pos[o], c) for o, c in w[q].items() if o in pos]
+        if not placed:
+            best = max(free, key=lambda p: pdeg[p])
+        else:
+            best = min(free, key=lambda p: (sum(c * H[p][po] for po, c in placed), -pdeg[p]))
+        pos[q] = best
+        free.discard(best)
+    return float(sum(c * max(H[pos[a]][pos[b]] - 1, 0) for (a, b), c in pairs.items()))
+
+
+def routing_estimate(circuits, devices, cache: dict | None = None) -> torch.Tensor:
+    """``(B, D)``: log1p(greedy routing cost / number of multi-qubit gates), cached by
+    (circuit name, coupling map).  Cost ≈ 0.5 ms per circuit for 3 topologies (Python)."""
+    n_q = circuits.n_qubits.view(-1).tolist()
+    gq = circuits.gate_qubits.cpu()
+    gb = circuits.batch.cpu()
+    names = getattr(circuits, "circuit_name", None)
+    ei = devices.edge_index.cpu()
+    sizes = torch.bincount(devices.batch.cpu()).tolist()
+    chips, offset = [], 0
+    for n in sizes:
+        sel = (ei[0] >= offset) & (ei[0] < offset + n)
+        edges = tuple(sorted({(min(a, b), max(a, b)) for a, b in (ei[:, sel] - offset).t().tolist()}))
+        offset += n
+        chips.append((n, edges))
+    tables = {}
+    out = torch.zeros(len(n_q), len(chips))
+    starts = torch.searchsorted(gb, torch.arange(len(n_q) + 1)).tolist()
+    for b in range(len(n_q)):
+        keys = [(names[b], c[1]) if names is not None else None for c in chips]
+        if cache is not None and all(k is not None and k in cache for k in keys):
+            out[b] = torch.tensor([cache[k] for k in keys])
+            continue
+        pairs: dict = {}
+        multi = 0
+        for row in gq[starts[b]: starts[b + 1]].tolist():
+            q = [x for x in row if x >= 0]
+            if len(q) > 1:
+                multi += 1
+            for i in range(len(q)):
+                for j in range(i + 1, len(q)):
+                    k = (min(q[i], q[j]), max(q[i], q[j]))
+                    pairs[k] = pairs.get(k, 0) + 1
+        for dd, (n, edges) in enumerate(chips):
+            if edges not in tables:
+                adj = [[] for _ in range(n)]
+                for a, c in edges:
+                    adj[a].append(c); adj[c].append(a)
+                H = []
+                for s0 in range(n):
+                    dist = [n + 1] * n; dist[s0] = 0; front = [s0]
+                    while front:
+                        nxt = []
+                        for u in front:
+                            for v in adj[u]:
+                                if dist[v] > dist[u] + 1:
+                                    dist[v] = dist[u] + 1; nxt.append(v)
+                        front = nxt
+                    H.append(dist)
+                tables[edges] = (H, [len(a) for a in adj])
+            val = 0.0
+            if pairs:
+                val = float(np.log1p(_greedy_route_cost(pairs, *tables[edges]) / max(multi, 1)))
+            out[b, dd] = val
+            if keys[dd] is not None and cache is not None:
+                cache[keys[dd]] = val
+    return out
+
+
+def routing_free(circuits, devices, cache: dict | None = None) -> torch.Tensor:
+    """``(B, D)``: 1 if circuit b needs no routing on device d, i.e. its interaction graph
+    (pairs of logical qubits sharing a gate) is a subgraph of the coupling graph — the
+    perfect layout Qiskit's VF2Layout looks for at level 2.  rustworkx VF2 with a call
+    limit (undecided -> 0).  Cached by (circuit name, coupling map) when names exist."""
+    import rustworkx as rx
+    n_q = circuits.n_qubits.view(-1).tolist()
+    gq = circuits.gate_qubits.cpu()
+    gb = circuits.batch.cpu()
+    names = getattr(circuits, "circuit_name", None)
+    if cache is not None and cache.get("_dev_id") == id(devices):
+        chips = cache["_chips"]
+    else:
+        chips = None
+    ei = devices.edge_index.cpu() if chips is None else None
+    if chips is None:
+        chips = []
+        sizes = torch.bincount(devices.batch.cpu()).tolist()
+        offset = 0
+        for n in sizes:
+            sel = (ei[0] >= offset) & (ei[0] < offset + n)
+            edges = tuple(sorted({(min(a, b), max(a, b)) for a, b in (ei[:, sel] - offset).t().tolist()}))
+            offset += n
+            chips.append(edges)
+        if cache is not None:
+            cache["_dev_id"], cache["_chips"] = id(devices), chips
+    chip_graphs = {}
+    out = torch.zeros(len(n_q), len(chips))
+    starts = torch.searchsorted(gb, torch.arange(len(n_q) + 1)).tolist()
+    for b in range(len(n_q)):
+        keys = [(names[b], edges) if names is not None else None for edges in chips]
+        if cache is not None and all(k is not None and k in cache for k in keys):
+            out[b] = torch.tensor([cache[k] for k in keys])
+            continue
+        pairs = set()
+        for row in gq[starts[b]: starts[b + 1]].tolist():
+            q = [x for x in row if x >= 0]
+            for i in range(len(q)):
+                for j in range(i + 1, len(q)):
+                    pairs.add((min(q[i], q[j]), max(q[i], q[j])))
+        for dd, edges in enumerate(chips):
+            key = keys[dd]
+            if key is not None and cache is not None and key in cache:
+                out[b, dd] = cache[key]
+                continue
+            if edges not in chip_graphs:
+                c = rx.PyGraph(); c.add_nodes_from(range(1 + max(max(e) for e in edges))); c.add_edges_from_no_data(list(edges))
+                chip_graphs[edges] = c
+            if not pairs:
+                val = 1.0
+            else:
+                used = sorted({q for p in pairs for q in p})
+                pos = {q: i for i, q in enumerate(used)}
+                g = rx.PyGraph(); g.add_nodes_from(range(len(used)))
+                g.add_edges_from_no_data([(pos[a], pos[c]) for a, c in pairs])
+                val = float(len(used) <= chip_graphs[edges].num_nodes() and rx.is_subgraph_isomorphic(
+                    chip_graphs[edges], g, id_order=False, induced=False, call_limit=20_000))
+            out[b, dd] = val
+            if key is not None and cache is not None:
+                cache[key] = val
+    return out
+
+
 def build_model(kind: str, params: dict[str, Any], devices, device: torch.device) -> nn.Module:
     if kind == "pooled":
         return build_v2_model(params, devices, device)
-    if kind == "sinkhorn":
-        return SinkhornPlacementPredictor(
-            params, dev_node_dim=devices.x.size(1), dev_edge_dim=devices.edge_attr.size(1),
+    if kind in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route"):
+        rel = kind in ("sinkhorn_rf_rel", "sinkhorn_rf_rel_route")
+        model = SinkhornPlacementPredictor(
+            params, dev_node_dim=devices.x.size(1) + (N_RELATIVE if rel else 0),
+            dev_edge_dim=devices.edge_attr.size(1) * (2 if rel else 1),
             devices=devices.clone().cpu(),   # clone: PyG .cpu() moves the batch in place
-        ).to(device)
+            routing_flag=kind in ("sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route"),
+            routing_est=kind in ("sinkhorn_rf_route", "sinkhorn_rf_rel_route"),
+        )
+        model.relative_dev = rel
+        return model.to(device)
     if kind == "phys_uniform":
         return PhysicsHeadPredictor(
             params, dev_node_dim=devices.x.size(1), dev_edge_dim=devices.edge_attr.size(1),

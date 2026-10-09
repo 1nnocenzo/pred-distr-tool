@@ -153,6 +153,8 @@ def build_parser() -> argparse.ArgumentParser:
                         "(which physical qubits are used + operand distances).")
     p.add_argument("--count-lambda", type=float, default=None,
                    help="v8: weight of the loss on the predicted native-operation counts (needs --counts-path).")
+    p.add_argument("--count-weights", default=None,
+                   help="Per-kind weights of the count loss as 'r,measure,cz' (e.g. 0.1,0.1,1).")
     p.add_argument("--counts-path", type=Path, default=None,
                    help="compiler_counts.pt from evaluations/compile_check/compile_layouts.py counts.")
     p.add_argument("--calib-aug", type=Path, default=None,
@@ -160,6 +162,17 @@ def build_parser() -> argparse.ArgumentParser:
                         "variants compiled by evaluations/compile_check/v8b_variants.py).")
     p.add_argument("--aug-p-orig", type=float, default=None,
                    help="v8b: probability that a batch uses the original calibration (default 0.25).")
+    p.add_argument("--delta-lambda", type=float, default=None,
+                   help="Change loss: weight of the fit of dlogF (variant vs original calibration); "
+                        "needs --calib-aug and --orig-best.")
+    p.add_argument("--orig-best", type=Path, default=None,
+                   help="v8b_orig_labels.pt: best-of-K fidelity on the original devices (y_ob).")
+    p.add_argument("--aug-variants", default=None,
+                   help="Comma-separated subset of the calibration variant sets to use (default all).")
+    p.add_argument("--init-from", type=Path, default=None,
+                   help="Start from this model.pth (fine-tuning).")
+    p.add_argument("--keep-last", action="store_true",
+                   help="Keep the last-epoch weights instead of the best-validation ones.")
     p.add_argument("--layouts-path", type=Path, default=None,
                    help="compiler_layouts.pt from evaluations/compile_check/compile_layouts.py merge.")
     p.add_argument("--select-metric", choices=["mse", "log_mse"],
@@ -191,7 +204,7 @@ def main() -> int:
     # Opt-in v5b keys: only present when requested, so older configurations (and
     # their checkpoints) are unchanged.
     for key in ("epoch_budget", "swa_frac", "tau_start", "layout_lambda", "layout_loss", "count_lambda",
-                "aug_p_orig"):
+                "aug_p_orig", "delta_lambda", "aug_variants", "count_weights"):
         if getattr(args, key) is not None:
             protocol[key] = getattr(args, key)
     if args.model == "v1":
@@ -201,24 +214,39 @@ def main() -> int:
         devices = None
     else:
         params = load_hparams(args.params_path)
-        qubit_aware = args.model in ("xattn", "phys", "sinkhorn", "phys_uniform")
+        qubit_aware = args.model in ("xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route")
         devices = load_devices(args.device_graphs, DEVICE_NAMES,
                                lap_pe=params["lap_pe"] if qubit_aware else 0,
-                               physical_errors=args.model in ("phys", "sinkhorn", "phys_uniform"))
+                               physical_errors=args.model in ("phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route"))
 
-    if args.dataset_dir is None and args.model in ("xattn", "phys", "sinkhorn", "phys_uniform"):
+    if args.dataset_dir is None and args.model in ("xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route"):
         args.dataset_dir = paths.DATA_DIR
     dataset_dir = v1_paths.find_dataset_dir(args.dataset_dir, FIGURE_OF_MERIT)
     dataset = GraphDataset.load(dataset_dir, FIGURE_OF_MERIT)
     if args.layout_lambda:
-        if args.model != "sinkhorn" or args.layouts_path is None:
+        if args.model not in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route") or args.layouts_path is None:
             raise SystemExit("--layout-lambda needs --model sinkhorn and --layouts-path")
         attach_layouts(dataset, args.layouts_path)
     if args.calib_aug is not None:
         protocol["calib_aug"] = str(args.calib_aug)
         attach_calib_aug(dataset, args.calib_aug)
+    if args.init_from is not None:
+        protocol["init_from"] = str(args.init_from)
+    if args.keep_last:
+        protocol["keep_last"] = True
+    if args.delta_lambda:
+        if args.orig_best is None or args.calib_aug is None:
+            raise SystemExit("--delta-lambda needs --calib-aug and --orig-best")
+        import torch
+        ob = torch.load(args.orig_best, weights_only=False)
+        found = 0
+        for d, name in zip(dataset.data, dataset.names):
+            r = ob.get(name)
+            d.y_ob = r["F"].float().view(1, -1) if r is not None else torch.full((1, len(DEVICE_NAMES)), -1.0)
+            found += r is not None
+        logger.info("Original-calibration best-of-K labels (%s): %d/%d circuits", args.orig_best, found, len(dataset.data))
     if args.count_lambda:
-        if args.model not in ("sinkhorn", "phys", "phys_uniform") or args.counts_path is None:
+        if args.model not in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "phys", "phys_uniform") or args.counts_path is None:
             raise SystemExit("--count-lambda needs a physics-head model and --counts-path")
         attach_counts(dataset, args.counts_path)
     save_json(dataset.summary(), experiment_dir / "dataset_summary.json")

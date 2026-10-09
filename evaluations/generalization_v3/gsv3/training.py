@@ -53,7 +53,7 @@ TRAIN_PROTOCOL: dict[str, Any] = {
 }
 
 
-def count_loss(model, batch) -> tuple[torch.Tensor, float]:
+def count_loss(model, batch, kind_weights=None) -> tuple[torch.Tensor, float]:
     """v8: predicted native-operation counts vs the compiled circuits' true ones.
 
     ``batch.counts`` is ``(n_circuits, n_devices, 3)`` = true (1q ``r``, ``measure``,
@@ -64,6 +64,8 @@ def count_loss(model, batch) -> tuple[torch.Tensor, float]:
     pred, true = model.last_counts, batch.counts.view_as(model.last_counts)
     known = true >= 0
     err = (torch.log1p(pred) - torch.log1p(true.clamp(min=0))) ** 2
+    if kind_weights is not None:      # per-kind weights (r, measure, cz)
+        err = err * torch.as_tensor(kind_weights, dtype=err.dtype, device=err.device)
     loss = (err * known).sum() / known.sum().clamp(min=1)
     k2 = known[..., 2] & (true[..., 2] > 0)
     rel2 = ((pred[..., 2] - true[..., 2]).abs() / true[..., 2].clamp(min=1))[k2].mean() if k2.any() else pred.new_tensor(0.0)
@@ -196,6 +198,9 @@ def train_model(
     seed, eps = protocol["seed"], protocol["log_eps"]
     torch.manual_seed(seed)
     model = build_model(protocol["model"], params, devices, device)
+    if protocol.get("init_from"):     # fine-tuning (e.g. the change loss on a trained v8a)
+        model.load_state_dict(torch.load(protocol["init_from"], map_location=device))
+        logger.info("[%s] initialised from %s", tag, protocol["init_from"])
     optimizer = torch.optim.Adam(model.parameters(), lr=protocol["lr"])
 
     sampler = balanced_sampler(train_families, protocol["balance_alpha"], seed)
@@ -220,6 +225,9 @@ def train_model(
     layout_kind = protocol.get("layout_loss", "assign")
     # v8 (opt-in): weight of the count loss; needs ``counts`` on the graphs.
     count_lambda = float(protocol.get("count_lambda", 0) or 0)
+    # optional per-kind weights of the count loss, "r,measure,cz" (e.g. "0.1,0.1,1": cz-heavy)
+    count_w = ([float(v) for v in str(protocol["count_weights"]).split(",")]
+               if protocol.get("count_weights") else None)
     # v8b (opt-in): calibration augmentation.  Each training batch uses the original
     # calibration with probability ``aug_p_orig``, otherwise one of the variants in
     # ``calib_aug`` (device graphs + per-variant labels / layouts / counts on the graphs).
@@ -232,10 +240,18 @@ def train_model(
         n_aug = len(raw) // len(names)
         aug_devices = [variant_batch(raw, [f"{d}/aug{j}" for d in names], params["lap_pe"]).to(device)
                        for j in range(n_aug)]
+        # optional subset of the variant sets (e.g. to test how many calibrations are needed)
+        aug_ids = [int(j) for j in str(protocol.get("aug_variants", "")).split(",") if j.strip()] or list(range(n_aug))
         aug_rng = np.random.default_rng(seed + 1)
         p_orig = float(protocol.get("aug_p_orig", 0.25))
-        logger.info("[%s] calibration augmentation: %d variant sets, p(orig) = %.2f",
-                    tag, n_aug, p_orig)
+    # Change loss (opt-in, needs calib_aug and ``y_ob`` on the graphs): every batch is run on
+    # the original devices (absolute loss as usual) and on one random variant, and
+    # (log F^_var - log F^_orig) is fitted to (log F_var - log F_orig), both best-of-K labels.
+    delta_lambda = float(protocol.get("delta_lambda", 0) or 0)
+    if delta_lambda and aug_devices is None:
+        raise ValueError("delta_lambda needs calib_aug")
+        logger.info("[%s] calibration augmentation: variant sets %s of %d, p(orig) = %.2f",
+                    tag, aug_ids, n_aug, p_orig)
     swa_state, swa_n = None, 0
     tau_end = getattr(model, "tau", None)
 
@@ -279,11 +295,12 @@ def train_model(
         lay_ce, lay_acc, lay_n = 0.0, 0.0, 0
         v7_stats: dict[str, float] = {}
         cnt_loss, cnt_rel2, cnt_n = 0.0, 0.0, 0
+        dl_sum, dl_n = 0.0, 0
         for batch in loader:
             batch = batch.to(device)
             batch_devices = devices
-            if aug_devices is not None and aug_rng.random() >= p_orig:
-                j = int(aug_rng.integers(len(aug_devices)))
+            if aug_devices is not None and not delta_lambda and aug_rng.random() >= p_orig:
+                j = aug_ids[int(aug_rng.integers(len(aug_ids)))]
                 batch_devices = aug_devices[j]
                 batch.y = batch.y_aug[:, j]
                 batch.layout = batch.layout_aug[:, j]
@@ -309,9 +326,20 @@ def train_model(
                 loss = loss + layout_lambda * ce
                 lay_ce, lay_acc, lay_n = lay_ce + float(ce), lay_acc + float(acc), lay_n + 1
             if count_lambda:
-                closs, rel2 = count_loss(model, batch)
+                closs, rel2 = count_loss(model, batch, count_w)
                 loss = loss + count_lambda * closs
                 cnt_loss, cnt_rel2, cnt_n = cnt_loss + closs.item(), cnt_rel2 + rel2, cnt_n + 1
+            if delta_lambda:          # second pass on a random calibration variant
+                j = aug_ids[int(aug_rng.integers(len(aug_ids)))]
+                log_var = model(batch, aug_devices[j])
+                y_v = batch.y_aug[:, j].float().view(log_var.shape)
+                y_o = batch.y_ob.float().view(log_var.shape)
+                ok = ((y_v > 0.01) & (y_o > 0.01)).float()
+                d_true = torch.log(y_v.clamp(min=1e-6)) - torch.log(y_o.clamp(min=1e-6))
+                d_pred = torch.clamp(log_var, max=0.0) - torch.clamp(log_pred, max=0.0)
+                dloss = (ok * (d_pred - d_true) ** 2).sum() / ok.sum().clamp(min=1)
+                loss = loss + delta_lambda * dloss
+                dl_sum, dl_n = dl_sum + dloss.item(), dl_n + 1
             optimizer.zero_grad()
             loss.backward()
             if protocol["grad_clip"]:
@@ -327,6 +355,9 @@ def train_model(
         val_mse = float(np.mean((val_pred - val_true) ** 2))
         history.append({"epoch": epoch, "train_log_mse": train_loss, "val_log_mse": val_loss,
                         "val_mse": val_mse, "max_grad_norm": max_grad})
+        if delta_lambda:
+            history[-1]["train_delta_mse"] = dl_sum / max(1, dl_n)
+            logger.info("[%s] epoch %04d  delta_mse=%.4f", tag, epoch, history[-1]["train_delta_mse"])
         if count_lambda:
             history[-1]["train_count_mse"] = cnt_loss / max(1, cnt_n)
             history[-1]["train_count_rel_err_2q"] = cnt_rel2 / max(1, cnt_n)
@@ -384,7 +415,7 @@ def train_model(
                                 device=device, eps=eps)
         logger.info("[%s] final model = SWA of the last %d epochs (val_log_mse=%.5f)",
                     tag, swa_n, swa_val)
-    elif best_state is not None:
+    elif best_state is not None and not protocol.get("keep_last"):
         model.load_state_dict(best_state)
         model.to(device)
     return model, {"best_epoch": best_epoch, "epochs_run": len(history),

@@ -76,9 +76,12 @@ def make_aug(backend, j: int, dev_index: int):
     return be
 
 
-def variants() -> dict:
+def variants(orig: bool = False) -> dict:
+    """The 8 variants per device, or with ``orig`` the unchanged devices (key ``<dev>/orig``)."""
     from createDevice import EQE1BottomBackend, EQE1TopBackend, QExa20Backend
     base = {"EQE1_Top": EQE1TopBackend(), "EQE1_Bottom": EQE1BottomBackend(), "QExa20": QExa20Backend()}
+    if orig:
+        return {f"{d}/orig": be for d, be in base.items()}
     return {f"{d}/aug{j}": make_aug(be, j, i) for i, (d, be) in enumerate(base.items()) for j in range(N_AUG)}
 
 
@@ -86,7 +89,7 @@ def run(args) -> None:
     from qiskit import qasm3
     from compile_check import DATA, LABELS, compile_once
     from compile_layouts import _counts, fidelity
-    vs = variants()
+    vs = variants(orig=args.orig)
     node = {k: {q: i for i, q in enumerate(getattr(be, "active_qubits", None) or range(be.num_qubits))}
             for k, be in vs.items()}
     names = sorted(n for n in json.loads(LABELS.read_text()) if not n.startswith("grover/"))
@@ -137,21 +140,23 @@ def raw(args) -> None:
 
 def merge(args) -> None:
     """-> v8b_labels.pt {circuit: {"F": (N_AUG, 3) best fidelity, "layout": (n, N_AUG, 3),
-    "counts": (N_AUG, 3, 3)}} in DEVICES order."""
+    "counts": (N_AUG, 3, 3)}} in DEVICES order (with --orig: v8b_orig_labels.pt, N_AUG = 1)."""
     import torch
     out, bad = {}, 0
-    keys = [[f"{d}/aug{j}" for d in DEVICES] for j in range(N_AUG)]
+    keys = ([[f"{d}/orig" for d in DEVICES]] if args.orig
+            else [[f"{d}/aug{j}" for d in DEVICES] for j in range(N_AUG)])
     for f in sorted(args.out.glob("task*.jsonl")):
         for r in map(json.loads, f.read_text().splitlines()):
-            if "error" in r or len(r["F"]) != N_AUG * len(DEVICES):
+            if "error" in r or len(r["F"]) != len(keys) * len(DEVICES):
                 bad += 1
                 continue
             F = torch.tensor([[max(r["F"][k]) for k in row] for row in keys])
             lay = torch.tensor([[r["layout"][k] for k in row] for row in keys]).permute(2, 0, 1)
             cnt = torch.tensor([[r["counts"][k] for k in row] for row in keys])
             out[r["circuit"]] = {"F": F, "layout": lay.contiguous(), "counts": cnt}
-    torch.save(out, args.out / "v8b_labels.pt")
-    print(f"{len(out)} circuits, {bad} skipped -> {args.out / 'v8b_labels.pt'}")
+    name = "v8b_orig_labels.pt" if args.orig else "v8b_labels.pt"
+    torch.save(out, args.out / name)
+    print(f"{len(out)} circuits, {bad} skipped -> {args.out / name}")
 
 
 def main() -> None:
@@ -160,6 +165,7 @@ def main() -> None:
     ap.add_argument("--task-id", type=int, default=0)
     ap.add_argument("--n-tasks", type=int, default=1)
     ap.add_argument("--k", type=int, default=3, help="compiler seeds per (circuit, variant)")
+    ap.add_argument("--orig", action="store_true", help="the unchanged devices instead of the variants")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
     {"run": run, "raw": raw, "merge": merge}[args.cmd](args)

@@ -52,8 +52,18 @@ for _s in (5, 6, 7):
     MODELS[f"v4u_phys@s{_s}"] = ("phys_uniform", _control("generalization_v6", "v4u_phys", _s))
     for _lam in ("v7_l001", "v7_l01"):   # v7: Sinkhorn + region/distance layout loss
         MODELS[f"{_lam}@s{_s}"] = ("sinkhorn", _control("generalization_v7", _lam, _s))
-    for _c in ("v8a_c001", "v8a_c01", "v8b_c001", "v8b_c01"):   # v8a: v7 (λ 0.1) + counts; v8b: + calibration variants
+    # v8a: v7 (λ 0.1) + counts; v8b: + calibration variants; v8c: v8a fine-tuned with the change loss
+    for _c in ("v8a_c001", "v8a_c01", "v8b_c001", "v8b_c01", "v8c_d01", "v8c_d1", "v8c_d1_v4"):
         MODELS[f"{_c}@s{_s}"] = ("sinkhorn", _control("generalization_v8", _c, _s))
+    MODELS[f"v8r@s{_s}"] = ("sinkhorn_rf", _control("generalization_v8", "v8r", _s))   # v8a + routing-free flag
+    MODELS[f"v9@s{_s}"] = ("sinkhorn_rf_rel", _control("generalization_v9", "v9", _s))  # v8r + relative device features
+    MODELS[f"v8r_cz@s{_s}"] = ("sinkhorn_rf", _control("generalization_v9", "v8r_cz", _s))  # v8r + cz-heavy count loss
+    MODELS[f"v8s@s{_s}"] = ("sinkhorn_rf_route", _control("generalization_v9", "v8s", _s))  # v8r_cz + routing estimate
+# v9f: the add-ons kept by generalization_v9/decide_v9f.py (kind written there)
+_DEC = EVAL / "generalization_v9" / "results" / "decision.json"
+if _DEC.is_file() and json.loads(_DEC.read_text()).get("run") == "v9f":
+    for _s in (5, 6, 7):
+        MODELS[f"v9f@s{_s}"] = (json.loads(_DEC.read_text())["kind"], _control("generalization_v9", "v9f", _s))
 
 _VARIANTS = None
 

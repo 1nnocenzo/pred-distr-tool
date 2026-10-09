@@ -1,6 +1,6 @@
 #!/bin/bash
 # One v3 configuration on one GPU (default A100; e.g. sbatch -p gpu_a40 for an A40; same options as train_cpu.sh). Log names keep
-# the cpu_ prefix so that evaluations/status.py shows their progress.
+# the cpu_ prefix, like the CPU runs.
 # same RUN: thanks to the per-split lock every job trains a different unfinished
 # split (finished splits are skipped, a split being trained elsewhere is skipped),
 # so N jobs train N splits in parallel.  GPU jobs on the same RUN coexist safely.

@@ -36,11 +36,24 @@ import cshift  # noqa: E402
 RESULTS = HERE / "results"
 EXCLUDE = {"iqpe", "dynamic_qft", "ghz_dynamic", "seven_qubit_steane_code",
            "shors_nine_qubit_code"}           # dynamic circuits: see generalization_v4 README
-MODELS = {  # name: (kind, control model)
-    "v3_xattn": ("xattn", EVAL / "generalization_v3/results/xattn_a05/random_control/random_seed5/model.pth"),
-    "v4_phys": ("phys", EVAL / "generalization_v4/results/v4_phys/random_control/random_seed5/model.pth"),
-    "v5_sinkhorn": ("sinkhorn", EVAL / "generalization_v5/results/v5_sinkhorn/random_control/random_seed5/model.pth"),
-}
+def _control(root: str, run: str, seed: int) -> Path:
+    name = run if seed == 5 else f"{run}_s{seed}"
+    return EVAL / root / "results" / name / "random_control" / f"random_seed{seed}" / "model.pth"
+
+
+# name: (kind, control model).  "@sN" marks the seed; report() aggregates seeds.
+MODELS = {"v3_xattn@s5": ("xattn", _control("generalization_v3", "xattn_a05", 5))}
+for _s in (5, 6, 7):
+    MODELS[f"v4_phys@s{_s}"] = ("phys", _control("generalization_v4", "v4_phys", _s))
+    MODELS[f"v5_sinkhorn@s{_s}"] = ("sinkhorn", _control("generalization_v5", "v5_sinkhorn", _s))
+    MODELS[f"v5b_sinkhorn@s{_s}"] = ("sinkhorn", _control("generalization_v5", "v5b_sinkhorn", _s))
+    for _lam in ("v6_l001", "v6_l01"):   # v6: Sinkhorn + compiler-layout loss (missing seeds skipped)
+        MODELS[f"{_lam}@s{_s}"] = ("sinkhorn", _control("generalization_v6", _lam, _s))
+    MODELS[f"v4u_phys@s{_s}"] = ("phys_uniform", _control("generalization_v6", "v4u_phys", _s))
+    for _lam in ("v7_l001", "v7_l01"):   # v7: Sinkhorn + region/distance layout loss
+        MODELS[f"{_lam}@s{_s}"] = ("sinkhorn", _control("generalization_v7", _lam, _s))
+    for _c in ("v8a_c001", "v8a_c01"):   # v8a: v7 (λ 0.1) + count loss
+        MODELS[f"{_c}@s{_s}"] = ("sinkhorn", _control("generalization_v8", _c, _s))
 
 _VARIANTS = None
 
@@ -151,6 +164,9 @@ def cmd_predict(args):
 
     preds = {}
     for mname, (kind, path) in MODELS.items():
+        if not path.is_file():
+            print(f"skip {mname}: {path} not found", flush=True)
+            continue
         model = build_model(kind, params, devices, torch.device("cpu"))
         model.load_state_dict(torch.load(path, map_location="cpu"))
         model.eval()
@@ -189,7 +205,9 @@ def cmd_report(args):
         out(f"{dev:12} R2 {_r2(t, d):.4f}  MAE {np.mean(np.abs(np.array(t) - d)):.4f}")
 
     # 2) accuracy per variant, and tracking of the change w.r.t. orig.
-    out("\n## Accuracy per variant (R2 / MAE) and tracking of the change vs. orig")
+    all_preds = preds
+    preds = {m.split("@")[0]: v for m, v in all_preds.items() if m.endswith("@s5")}
+    out("\n## Accuracy per variant (R2 / MAE) and tracking of the change vs. orig (seed 5)")
     out("tracking = corr(predicted log F(variant) - log F(orig), true ...), on circuits with F > 0.01")
     for dev in cshift.DEVICE_NAMES:
         out(f"\n### {dev}")
@@ -220,6 +238,46 @@ def cmd_report(args):
             p = np.array([preds[m][n][k] for k in keys])
             acc.append(np.argmax(p) == np.argmax(t)); reg.append(t.max() - t[np.argmax(p)])
         out(f"{m:12} accuracy {np.mean(acc):.3f}  regret {np.mean(reg):.4f}")
+    # 4) Seed-aggregated summary: one row per model version, mean ± std over seeds.
+    out("\n## Summary over seeds (mean ± std over the available seeds)")
+    out("worst R2 = min over all 18 device variants; scale = x0.5/x2; local = shuffle/jitter")
+    def stats(vals):
+        vals = [v for v in vals if v == v]
+        if not vals:
+            return "-"
+        return f"{np.mean(vals):.3f}" + (f"±{np.std(vals, ddof=1):.3f}" if len(vals) > 1 else "") + f"({len(vals)})"
+    per = defaultdict(lambda: defaultdict(list))
+    for m, P in all_preds.items():
+        base = m.split("@")[0]
+        r2s, trk_scale, trk_local = [], [], []
+        for dev in cshift.DEVICE_NAMES:
+            ref = f"{dev}/orig"
+            for v in cshift.VARIANTS:
+                key = f"{dev}/{v}"
+                ok = [n for n in names if truth[n][key][0] is not None and truth[n][ref][0] is not None]
+                t = np.array([truth[n][key][0] for n in ok]); p = np.array([P[n][key] for n in ok])
+                r2s.append(_r2(p, t))
+                if v == "orig":
+                    continue
+                keep = [n for n in ok if truth[n][key][0] > 0.01 and truth[n][ref][0] > 0.01]
+                dt = np.log([truth[n][key][0] / truth[n][ref][0] for n in keep])
+                dp = np.log([max(P[n][key], 1e-6) / max(P[n][ref], 1e-6) for n in keep])
+                c = np.corrcoef(dp, dt)[0, 1] if len(keep) > 2 and dt.std() > 0 else float("nan")
+                (trk_scale if v in ("x0.5", "x2") else trk_local).append(c)
+        acc, reg = [], []
+        for n in names:
+            t = np.array([truth[n][k][0] if truth[n][k][0] is not None else -1 for k in keys])
+            p = np.array([P[n][k] for k in keys])
+            acc.append(np.argmax(p) == np.argmax(t)); reg.append(t.max() - t[np.argmax(p)])
+        for k, v in (("worst R2", min(r2s)), ("mean R2", float(np.mean(r2s))),
+                     ("tracking scale", float(np.nanmean(trk_scale))),
+                     ("tracking local", float(np.nanmean(trk_local))),
+                     ("choice acc", float(np.mean(acc))), ("choice regret", float(np.mean(reg)))):
+            per[base][k].append(v)
+    cols = ["worst R2", "mean R2", "tracking scale", "tracking local", "choice acc", "choice regret"]
+    out(f"{'model':14}" + "".join(f"{c:>22}" for c in cols))
+    for base, d in per.items():
+        out(f"{base:14}" + "".join(f"{stats(d[c]):>22}" for c in cols))
     (RESULTS / "report.md").write_text("\n".join(lines) + "\n")
     print("\nwrote", RESULTS / "report.md")
 

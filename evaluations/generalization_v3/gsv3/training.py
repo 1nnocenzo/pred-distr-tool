@@ -53,6 +53,107 @@ TRAIN_PROTOCOL: dict[str, Any] = {
 }
 
 
+def count_loss(model, batch) -> tuple[torch.Tensor, float]:
+    """v8: predicted native-operation counts vs the compiled circuits' true ones.
+
+    ``batch.counts`` is ``(n_circuits, n_devices, 3)`` = true (1q ``r``, ``measure``,
+    ``cz``) per circuit and device (``-1`` where unknown); ``model.last_counts`` is the
+    sum over the gates of the count head's ``n_k``.  MSE on ``log1p`` over the known
+    entries; also returns the mean absolute relative error of the 2q count.
+    """
+    pred, true = model.last_counts, batch.counts.view_as(model.last_counts)
+    known = true >= 0
+    err = (torch.log1p(pred) - torch.log1p(true.clamp(min=0))) ** 2
+    loss = (err * known).sum() / known.sum().clamp(min=1)
+    k2 = known[..., 2] & (true[..., 2] > 0)
+    rel2 = ((pred[..., 2] - true[..., 2]).abs() / true[..., 2].clamp(min=1))[k2].mean() if k2.any() else pred.new_tensor(0.0)
+    return loss, rel2.item()
+
+
+def layout_loss(model, batch) -> tuple[torch.Tensor, torch.Tensor]:
+    """v6: cross-entropy of the Sinkhorn placement vs the compiler's initial layout.
+
+    ``batch.layout`` is ``(n_qubits, n_devices)`` per circuit: the device-graph node
+    the compiler put each logical qubit on, ``-1`` where unknown (those qubits are
+    left out).  Returns ``(mean -log A[q, layout[q]], fraction of qubits whose argmax
+    is the compiler's node)``, both over the known (qubit, device) pairs.
+    """
+    from torch_geometric.utils import to_dense_batch
+
+    assign, q_mask = model.last_assign, model.last_q_mask      # (B, D, Qm, P), (B, Qm)
+    n_q = batch.n_qubits.view(-1).long()
+    q_batch = torch.repeat_interleave(torch.arange(n_q.numel(), device=n_q.device), n_q)
+    target, _ = to_dense_batch(batch.layout, q_batch, fill_value=-1,
+                               max_num_nodes=assign.size(2))    # (B, Qm, D)
+    target = target.permute(0, 2, 1)                            # (B, D, Qm)
+    known = (target >= 0) & q_mask.unsqueeze(1)
+    picked = assign.gather(-1, target.clamp(min=0).unsqueeze(-1)).squeeze(-1)
+    ce = -torch.log(picked.clamp_min(1e-9))
+    n = known.sum().clamp(min=1)
+    acc = ((assign.argmax(-1) == target) & known).sum() / n
+    return (ce * known).sum() / n, acc
+
+
+def region_distance_loss(model, batch) -> tuple[torch.Tensor, dict[str, float]]:
+    """v7: supervise the parts of the compiler's layout that do not depend on the family.
+
+    * **region**: occupancy of each physical qubit, ``u_p = Σ_q A[q, p]`` (in [0, 1]),
+      vs whether the compiler put any logical qubit on it (binary cross-entropy over
+      the device's qubits);
+    * **distance**: the model's expected chip distance between the operands of every
+      multi-qubit gate (``model.last_dist``, the input of its count head) vs the hop
+      distance between the qubits the compiler put them on (MSE on ``log1p``).
+
+    Circuits without a known layout (``batch.layout`` = -1) are left out.  Returns
+    ``(region_bce + distance_mse, {"region_bce", "dist_mse", "region_overlap"})``.
+    """
+    from torch_geometric.utils import to_dense_batch
+
+    assign, q_mask = model.last_assign, model.last_q_mask         # (B, D, Qm, P), (B, Qm)
+    col_mask = model.last_col_mask                                # (D, P)
+    n_dev, p_max = col_mask.shape
+    n_q = batch.n_qubits.view(-1).long()
+    n_circ = n_q.numel()
+    q_batch = torch.repeat_interleave(torch.arange(n_circ, device=n_q.device), n_q)
+    target, _ = to_dense_batch(batch.layout, q_batch, fill_value=-1,
+                               max_num_nodes=assign.size(2))      # (B, Qm, D)
+    known_q = (target >= 0) & q_mask.unsqueeze(-1)
+    known_c = (known_q | ~q_mask.unsqueeze(-1)).all(1)            # (B, D): every qubit known
+
+    # Region: which physical qubits the compiler used.
+    used = torch.zeros(n_circ, n_dev, p_max + 1, device=assign.device)
+    idx = torch.where(known_q, target, torch.full_like(target, p_max)).permute(0, 2, 1)  # (B, D, Qm)
+    used.scatter_(2, idx, 1.0)
+    used = used[..., :p_max]
+    occ = assign.sum(2).clamp(1e-6, 1 - 1e-6)                     # (B, D, P)
+    cell = (known_c.unsqueeze(-1) & col_mask.unsqueeze(0)).float()
+    bce = -(used * occ.log() + (1 - used) * (1 - occ).log())
+    region = (bce * cell).sum() / cell.sum().clamp(min=1)
+    overlap = (torch.minimum(occ, used) * cell).sum() / (used * cell).sum().clamp(min=1)
+
+    # Distance between interacting qubits under the compiler's layout.
+    offsets = torch.cumsum(n_q, 0) - n_q
+    gq = batch.gate_qubits
+    valid = gq >= 0
+    glob = torch.where(valid, gq + offsets[batch.batch].unsqueeze(1), torch.zeros_like(gq))
+    hops = model.hops[:, :p_max, :p_max]
+    dev = torch.arange(n_dev, device=gq.device).view(1, -1)
+    true_d = torch.zeros(gq.size(0), n_dev, device=assign.device)
+    n_pairs = torch.zeros(gq.size(0), n_dev, device=assign.device)
+    for a, b in ((0, 1), (0, 2), (1, 2)):
+        la, lb = batch.layout[glob[:, a]], batch.layout[glob[:, b]]      # (G, D)
+        ok = (valid[:, a] & valid[:, b]).unsqueeze(1) & (la >= 0) & (lb >= 0)
+        h = hops[dev, la.clamp(min=0), lb.clamp(min=0)]
+        true_d = true_d + ok * h
+        n_pairs = n_pairs + ok
+    gate_ok = n_pairs > 0
+    true_d = true_d / n_pairs.clamp(min=1)
+    err = (torch.log1p(model.last_dist) - torch.log1p(true_d)) ** 2
+    dist = (err * gate_ok).sum() / gate_ok.sum().clamp(min=1)
+    return region + dist, {"region_bce": region.item(), "dist_mse": dist.item(),
+                           "region_overlap": overlap.item()}
+
+
 @torch.no_grad()
 def predict(model, graphs, devices, *, batch_size: int, device: torch.device,
             eps: float) -> tuple[np.ndarray, np.ndarray, float]:
@@ -113,6 +214,12 @@ def train_model(
     # returned as the final model, no early stopping) and, for Sinkhorn models, a
     # temperature annealed from ``tau_start`` to the model's ``sinkhorn_tau``.
     budget = int(protocol.get("epoch_budget", 0) or 0)
+    # v6 (opt-in): weight of the layout cross-entropy; needs ``layout`` on the graphs.
+    layout_lambda = float(protocol.get("layout_lambda", 0) or 0)
+    # v7 (opt-in): "region_dist" = region + distance loss instead of v6's exact-layout CE.
+    layout_kind = protocol.get("layout_loss", "assign")
+    # v8 (opt-in): weight of the count loss; needs ``counts`` on the graphs.
+    count_lambda = float(protocol.get("count_lambda", 0) or 0)
     swa_state, swa_n = None, 0
     tau_end = getattr(model, "tau", None)
 
@@ -153,6 +260,9 @@ def train_model(
                 model.tau = float(protocol["tau_start"] * (tau_end / protocol["tau_start"]) ** anneal)
         model.train()
         running, seen, max_grad = 0.0, 0, 0.0
+        lay_ce, lay_acc, lay_n = 0.0, 0.0, 0
+        v7_stats: dict[str, float] = {}
+        cnt_loss, cnt_rel2, cnt_n = 0.0, 0.0, 0
         for batch in loader:
             batch = batch.to(device)
             log_pred = model(batch, devices)
@@ -161,13 +271,28 @@ def train_model(
             if protocol.get("loss_kind", "log") == "mixed":
                 fid = torch.exp(torch.clamp(log_pred, max=0.0))
                 loss = torch.mean((fid - y) ** 2) + protocol["mix_lambda"] * loss
+            fid_loss = loss.item()        # logged as train_log_mse (without the layout term)
+            if layout_lambda and layout_kind == "region_dist":
+                aux, stats = region_distance_loss(model, batch)
+                loss = loss + layout_lambda * aux
+                for k, v in stats.items():
+                    v7_stats[k] = v7_stats.get(k, 0.0) + v
+                lay_n += 1
+            elif layout_lambda:
+                ce, acc = layout_loss(model, batch)
+                loss = loss + layout_lambda * ce
+                lay_ce, lay_acc, lay_n = lay_ce + float(ce), lay_acc + float(acc), lay_n + 1
+            if count_lambda:
+                closs, rel2 = count_loss(model, batch)
+                loss = loss + count_lambda * closs
+                cnt_loss, cnt_rel2, cnt_n = cnt_loss + closs.item(), cnt_rel2 + rel2, cnt_n + 1
             optimizer.zero_grad()
             loss.backward()
             if protocol["grad_clip"]:
                 norm = torch.nn.utils.clip_grad_norm_(model.parameters(), protocol["grad_clip"])
                 max_grad = max(max_grad, float(norm))
             optimizer.step()
-            running += loss.item() * log_pred.size(0)
+            running += fid_loss * log_pred.size(0)
             seen += log_pred.size(0)
         train_loss = running / max(1, seen)
 
@@ -176,6 +301,22 @@ def train_model(
         val_mse = float(np.mean((val_pred - val_true) ** 2))
         history.append({"epoch": epoch, "train_log_mse": train_loss, "val_log_mse": val_loss,
                         "val_mse": val_mse, "max_grad_norm": max_grad})
+        if count_lambda:
+            history[-1]["train_count_mse"] = cnt_loss / max(1, cnt_n)
+            history[-1]["train_count_rel_err_2q"] = cnt_rel2 / max(1, cnt_n)
+            logger.info("[%s] epoch %04d  count_mse=%.4f  count_rel_err_2q=%.3f", tag, epoch,
+                        history[-1]["train_count_mse"], history[-1]["train_count_rel_err_2q"])
+        if layout_lambda and layout_kind == "region_dist":
+            for k, v in v7_stats.items():
+                history[-1][f"train_{k}"] = v / max(1, lay_n)
+            logger.info("[%s] epoch %04d  region_bce=%.4f  dist_mse=%.4f  region_overlap=%.3f", tag,
+                        epoch, history[-1]["train_region_bce"], history[-1]["train_dist_mse"],
+                        history[-1]["train_region_overlap"])
+        elif layout_lambda:
+            history[-1]["train_layout_ce"] = lay_ce / max(1, lay_n)
+            history[-1]["train_layout_acc"] = lay_acc / max(1, lay_n)
+            logger.info("[%s] epoch %04d  layout_ce=%.4f  layout_acc=%.3f", tag, epoch,
+                        history[-1]["train_layout_ce"], history[-1]["train_layout_acc"])
 
         if budget:
             history[-1]["lr"] = optimizer.param_groups[0]["lr"]

@@ -61,7 +61,7 @@ XATTN_DEFAULTS: dict[str, Any] = {
     "cost_bias_init": -6.0,   # softplus(-6) ≈ 2.5e-3 per gate at initialisation
 }
 
-MODEL_KINDS = ("pooled", "xattn", "phys", "sinkhorn")
+MODEL_KINDS = ("pooled", "xattn", "phys", "sinkhorn", "phys_uniform")
 
 
 def load_hparams(params_path: Path | str | None = None) -> dict[str, Any]:
@@ -227,8 +227,12 @@ class PhysicsHeadPredictor(QubitCrossAttentionPredictor):
 
     N_KINDS = 3  # 1q, readout, 2q — order of devices.phys
 
-    def __init__(self, params: dict[str, Any], dev_node_dim: int, dev_edge_dim: int) -> None:
+    def __init__(self, params: dict[str, Any], dev_node_dim: int, dev_edge_dim: int,
+                 uniform_attention: bool = False) -> None:
         super().__init__(params, dev_node_dim, dev_edge_dim)
+        # ``phys_uniform`` (diagnostic): no placement at all — every logical qubit
+        # attends uniformly to the device's qubits, in the errors and in the context.
+        self.uniform_attention = uniform_attention
         d = params["fusion_dim"]
         layers: list[nn.Module] = []
         last = 5 * d
@@ -249,9 +253,16 @@ class PhysicsHeadPredictor(QubitCrossAttentionPredictor):
         n_dev = phys.size(0)
 
         query = q.unsqueeze(0).expand(n_dev, -1, -1)
-        ctx, attn = self.attn(query, phys, phys, key_padding_mask=~mask,
-                              need_weights=True, average_attn_weights=True)
-        ctx = ctx.transpose(0, 1)                                   # (Q, D, d)
+        if self.uniform_attention:
+            d = phys.size(-1)
+            attn = mask.float().unsqueeze(1).expand(-1, q.size(0), -1) / mask.sum(1).view(-1, 1, 1)
+            v = F.linear(phys, self.attn.in_proj_weight[2 * d:], self.attn.in_proj_bias[2 * d:])
+            v_mean = (v * mask.unsqueeze(-1)).sum(1) / mask.sum(1, keepdim=True)        # (D, d)
+            ctx = self.attn.out_proj(v_mean).unsqueeze(0).expand(q.size(0), -1, -1)    # (Q, D, d)
+        else:
+            ctx, attn = self.attn(query, phys, phys, key_padding_mask=~mask,
+                                  need_weights=True, average_attn_weights=True)
+            ctx = ctx.transpose(0, 1)                               # (Q, D, d)
         eps_dense, _ = to_dense_batch(devices.phys, devices.batch)  # (D, P, 3)
         q_eps = torch.einsum("dqp,dpk->qdk", attn, eps_dense)       # (Q, D, 3)
 
@@ -272,6 +283,8 @@ class PhysicsHeadPredictor(QubitCrossAttentionPredictor):
         n_ops = F.softplus(self.cost(z))                            # (G, D, 3)
         cost = (n_ops * g_eps * self.log_scale.exp()).sum(-1)        # (G, D)
         n_circ = circuits.n_qubits.view(-1).size(0)
+        # v8: predicted native-operation counts per circuit (B, D, 3), for the count loss.
+        self.last_counts = scatter(n_ops, circuits.batch, dim=0, dim_size=n_circ, reduce="sum")
         return -scatter(cost, circuits.batch, dim=0, dim_size=n_circ, reduce="sum")
 
 
@@ -309,6 +322,13 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
     distance* between its operands, ``A_a^T H A_b`` (``H`` = hop distances on the
     coupling map, raw device structure), and, as in v4, the placement-weighted
     calibrated errors.  ``log F = -Σ_g Σ_k s_k n_k ε_k`` is unchanged.
+
+    v6 uses the same network and adds, in training only, a cross-entropy between
+    ``A`` and the initial layout the compiler chose (``training.layout_loss``), so
+    that the placement becomes "where the compiler will put the qubits".  v7 keeps
+    the network too but supervises only family-agnostic properties of that layout:
+    which physical qubits are used and how far apart interacting qubits are
+    (``training.region_distance_loss``).
     """
 
     def __init__(self, params: dict[str, Any], dev_node_dim: int, dev_edge_dim: int,
@@ -380,6 +400,8 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         scores = torch.einsum("bqk,dpk->bdqp", self.w_q(q_dense), self.w_p(phys))
         scores = scores / phys.size(-1) ** 0.5
         assign = self._sinkhorn(scores, n_q, mask.sum(1))           # (B, D, Qm, P)
+        # Kept for the v6 layout loss (training.layout_loss); not used by the head.
+        self.last_assign, self.last_q_mask = assign, q_mask
 
         ctx = torch.einsum("bdqp,dpk->bdqk", assign, phys)           # (B, D, Qm, d)
         eps_dense, _ = to_dense_batch(devices.phys, devices.batch)   # (D, P, 3)
@@ -407,6 +429,8 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
             dist = dist + m * d_ab
             n_pairs = n_pairs + m
         dist = dist / n_pairs.clamp(min=1)                           # (G, D)
+        # Kept for the v7 layout loss (expected operand distance per gate, column mask).
+        self.last_dist, self.last_col_mask = dist, mask
 
         g_e = g.unsqueeze(1).expand(-1, n_dev, -1)
         d_e = dev_glob.unsqueeze(0).expand(g.size(0), -1, -1)
@@ -414,6 +438,7 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
                        dist.unsqueeze(-1), torch.log1p(dist).unsqueeze(-1)], dim=-1)
         n_ops = F.softplus(self.cost(z))                             # (G, D, 3)
         cost = (n_ops * g_eps * self.log_scale.exp()).sum(-1)
+        self.last_counts = scatter(n_ops, gb, dim=0, dim_size=n_circ, reduce="sum")   # v8
         return -scatter(cost, gb, dim=0, dim_size=n_circ, reduce="sum")
 
 
@@ -424,6 +449,11 @@ def build_model(kind: str, params: dict[str, Any], devices, device: torch.device
         return SinkhornPlacementPredictor(
             params, dev_node_dim=devices.x.size(1), dev_edge_dim=devices.edge_attr.size(1),
             devices=devices.clone().cpu(),   # clone: PyG .cpu() moves the batch in place
+        ).to(device)
+    if kind == "phys_uniform":
+        return PhysicsHeadPredictor(
+            params, dev_node_dim=devices.x.size(1), dev_edge_dim=devices.edge_attr.size(1),
+            uniform_attention=True,
         ).to(device)
     if kind in ("xattn", "phys"):
         cls = QubitCrossAttentionPredictor if kind == "xattn" else PhysicsHeadPredictor

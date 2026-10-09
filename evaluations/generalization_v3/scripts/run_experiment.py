@@ -89,6 +89,29 @@ def attach_counts(dataset, path: Path) -> None:
     logger.info("Compiler counts (%s): %d/%d circuits", path, found, len(dataset.data))
 
 
+def attach_calib_aug(dataset, directory: Path) -> None:
+    """v8b: per-variant labels ``y_aug`` (1, A, D), layouts ``layout_aug`` (n, A, D) and
+    counts ``counts_aug`` (1, A, D, 3) from ``v8b_labels.pt``; ``-1`` where missing."""
+    import torch
+    labels = torch.load(Path(directory) / "v8b_labels.pt", weights_only=False)
+    n_aug = next(iter(labels.values()))["F"].shape[0]
+    n_dev, found = len(DEVICE_NAMES), 0
+    for d, name in zip(dataset.data, dataset.names):
+        n = int(d.n_qubits)
+        r = labels.get(name)
+        if r is not None and r["layout"].shape[0] == n:
+            d.y_aug = r["F"].unsqueeze(0).float()
+            d.layout_aug = r["layout"].long()
+            d.counts_aug = r["counts"].unsqueeze(0).float()
+            found += 1
+        else:
+            d.y_aug = torch.full((1, n_aug, n_dev), -1.0)
+            d.layout_aug = torch.full((n, n_aug, n_dev), -1, dtype=torch.long)
+            d.counts_aug = torch.full((1, n_aug, n_dev, 3), -1.0)
+    logger.info("Calibration variants (%s): %d variant sets, %d/%d circuits",
+                directory, n_aug, found, len(dataset.data))
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0],
                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -132,6 +155,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="v8: weight of the loss on the predicted native-operation counts (needs --counts-path).")
     p.add_argument("--counts-path", type=Path, default=None,
                    help="compiler_counts.pt from evaluations/compile_check/compile_layouts.py counts.")
+    p.add_argument("--calib-aug", type=Path, default=None,
+                   help="v8b: directory with v8b_labels.pt and variants_raw.json (calibration "
+                        "variants compiled by evaluations/compile_check/v8b_variants.py).")
+    p.add_argument("--aug-p-orig", type=float, default=None,
+                   help="v8b: probability that a batch uses the original calibration (default 0.25).")
     p.add_argument("--layouts-path", type=Path, default=None,
                    help="compiler_layouts.pt from evaluations/compile_check/compile_layouts.py merge.")
     p.add_argument("--select-metric", choices=["mse", "log_mse"],
@@ -162,7 +190,8 @@ def main() -> int:
                 "mix_lambda": args.mix_lambda}
     # Opt-in v5b keys: only present when requested, so older configurations (and
     # their checkpoints) are unchanged.
-    for key in ("epoch_budget", "swa_frac", "tau_start", "layout_lambda", "layout_loss", "count_lambda"):
+    for key in ("epoch_budget", "swa_frac", "tau_start", "layout_lambda", "layout_loss", "count_lambda",
+                "aug_p_orig"):
         if getattr(args, key) is not None:
             protocol[key] = getattr(args, key)
     if args.model == "v1":
@@ -185,6 +214,9 @@ def main() -> int:
         if args.model != "sinkhorn" or args.layouts_path is None:
             raise SystemExit("--layout-lambda needs --model sinkhorn and --layouts-path")
         attach_layouts(dataset, args.layouts_path)
+    if args.calib_aug is not None:
+        protocol["calib_aug"] = str(args.calib_aug)
+        attach_calib_aug(dataset, args.calib_aug)
     if args.count_lambda:
         if args.model not in ("sinkhorn", "phys", "phys_uniform") or args.counts_path is None:
             raise SystemExit("--count-lambda needs a physics-head model and --counts-path")

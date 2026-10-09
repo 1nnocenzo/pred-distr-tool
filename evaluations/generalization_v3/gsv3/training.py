@@ -220,6 +220,22 @@ def train_model(
     layout_kind = protocol.get("layout_loss", "assign")
     # v8 (opt-in): weight of the count loss; needs ``counts`` on the graphs.
     count_lambda = float(protocol.get("count_lambda", 0) or 0)
+    # v8b (opt-in): calibration augmentation.  Each training batch uses the original
+    # calibration with probability ``aug_p_orig``, otherwise one of the variants in
+    # ``calib_aug`` (device graphs + per-variant labels / layouts / counts on the graphs).
+    aug_devices = None
+    if protocol.get("calib_aug"):
+        import json as _json
+        from .devices import variant_batch
+        raw = _json.loads((Path(protocol["calib_aug"]) / "variants_raw.json").read_text())
+        names = ("EQE1_Top", "EQE1_Bottom", "QExa20")   # = genstudy.data.DEVICE_NAMES
+        n_aug = len(raw) // len(names)
+        aug_devices = [variant_batch(raw, [f"{d}/aug{j}" for d in names], params["lap_pe"]).to(device)
+                       for j in range(n_aug)]
+        aug_rng = np.random.default_rng(seed + 1)
+        p_orig = float(protocol.get("aug_p_orig", 0.25))
+        logger.info("[%s] calibration augmentation: %d variant sets, p(orig) = %.2f",
+                    tag, n_aug, p_orig)
     swa_state, swa_n = None, 0
     tau_end = getattr(model, "tau", None)
 
@@ -265,12 +281,22 @@ def train_model(
         cnt_loss, cnt_rel2, cnt_n = 0.0, 0.0, 0
         for batch in loader:
             batch = batch.to(device)
-            log_pred = model(batch, devices)
+            batch_devices = devices
+            if aug_devices is not None and aug_rng.random() >= p_orig:
+                j = int(aug_rng.integers(len(aug_devices)))
+                batch_devices = aug_devices[j]
+                batch.y = batch.y_aug[:, j]
+                batch.layout = batch.layout_aug[:, j]
+                batch.counts = batch.counts_aug[:, j]
+            log_pred = model(batch, batch_devices)
             y = batch.y.float().view(log_pred.shape)
-            loss = torch.mean((log_pred - log_target(y, eps)) ** 2)
+            w = (y >= 0).float()            # v8b: circuits without a label on this variant
+            n_w = w.sum().clamp(min=1)
+            y = y.clamp(min=0)
+            loss = (w * (log_pred - log_target(y, eps)) ** 2).sum() / n_w
             if protocol.get("loss_kind", "log") == "mixed":
                 fid = torch.exp(torch.clamp(log_pred, max=0.0))
-                loss = torch.mean((fid - y) ** 2) + protocol["mix_lambda"] * loss
+                loss = (w * (fid - y) ** 2).sum() / n_w + protocol["mix_lambda"] * loss
             fid_loss = loss.item()        # logged as train_log_mse (without the layout term)
             if layout_lambda and layout_kind == "region_dist":
                 aux, stats = region_distance_loss(model, batch)

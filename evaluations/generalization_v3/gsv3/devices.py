@@ -73,3 +73,35 @@ def load_devices(path: Path, device_names: tuple[str, ...], lap_pe: int = 0,
     logger.info("Device graphs: node features %d (Laplacian PE %d), physical errors %s",
                 graphs[0].x.size(1), lap_pe, physical_errors)
     return Batch.from_data_list(graphs)
+
+
+def variant_batch(raw_variants: dict, keys: list[str], lap_pe: int, path: Path | None = None) -> Batch:
+    """Device graphs of calibration variants, standardised like the training graphs.
+
+    ``raw_variants[key]`` = ``{"nodes", "edges", "edge_feats"}`` as written by
+    ``gsv2.devices._backend_graph`` (same coupling map as the original device, only the
+    errors differ).  Node/edge features are standardised with the statistics of the
+    three ORIGINAL devices, exactly as at training time (v8b calibration augmentation).
+    """
+    from torch_geometric.data import Data
+    path = path or paths.V2_DEVICE_GRAPHS
+    orig = torch.load(path, weights_only=False)["raw"]
+    all_nodes = torch.tensor([r for v in orig.values() for r in v["nodes"]])
+    all_edges = torch.tensor([e for v in orig.values() for e in v["edge_feats"]]).unsqueeze(1)
+    n_mean, n_std = all_nodes.mean(0), all_nodes.std(0).clamp_min(1e-8)
+    e_mean, e_std = all_edges.mean(0), all_edges.std(0).clamp_min(1e-8)
+    graphs = []
+    for k in keys:
+        r = raw_variants[k]
+        x = (torch.tensor(r["nodes"]) - n_mean) / n_std
+        ea = ((torch.tensor(r["edge_feats"]).unsqueeze(1) - e_mean) / e_std).float()
+        src = [a for a, b in r["edges"]] + [b for a, b in r["edges"]]
+        dst = [b for a, b in r["edges"]] + [a for a, b in r["edges"]]
+        g = Data(x=x.float(), edge_index=torch.tensor([src, dst], dtype=torch.long),
+                 edge_attr=torch.cat([ea, ea]))
+        if lap_pe > 0:
+            g.x = torch.cat([g.x, _laplacian_pe(g.num_nodes, g.edge_index, lap_pe)], dim=1)
+        g.phys = _physical_errors({"nodes": r["nodes"], "edges": [tuple(e) for e in r["edges"]],
+                                   "edge_feats": r["edge_feats"]})
+        graphs.append(g)
+    return Batch.from_data_list(graphs)

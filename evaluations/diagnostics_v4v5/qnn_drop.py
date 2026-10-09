@@ -17,7 +17,10 @@ runs = {"v4_phys": ("v4_phys", "phys", EVAL / "generalization_v4/results/v4_phys
         "v5": ("v5_sinkhorn", "sinkhorn", EVAL / "generalization_v5/results/v5_sinkhorn"),
         "phys_uniform": ("v4_phys", "phys_uniform", EVAL / "generalization_v6/results/v4u_phys"),
         "v7_l001": ("v5_sinkhorn", "sinkhorn", EVAL / "generalization_v7/results/v7_l001"),
-        "v7_l01": ("v5_sinkhorn", "sinkhorn", EVAL / "generalization_v7/results/v7_l01")}
+        "v7_l01": ("v5_sinkhorn", "sinkhorn", EVAL / "generalization_v7/results/v7_l01"),
+        "v8a_s5": ("v5_sinkhorn", "sinkhorn", EVAL / "generalization_v8/results/v8a_c001"),
+        "v8a_s6": ("v5_sinkhorn", "sinkhorn", EVAL / "generalization_v8/results/v8a_c001_s6"),
+        "v8a_s7": ("v5_sinkhorn", "sinkhorn", EVAL / "generalization_v8/results/v8a_c001_s7")}
 bands = [(lo, hi) for lo, hi in ((2, 4), (5, 7), (8, 10), (11, 14), (15, 20)) if ((nq >= lo) & (nq <= hi)).any()]
 print(f"qnn test: {len(names)} circuits, qubits {nq.min()}-{nq.max()}")
 for lo, hi in bands:
@@ -37,12 +40,18 @@ for label, (fwd, kind, root) in runs.items():
     else:
         parts, _ = D.parts_of(fwd, model, graphs, devices)
         F = D.fid(parts)
+        cnt = []
+        with torch.no_grad():
+            for b in DataLoader(graphs, batch_size=16):
+                model(b, devices); cnt.append(model.last_counts)
+        cnt = torch.cat(cnt).numpy()
     print(f"\n{label:13} R2 {D.r2(F.ravel(), T.ravel()):.3f}  bias {np.mean(F - T):+.3f}  MAE {np.abs(F - T).mean():.3f}")
     for lo, hi in bands:
         s = (nq >= lo) & (nq <= hi)
         line = f"  q{lo}-{hi:<3} R2 {D.r2(F[s].ravel(), T[s].ravel()):6.3f} bias {np.mean(F[s] - T[s]):+.3f}"
         if parts is not None:
             line += "  parts 1q/meas/2q " + "/".join(f"{parts[s][..., k].mean():.3f}" for k in range(3))
+            line += "  counts r/meas/cz " + "/".join(f"{cnt[s][..., k].mean():.0f}" for k in range(3))
         print(line)
     if kind == "sinkhorn":
         gs = []

@@ -1,0 +1,651 @@
+"""Predictors of the v3 study.
+
+``pooled``  the v2 ``DeviceAwarePredictor`` (imported unchanged from ``gsv2``), used
+            to measure the effect of the stabilised training alone.
+
+``xattn``   :class:`QubitCrossAttentionPredictor`, end-to-end from the raw circuit
+            and the raw device description::
+
+    gate DAG ──GraphConvolutionSage (node level)──► gate embeddings g
+                     │ scatter over each gate's operand qubits
+                     ▼
+    logical qubits ──GINE over the interaction graph (edges = multi-qubit gates)──► q
+                     │ cross-attention (queries q, keys/values = physical qubits)
+                     ▼
+    device d ──GINE over the coupling map (+ Laplacian PE)──► physical qubits p_d
+                     │
+    per gate g, per device d:  cost(g, d) = softplus(MLP[g, ctx_mean, ctx_range, d̄, g·ctx_mean]) ≥ 0
+                     ▼
+    log F(c, d) = − Σ_g cost(g, d)
+
+The cross-attention is a soft, learned layout: each logical qubit attends to the
+physical qubits of the device; the contexts of a gate's operands then tell the
+cost head where on the chip the gate lands (and so how far apart its qubits are,
+i.e. the routing it will need).  No compilation, routing estimate or other
+hand-made feature is used.  ``log F`` is a sum of non-negative per-gate terms,
+which keeps ``F <= 1`` by construction and mirrors the product form of the
+expected fidelity.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import torch
+from torch import nn
+from torch.nn import functional as F
+from torch_geometric.nn import GINEConv
+from torch_geometric.utils import scatter, to_dense_batch
+
+from . import paths
+
+paths.ensure_imports()
+
+from encoding import get_gnn_input_features  # noqa: E402  (src/model/encoding.py)
+from gnn import GraphConvolutionSage  # noqa: E402  (src/model/gnn.py)
+from gsv2.model import build_model as build_v2_model  # noqa: E402
+
+logger = logging.getLogger(__name__)
+
+#: Fixed (untuned) sizes of the v3 components; the circuit encoder keeps best_params.json.
+XATTN_DEFAULTS: dict[str, Any] = {
+    "device_hidden": 64,      # v2 pooled model only
+    "device_layers": 3,
+    "fusion_dim": 128,
+    "qubit_layers": 2,
+    "attn_heads": 4,
+    "lap_pe": 8,
+    "cost_bias_init": -6.0,   # softplus(-6) ≈ 2.5e-3 per gate at initialisation
+}
+
+MODEL_KINDS = ("pooled", "xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route")
+
+
+def load_hparams(params_path: Path | str | None = None) -> dict[str, Any]:
+    params_path = Path(params_path or paths.REPO_ROOT / "src" / "model" / "best_params.json")
+    with open(params_path) as handle:
+        params = json.load(handle)
+    merged = {**XATTN_DEFAULTS, **params}
+    logger.info("Hyper-parameters (%s + v3 defaults): %s", params_path, merged)
+    return merged
+
+
+class NodeSage(GraphConvolutionSage):
+    """``GraphConvolutionSage`` that returns node embeddings instead of a pooled vector."""
+
+    def forward(self, data) -> torch.Tensor:  # noqa: D401
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+        for i, conv in enumerate(self.convs):
+            if self.bidirectional:
+                x_new = self._apply_conv_bidir(conv, x, edge_index)
+            else:
+                x_new = conv(x, edge_index)
+            x_new = self.norms[i](x_new, batch=batch)
+            x_new = self.conv_activation(x_new, **self.conv_act_kwargs)
+            x_new = self.drop(x_new)
+            x = x_new if i < self._residual_start else x + x_new
+        return x
+
+
+def _gine(dim: int, edge_dim: int) -> GINEConv:
+    return GINEConv(nn.Sequential(nn.Linear(dim, dim), nn.LeakyReLU(), nn.Linear(dim, dim)),
+                    edge_dim=edge_dim)
+
+
+class QubitCrossAttentionPredictor(nn.Module):
+    """Returns ``log F`` of shape ``(B, n_devices)``; always ``<= 0``."""
+
+    def __init__(self, params: dict[str, Any], dev_node_dim: int, dev_edge_dim: int) -> None:
+        super().__init__()
+        d = params["fusion_dim"]
+        self.circuit_encoder = NodeSage(
+            in_feats=get_gnn_input_features(),
+            hidden_dim=params["hidden_dim"],
+            num_conv_wo_resnet=params["num_conv_wo_resnet"],
+            num_resnet_layers=params["num_resnet_layers"],
+            dropout_p=params["dropout"],
+            dropedge_p=0.0,
+            bidirectional=params["bidirectional"],
+            combine=params.get("combine", "sum"),
+            readout=params.get("readout", "meanmaxsum"),
+            conv_activation=F.leaky_relu,
+        )
+        self.gate_proj = nn.Linear(self.circuit_encoder.out_dim, d)
+
+        self.qubit_in = nn.Linear(2 * d, d)
+        self.qubit_convs = nn.ModuleList(_gine(d, d) for _ in range(params["qubit_layers"]))
+
+        self.dev_in = nn.Linear(dev_node_dim, d)
+        self.dev_convs = nn.ModuleList(
+            _gine(d, dev_edge_dim) for _ in range(params["device_layers"]))
+
+        self.attn = nn.MultiheadAttention(d, params["attn_heads"], batch_first=True)
+
+        layers: list[nn.Module] = []
+        last = 5 * d
+        for width in params["mlp"]:
+            layers += [nn.Linear(last, width), nn.LeakyReLU()]
+            last = width
+        out = nn.Linear(last, 1)
+        nn.init.constant_(out.bias, params["cost_bias_init"])
+        layers.append(out)
+        self.cost = nn.Sequential(*layers)
+
+    # -- circuit side ------------------------------------------------------
+
+    def _qubits(self, circuits, g: torch.Tensor):
+        """Logical-qubit embeddings ``(Q, d)`` and global operand indices ``(G, 3)``."""
+        n_q = circuits.n_qubits.view(-1).long()
+        offsets = torch.cumsum(n_q, 0) - n_q
+        gq = circuits.gate_qubits
+        valid = gq >= 0
+        gq_glob = torch.where(valid, gq + offsets[circuits.batch].unsqueeze(1), -1)
+        n_total = int(n_q.sum())
+
+        gate_ids = torch.arange(g.size(0), device=g.device).unsqueeze(1).expand_as(gq)
+        src_g, dst_q = gate_ids[valid], gq_glob[valid]
+        q_mean = scatter(g[src_g], dst_q, dim=0, dim_size=n_total, reduce="mean")
+        q_max = scatter(g[src_g], dst_q, dim=0, dim_size=n_total, reduce="max")
+        q = F.leaky_relu(self.qubit_in(torch.cat([q_mean, q_max], dim=-1)))
+
+        # Interaction graph: one edge per operand pair of every multi-qubit gate.
+        src, dst, eg = [], [], []
+        for a, b in ((0, 1), (0, 2), (1, 2)):
+            m = valid[:, a] & valid[:, b]
+            if m.any():
+                src += [gq_glob[m, a], gq_glob[m, b]]
+                dst += [gq_glob[m, b], gq_glob[m, a]]
+                ids = gate_ids[m, 0]
+                eg += [ids, ids]
+        if src:
+            edge_index = torch.stack([torch.cat(src), torch.cat(dst)])
+            edge_attr = g[torch.cat(eg)]
+            for conv in self.qubit_convs:
+                q = q + F.leaky_relu(conv(q, edge_index, edge_attr))
+        return q, gq_glob, valid
+
+    # -- device side -------------------------------------------------------
+
+    def _devices(self, devices):
+        x_in, e_in = devices.x, devices.edge_attr
+        if getattr(self, "relative_dev", False):
+            x_in, e_in = relative_device_features(devices)
+        x = F.leaky_relu(self.dev_in(x_in))
+        for conv in self.dev_convs:
+            x = x + F.leaky_relu(conv(x, devices.edge_index, e_in))
+        dense, mask = to_dense_batch(x, devices.batch)            # (D, P, d), (D, P)
+        glob = scatter(x, devices.batch, dim=0, reduce="mean")     # (D, d)
+        return dense, mask, glob
+
+    def forward(self, circuits, devices) -> torch.Tensor:
+        g = self.gate_proj(self.circuit_encoder(circuits))         # (G, d)
+        q, gq_glob, valid = self._qubits(circuits, g)              # (Q, d)
+        phys, mask, dev_glob = self._devices(devices)
+        n_dev = phys.size(0)
+
+        query = q.unsqueeze(0).expand(n_dev, -1, -1)               # (D, Q, d)
+        ctx, _ = self.attn(query, phys, phys, key_padding_mask=~mask, need_weights=False)
+        ctx = ctx.transpose(0, 1)                                  # (Q, D, d)
+
+        slots = ctx[gq_glob.clamp(min=0)]                          # (G, 3, D, d)
+        vmask = valid.unsqueeze(-1).unsqueeze(-1)
+        count = valid.sum(1).clamp(min=1).view(-1, 1, 1).float()
+        c_mean = (slots * vmask).sum(1) / count                    # (G, D, d)
+        c_max = slots.masked_fill(~vmask, -1e4).amax(1)
+        c_min = slots.masked_fill(~vmask, 1e4).amin(1)
+        c_range = torch.where(valid.sum(1).view(-1, 1, 1) > 1, c_max - c_min,
+                              torch.zeros_like(c_max))
+
+        g_e = g.unsqueeze(1).expand(-1, n_dev, -1)
+        d_e = dev_glob.unsqueeze(0).expand(g.size(0), -1, -1)
+        z = torch.cat([g_e, c_mean, c_range, d_e, g_e * c_mean], dim=-1)
+        cost = F.softplus(self.cost(z).squeeze(-1))                # (G, D)
+        n_circ = circuits.n_qubits.view(-1).size(0)
+        return -scatter(cost, circuits.batch, dim=0, dim_size=n_circ, reduce="sum")
+
+
+class PhysicsHeadPredictor(QubitCrossAttentionPredictor):
+    """v4 ``phys``: learned compilation counts × the device's calibrated errors.
+
+    The expected fidelity is ``Π_op (1 - e_op)`` over the operations of the
+    *compiled* circuit, i.e. ``log F = -Σ_op ε_op`` with ``ε = -log(1-e)``.  Instead
+    of a free per-gate cost, the head predicts for every gate and device how many
+    native operations it becomes — ``n_1q``, ``n_2q`` (routing SWAPs included) and
+    ``n_meas`` — and weights them with the calibrated errors of the physical
+    qubits the cross-attention places the gate's operands on::
+
+        cost(g, d) = Σ_k s_k · n_k(g, d) · ε̄_k(g, d)      k ∈ {1q, readout, 2q}
+
+    ``ε̄_k`` is the attention-weighted error of the operands' physical qubits
+    (``devices.phys``: 1q error, readout error, mean incident CZ error);
+    ``s_k = exp(log_scale_k)`` are three learned global factors (init 1) that absorb
+    the gap between the native gate set and the calibrated quantities.  The model
+    learns compilation (counts, placement); the error magnitudes come from the
+    device, so the prediction cannot drift to "large circuit ⇒ F ≈ 0" without
+    predicting the operations that would cause it.
+    """
+
+    N_KINDS = 3  # 1q, readout, 2q — order of devices.phys
+
+    def __init__(self, params: dict[str, Any], dev_node_dim: int, dev_edge_dim: int,
+                 uniform_attention: bool = False) -> None:
+        super().__init__(params, dev_node_dim, dev_edge_dim)
+        # ``phys_uniform`` (diagnostic): no placement at all — every logical qubit
+        # attends uniformly to the device's qubits, in the errors and in the context.
+        self.uniform_attention = uniform_attention
+        d = params["fusion_dim"]
+        layers: list[nn.Module] = []
+        last = 5 * d
+        for width in params["mlp"]:
+            layers += [nn.Linear(last, width), nn.LeakyReLU()]
+            last = width
+        out = nn.Linear(last, self.N_KINDS)
+        # softplus(0.5413) = 1: one native operation of each kind per gate at init.
+        nn.init.constant_(out.bias, 0.5413)
+        layers.append(out)
+        self.cost = nn.Sequential(*layers)
+        self.log_scale = nn.Parameter(torch.zeros(self.N_KINDS))
+
+    def forward(self, circuits, devices) -> torch.Tensor:
+        g = self.gate_proj(self.circuit_encoder(circuits))
+        q, gq_glob, valid = self._qubits(circuits, g)
+        phys, mask, dev_glob = self._devices(devices)
+        n_dev = phys.size(0)
+
+        query = q.unsqueeze(0).expand(n_dev, -1, -1)
+        if self.uniform_attention:
+            d = phys.size(-1)
+            attn = mask.float().unsqueeze(1).expand(-1, q.size(0), -1) / mask.sum(1).view(-1, 1, 1)
+            v = F.linear(phys, self.attn.in_proj_weight[2 * d:], self.attn.in_proj_bias[2 * d:])
+            v_mean = (v * mask.unsqueeze(-1)).sum(1) / mask.sum(1, keepdim=True)        # (D, d)
+            ctx = self.attn.out_proj(v_mean).unsqueeze(0).expand(q.size(0), -1, -1)    # (Q, D, d)
+        else:
+            ctx, attn = self.attn(query, phys, phys, key_padding_mask=~mask,
+                                  need_weights=True, average_attn_weights=True)
+            ctx = ctx.transpose(0, 1)                               # (Q, D, d)
+        eps_dense, _ = to_dense_batch(devices.phys, devices.batch)  # (D, P, 3)
+        q_eps = torch.einsum("dqp,dpk->qdk", attn, eps_dense)       # (Q, D, 3)
+
+        idx = gq_glob.clamp(min=0)
+        vmask = valid.unsqueeze(-1).unsqueeze(-1)
+        count = valid.sum(1).clamp(min=1).view(-1, 1, 1).float()
+        slots = ctx[idx]
+        c_mean = (slots * vmask).sum(1) / count
+        c_max = slots.masked_fill(~vmask, -1e4).amax(1)
+        c_min = slots.masked_fill(~vmask, 1e4).amin(1)
+        c_range = torch.where(valid.sum(1).view(-1, 1, 1) > 1, c_max - c_min,
+                              torch.zeros_like(c_max))
+        g_eps = (q_eps[idx] * vmask).sum(1) / count                  # (G, D, 3)
+
+        g_e = g.unsqueeze(1).expand(-1, n_dev, -1)
+        d_e = dev_glob.unsqueeze(0).expand(g.size(0), -1, -1)
+        z = torch.cat([g_e, c_mean, c_range, d_e, g_e * c_mean], dim=-1)
+        n_ops = F.softplus(self.cost(z))                            # (G, D, 3)
+        cost = (n_ops * g_eps * self.log_scale.exp()).sum(-1)        # (G, D)
+        n_circ = circuits.n_qubits.view(-1).size(0)
+        # v8: predicted native-operation counts per circuit (B, D, 3), for the count loss.
+        self.last_counts = scatter(n_ops, circuits.batch, dim=0, dim_size=n_circ, reduce="sum")
+        return -scatter(cost, circuits.batch, dim=0, dim_size=n_circ, reduce="sum")
+
+
+#: v5 placement knobs (read with ``params.get`` so that v3/v4 configurations, and
+#: therefore their checkpoints, are unchanged).
+SINKHORN_DEFAULTS: dict[str, Any] = {"sinkhorn_tau": 0.3, "sinkhorn_iters": 20}
+
+
+def _hop_distances(n: int, edge_index: torch.Tensor) -> torch.Tensor:
+    """All-pairs shortest-path length (in couplers) on one coupling map."""
+    inf = float(n + 1)
+    dist = torch.full((n, n), inf)
+    dist.fill_diagonal_(0.0)
+    dist[edge_index[0], edge_index[1]] = 1.0
+    for k in range(n):  # Floyd–Warshall; n <= 27
+        dist = torch.minimum(dist, dist[:, k:k + 1] + dist[k:k + 1, :])
+    return dist
+
+
+class SinkhornPlacementPredictor(PhysicsHeadPredictor):
+    """v5 ``sinkhorn``: the v4 physics head with a (soft) one-to-one placement.
+
+    In v4 every logical qubit attends to the physical qubits independently, so two
+    logical qubits may sit on the same physical qubit and the chip distance between
+    the operands of a two-qubit gate — what decides the routing SWAPs — is blurred.
+
+    v5 scores every (logical qubit, physical qubit) pair of a circuit on a device and
+    normalises the score matrix with Sinkhorn iterations (log domain, temperature
+    ``sinkhorn_tau``) until every logical qubit has total mass 1 and every physical
+    qubit at most 1 (unused physical qubits go to dummy rows): a differentiable
+    relaxation of a one-to-one layout.  It is a layer of the network, learned from
+    the fidelity targets; nothing is compiled.
+
+    With the placement ``A`` the head gets, for each gate, the *expected chip
+    distance* between its operands, ``A_a^T H A_b`` (``H`` = hop distances on the
+    coupling map, raw device structure), and, as in v4, the placement-weighted
+    calibrated errors.  ``log F = -Σ_g Σ_k s_k n_k ε_k`` is unchanged.
+
+    v6 uses the same network and adds, in training only, a cross-entropy between
+    ``A`` and the initial layout the compiler chose (``training.layout_loss``), so
+    that the placement becomes "where the compiler will put the qubits".  v7 keeps
+    the network too but supervises only family-agnostic properties of that layout:
+    which physical qubits are used and how far apart interacting qubits are
+    (``training.region_distance_loss``).
+    """
+
+    def __init__(self, params: dict[str, Any], dev_node_dim: int, dev_edge_dim: int,
+                 devices, routing_flag: bool = False, routing_est: bool = False) -> None:
+        super().__init__(params, dev_node_dim, dev_edge_dim)
+        d = params["fusion_dim"]
+        # ``sinkhorn_rf``: one more count-head input per (circuit, device), 1 if the circuit's
+        # interaction graph embeds in the device coupling graph (no routing SWAP needed).
+        self.routing_flag = routing_flag
+        self._rf_cache: dict = {}
+        # ``sinkhorn_rf_route`` (v8s): + a cheap routing-cost estimate per (circuit, device):
+        # greedy placement of the interaction graph on the coupling map, then
+        # log1p(Σ_pairs count · max(hops − 1, 0) / multi-qubit gates).
+        self.routing_est = routing_est
+        self._re_cache: dict = {}
+        self.tau = params.get("sinkhorn_tau", SINKHORN_DEFAULTS["sinkhorn_tau"])
+        self.iters = params.get("sinkhorn_iters", SINKHORN_DEFAULTS["sinkhorn_iters"])
+        self.w_q = nn.Linear(d, d)
+        self.w_p = nn.Linear(d, d)
+        self.dummy_score = nn.Parameter(torch.zeros(()))
+        # Count head: v4 inputs + [expected distance, log1p(expected distance)].
+        layers: list[nn.Module] = []
+        last = 5 * d + 2 + int(routing_flag) + int(routing_est)
+        for width in params["mlp"]:
+            layers += [nn.Linear(last, width), nn.LeakyReLU()]
+            last = width
+        out = nn.Linear(last, self.N_KINDS)
+        nn.init.constant_(out.bias, 0.5413)
+        layers.append(out)
+        self.cost = nn.Sequential(*layers)
+        # Hop-distance matrices of the (fixed) devices, padded to (D, P, P).
+        sizes = torch.bincount(devices.batch).tolist()
+        p_max, offset, mats = max(sizes), 0, []
+        for n in sizes:
+            sel = (devices.edge_index[0] >= offset) & (devices.edge_index[0] < offset + n)
+            h = _hop_distances(n, devices.edge_index[:, sel] - offset)
+            mats.append(F.pad(h, (0, p_max - n, 0, p_max - n)))
+            offset += n
+        self.register_buffer("hops", torch.stack(mats), persistent=False)
+
+    def _sinkhorn(self, scores: torch.Tensor, n_logical: torch.Tensor,
+                  n_phys: torch.Tensor) -> torch.Tensor:
+        """``scores`` (B, D, Qm, P) -> soft assignment (B, D, Qm, P) for real rows."""
+        b, n_dev, q_max, p_max = scores.shape
+        n_rows = p_max  # real rows + dummy rows, square per device
+        rows = torch.arange(n_rows, device=scores.device)
+        cols = torch.arange(p_max, device=scores.device)
+        real_row = rows.view(1, 1, -1) < n_logical.view(-1, 1, 1)               # (B, 1, R)
+        used_row = rows.view(1, 1, -1) < n_phys.view(1, -1, 1)                  # (1, D, R)
+        valid_col = cols.view(1, -1) < n_phys.view(-1, 1)                       # (D, P)
+        # Dummy rows (unused physical qubits) share one learned score.
+        dummy = self.dummy_score.expand(b, n_dev, n_rows - q_max, p_max)
+        head = torch.where(real_row[..., :q_max].unsqueeze(-1), scores,
+                           self.dummy_score.expand_as(scores))
+        full = torch.cat([head, dummy], dim=2)
+        mask = (used_row.unsqueeze(-1) & valid_col.view(1, n_dev, 1, p_max)
+                ).expand(b, -1, -1, -1)
+        # Masked cells get a large *finite* negative value: with -inf, logsumexp over an
+        # all-masked row/column yields NaN gradients even where torch.where discards it.
+        neg = torch.full_like(full, -1e4)
+        log_a = torch.where(mask, full / self.tau, neg)
+        for _ in range(self.iters):
+            log_a = torch.where(mask, log_a - torch.logsumexp(log_a, -1, keepdim=True), neg)
+            log_a = torch.where(mask, log_a - torch.logsumexp(log_a, -2, keepdim=True), neg)
+        assign = torch.exp(log_a) * mask
+        return assign[:, :, :q_max] * real_row[..., :q_max].unsqueeze(-1)
+
+    def forward(self, circuits, devices) -> torch.Tensor:
+        g = self.gate_proj(self.circuit_encoder(circuits))
+        q, gq_glob, valid = self._qubits(circuits, g)
+        phys, mask, dev_glob = self._devices(devices)                # (D, P, d)
+        n_dev, p_max = phys.size(0), phys.size(1)
+        n_q = circuits.n_qubits.view(-1).long()
+        n_circ = n_q.size(0)
+        q_batch = torch.repeat_interleave(torch.arange(n_circ, device=g.device), n_q)
+        q_dense, q_mask = to_dense_batch(q, q_batch)                 # (B, Qm, d)
+
+        scores = torch.einsum("bqk,dpk->bdqp", self.w_q(q_dense), self.w_p(phys))
+        scores = scores / phys.size(-1) ** 0.5
+        assign = self._sinkhorn(scores, n_q, mask.sum(1))           # (B, D, Qm, P)
+        # Kept for the v6 layout loss (training.layout_loss); not used by the head.
+        self.last_assign, self.last_q_mask = assign, q_mask
+
+        ctx = torch.einsum("bdqp,dpk->bdqk", assign, phys)           # (B, D, Qm, d)
+        eps_dense, _ = to_dense_batch(devices.phys, devices.batch)   # (D, P, 3)
+        q_eps = torch.einsum("bdqp,dpk->bdqk", assign, eps_dense)     # (B, D, Qm, 3)
+        a_h = torch.einsum("bdqp,dpr->bdqr", assign, self.hops[:, :p_max, :p_max])
+
+        gb = circuits.batch
+        local = circuits.gate_qubits.clamp(min=0)                    # (G, 3)
+        vmask = valid.unsqueeze(-1).unsqueeze(-1)                    # (G, 3, 1, 1)
+        count = valid.sum(1).clamp(min=1).view(-1, 1, 1).float()
+        slots = ctx[gb.unsqueeze(1), :, local]                       # (G, 3, D, d)
+        c_mean = (slots * vmask).sum(1) / count
+        c_max = slots.masked_fill(~vmask, -1e4).amax(1)
+        c_min = slots.masked_fill(~vmask, 1e4).amin(1)
+        multi = valid.sum(1).view(-1, 1, 1) > 1
+        c_range = torch.where(multi, c_max - c_min, torch.zeros_like(c_max))
+        g_eps = (q_eps[gb.unsqueeze(1), :, local] * vmask).sum(1) / count   # (G, D, 3)
+
+        # Expected chip distance between operand pairs (mean over the pairs).
+        dist = torch.zeros(g.size(0), n_dev, device=g.device)
+        n_pairs = torch.zeros(g.size(0), 1, device=g.device)
+        for a, b_ in ((0, 1), (0, 2), (1, 2)):
+            m = (valid[:, a] & valid[:, b_]).float().unsqueeze(-1)
+            d_ab = (a_h[gb, :, local[:, a]] * assign[gb, :, local[:, b_]]).sum(-1)
+            dist = dist + m * d_ab
+            n_pairs = n_pairs + m
+        dist = dist / n_pairs.clamp(min=1)                           # (G, D)
+        # Kept for the v7 layout loss (expected operand distance per gate, column mask).
+        self.last_dist, self.last_col_mask = dist, mask
+
+        g_e = g.unsqueeze(1).expand(-1, n_dev, -1)
+        d_e = dev_glob.unsqueeze(0).expand(g.size(0), -1, -1)
+        feats = [g_e, c_mean, c_range, d_e, g_e * c_mean,
+                 dist.unsqueeze(-1), torch.log1p(dist).unsqueeze(-1)]
+        if self.routing_flag:
+            rf = routing_free(circuits, devices, self._rf_cache).to(g.device)   # (B, D)
+            feats.append(rf[gb].unsqueeze(-1))
+        if self.routing_est:
+            re_ = routing_estimate(circuits, devices, self._re_cache).to(g.device)  # (B, D)
+            feats.append(re_[gb].unsqueeze(-1))
+        z = torch.cat(feats, dim=-1)
+        n_ops = F.softplus(self.cost(z))                             # (G, D, 3)
+        cost = (n_ops * g_eps * self.log_scale.exp()).sum(-1)
+        self.last_counts = scatter(n_ops, gb, dim=0, dim_size=n_circ, reduce="sum")   # v8
+        return -scatter(cost, gb, dim=0, dim_size=n_circ, reduce="sum")
+
+
+N_RELATIVE = 5   # per-device z-scores of the first 5 qubit features (1q err, readout, T1, T2, degree)
+
+
+def relative_device_features(devices):
+    """v9: append to each qubit its first ``N_RELATIVE`` features as z-scores WITHIN its own
+    device, and to each coupler its CZ error as a z-score within its device.  The compiler
+    picks qubits by relative quality ("the better ones of this chip"); relative features give
+    the same signal whatever the absolute calibration, so they should transfer to calibrations
+    the model has never seen.  Affine-invariant, so standardised inputs give the same values."""
+    b = devices.batch
+    x = devices.x[:, :N_RELATIVE]
+    mean = scatter(x, b, dim=0, reduce="mean")
+    std = (scatter((x - mean[b]) ** 2, b, dim=0, reduce="mean")).sqrt().clamp(min=1e-6)
+    xr = (x - mean[b]) / std[b]
+    eb = b[devices.edge_index[0]]
+    e = devices.edge_attr
+    emean = scatter(e, eb, dim=0, reduce="mean", dim_size=int(b.max()) + 1)
+    estd = (scatter((e - emean[eb]) ** 2, eb, dim=0, reduce="mean", dim_size=int(b.max()) + 1)).sqrt().clamp(min=1e-6)
+    er = (e - emean[eb]) / estd[eb]
+    return torch.cat([devices.x, xr], dim=1), torch.cat([e, er], dim=1)
+
+
+def _greedy_route_cost(pairs: dict, H, pdeg) -> float:
+    """Σ count · max(hops − 1, 0) of the interaction graph under a greedy placement."""
+    w: dict = {}
+    for (a, b), c in pairs.items():
+        w.setdefault(a, {})[b] = c
+        w.setdefault(b, {})[a] = c
+    pos, free = {}, set(range(len(pdeg)))
+    for q in sorted(w, key=lambda q: -sum(w[q].values())):
+        placed = [(pos[o], c) for o, c in w[q].items() if o in pos]
+        if not placed:
+            best = max(free, key=lambda p: pdeg[p])
+        else:
+            best = min(free, key=lambda p: (sum(c * H[p][po] for po, c in placed), -pdeg[p]))
+        pos[q] = best
+        free.discard(best)
+    return float(sum(c * max(H[pos[a]][pos[b]] - 1, 0) for (a, b), c in pairs.items()))
+
+
+def routing_estimate(circuits, devices, cache: dict | None = None) -> torch.Tensor:
+    """``(B, D)``: log1p(greedy routing cost / number of multi-qubit gates), cached by
+    (circuit name, coupling map).  Cost ≈ 0.5 ms per circuit for 3 topologies (Python)."""
+    n_q = circuits.n_qubits.view(-1).tolist()
+    gq = circuits.gate_qubits.cpu()
+    gb = circuits.batch.cpu()
+    names = getattr(circuits, "circuit_name", None)
+    ei = devices.edge_index.cpu()
+    sizes = torch.bincount(devices.batch.cpu()).tolist()
+    chips, offset = [], 0
+    for n in sizes:
+        sel = (ei[0] >= offset) & (ei[0] < offset + n)
+        edges = tuple(sorted({(min(a, b), max(a, b)) for a, b in (ei[:, sel] - offset).t().tolist()}))
+        offset += n
+        chips.append((n, edges))
+    tables = {}
+    out = torch.zeros(len(n_q), len(chips))
+    starts = torch.searchsorted(gb, torch.arange(len(n_q) + 1)).tolist()
+    for b in range(len(n_q)):
+        keys = [(names[b], c[1]) if names is not None else None for c in chips]
+        if cache is not None and all(k is not None and k in cache for k in keys):
+            out[b] = torch.tensor([cache[k] for k in keys])
+            continue
+        pairs: dict = {}
+        multi = 0
+        for row in gq[starts[b]: starts[b + 1]].tolist():
+            q = [x for x in row if x >= 0]
+            if len(q) > 1:
+                multi += 1
+            for i in range(len(q)):
+                for j in range(i + 1, len(q)):
+                    k = (min(q[i], q[j]), max(q[i], q[j]))
+                    pairs[k] = pairs.get(k, 0) + 1
+        for dd, (n, edges) in enumerate(chips):
+            if edges not in tables:
+                adj = [[] for _ in range(n)]
+                for a, c in edges:
+                    adj[a].append(c); adj[c].append(a)
+                H = []
+                for s0 in range(n):
+                    dist = [n + 1] * n; dist[s0] = 0; front = [s0]
+                    while front:
+                        nxt = []
+                        for u in front:
+                            for v in adj[u]:
+                                if dist[v] > dist[u] + 1:
+                                    dist[v] = dist[u] + 1; nxt.append(v)
+                        front = nxt
+                    H.append(dist)
+                tables[edges] = (H, [len(a) for a in adj])
+            val = 0.0
+            if pairs:
+                val = float(np.log1p(_greedy_route_cost(pairs, *tables[edges]) / max(multi, 1)))
+            out[b, dd] = val
+            if keys[dd] is not None and cache is not None:
+                cache[keys[dd]] = val
+    return out
+
+
+def routing_free(circuits, devices, cache: dict | None = None) -> torch.Tensor:
+    """``(B, D)``: 1 if circuit b needs no routing on device d, i.e. its interaction graph
+    (pairs of logical qubits sharing a gate) is a subgraph of the coupling graph — the
+    perfect layout Qiskit's VF2Layout looks for at level 2.  rustworkx VF2 with a call
+    limit (undecided -> 0).  Cached by (circuit name, coupling map) when names exist."""
+    import rustworkx as rx
+    n_q = circuits.n_qubits.view(-1).tolist()
+    gq = circuits.gate_qubits.cpu()
+    gb = circuits.batch.cpu()
+    names = getattr(circuits, "circuit_name", None)
+    if cache is not None and cache.get("_dev_id") == id(devices):
+        chips = cache["_chips"]
+    else:
+        chips = None
+    ei = devices.edge_index.cpu() if chips is None else None
+    if chips is None:
+        chips = []
+        sizes = torch.bincount(devices.batch.cpu()).tolist()
+        offset = 0
+        for n in sizes:
+            sel = (ei[0] >= offset) & (ei[0] < offset + n)
+            edges = tuple(sorted({(min(a, b), max(a, b)) for a, b in (ei[:, sel] - offset).t().tolist()}))
+            offset += n
+            chips.append(edges)
+        if cache is not None:
+            cache["_dev_id"], cache["_chips"] = id(devices), chips
+    chip_graphs = {}
+    out = torch.zeros(len(n_q), len(chips))
+    starts = torch.searchsorted(gb, torch.arange(len(n_q) + 1)).tolist()
+    for b in range(len(n_q)):
+        keys = [(names[b], edges) if names is not None else None for edges in chips]
+        if cache is not None and all(k is not None and k in cache for k in keys):
+            out[b] = torch.tensor([cache[k] for k in keys])
+            continue
+        pairs = set()
+        for row in gq[starts[b]: starts[b + 1]].tolist():
+            q = [x for x in row if x >= 0]
+            for i in range(len(q)):
+                for j in range(i + 1, len(q)):
+                    pairs.add((min(q[i], q[j]), max(q[i], q[j])))
+        for dd, edges in enumerate(chips):
+            key = keys[dd]
+            if key is not None and cache is not None and key in cache:
+                out[b, dd] = cache[key]
+                continue
+            if edges not in chip_graphs:
+                c = rx.PyGraph(); c.add_nodes_from(range(1 + max(max(e) for e in edges))); c.add_edges_from_no_data(list(edges))
+                chip_graphs[edges] = c
+            if not pairs:
+                val = 1.0
+            else:
+                used = sorted({q for p in pairs for q in p})
+                pos = {q: i for i, q in enumerate(used)}
+                g = rx.PyGraph(); g.add_nodes_from(range(len(used)))
+                g.add_edges_from_no_data([(pos[a], pos[c]) for a, c in pairs])
+                val = float(len(used) <= chip_graphs[edges].num_nodes() and rx.is_subgraph_isomorphic(
+                    chip_graphs[edges], g, id_order=False, induced=False, call_limit=20_000))
+            out[b, dd] = val
+            if key is not None and cache is not None:
+                cache[key] = val
+    return out
+
+
+def build_model(kind: str, params: dict[str, Any], devices, device: torch.device) -> nn.Module:
+    if kind == "pooled":
+        return build_v2_model(params, devices, device)
+    if kind in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route"):
+        rel = kind in ("sinkhorn_rf_rel", "sinkhorn_rf_rel_route")
+        model = SinkhornPlacementPredictor(
+            params, dev_node_dim=devices.x.size(1) + (N_RELATIVE if rel else 0),
+            dev_edge_dim=devices.edge_attr.size(1) * (2 if rel else 1),
+            devices=devices.clone().cpu(),   # clone: PyG .cpu() moves the batch in place
+            routing_flag=kind in ("sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route"),
+            routing_est=kind in ("sinkhorn_rf_route", "sinkhorn_rf_rel_route"),
+        )
+        model.relative_dev = rel
+        return model.to(device)
+    if kind == "phys_uniform":
+        return PhysicsHeadPredictor(
+            params, dev_node_dim=devices.x.size(1), dev_edge_dim=devices.edge_attr.size(1),
+            uniform_attention=True,
+        ).to(device)
+    if kind in ("xattn", "phys"):
+        cls = QubitCrossAttentionPredictor if kind == "xattn" else PhysicsHeadPredictor
+        return cls(
+            params, dev_node_dim=devices.x.size(1), dev_edge_dim=devices.edge_attr.size(1)
+        ).to(device)
+    raise ValueError(f"unknown model kind {kind!r}")

@@ -25,14 +25,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]          # evaluations/
 SOURCES = [ROOT / "generalization_v3" / "results", ROOT / "generalization_v4" / "results",
-           ROOT / "generalization_v5" / "results"]
+           ROOT / "generalization_v5" / "results", ROOT / "generalization_v6" / "results", ROOT / "generalization_v7" / "results", ROOT / "generalization_v8" / "results"]
 V1_RESULTS = ROOT / "generalization" / "results"
 EXP_DIRS = {"random_control": "control", "leave_one_family_out": "lofo",
             "size_extrapolation": "size", "leave_one_group_out": "logo"}
 METRICS = ("r2", "mae", "fidelity_regret_mean")
 SKIP_RUNS = {"xattn_a05_logsel"}
 ORDER = ["v1", "pooled_stab_a00", "pooled_stab_a05", "xattn_a00", "xattn_a05",
-         "v4_xattn_mixed", "v4_phys", "v5_sinkhorn", "v5b_sinkhorn"]
+         "v4_xattn_mixed", "v4_phys", "v5_sinkhorn", "v5b_sinkhorn", "v6_l001", "v6_l01", "v4u_phys", "v7_l001", "v7_l01", "v8a_c001", "v8a_c01"]
 
 
 def config_and_seed(run: str) -> tuple[str, int]:

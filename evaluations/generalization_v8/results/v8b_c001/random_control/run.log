@@ -1,0 +1,854 @@
+2026-10-09 07:12:29,795  genstudy.io               INFO     Logging to evaluations/generalization_v8/results/v8b_c001/random_control/run.log
+2026-10-09 07:12:29,795  run_experiment            INFO     Command line: evaluations/generalization_v3/scripts/run_experiment.py control --model sinkhorn --balance-alpha 0 --lr 3e-4 --grad-clip 1.0 --seed 5 --families x --groups x --loss mixed --val-mode random --layout-lambda 0.1 --layout-loss region_dist --layouts-path evaluations/compile_check/results/compiler_layouts_v6pilot.pt --count-lambda 0.01 --counts-path evaluations/compile_check/results/compiler_counts_v8.pt --calib-aug evaluations/compile_check/results/v8b --results-dir evaluations/generalization_v8/results/v8b_c001
+2026-10-09 07:12:29,795  gsv2.gpu                  WARNING  No CUDA device available — running on the CPU.
+2026-10-09 07:12:29,797  gsv3.model                INFO     Hyper-parameters (/home/atudisco/pred-distr-tool/src/model/best_params.json + v3 defaults): {'device_hidden': 64, 'device_layers': 3, 'fusion_dim': 128, 'qubit_layers': 2, 'attn_heads': 4, 'lap_pe': 8, 'cost_bias_init': -6.0, 'hidden_dim': 142, 'num_conv_wo_resnet': 3, 'num_resnet_layers': 1, 'dropout': 0.0, 'bidirectional': True, 'mlp': [512, 256, 128], 'lr': 0.001, 'readout': 'meanmaxsum'}
+2026-10-09 07:12:29,845  gsv3.devices              INFO     Device graphs: node features 13 (Laplacian PE 8), physical errors True
+2026-10-09 07:12:29,847  genstudy.data             INFO     Loading graph dataset: /home/atudisco/pred-distr-tool/evaluations/generalization_v3/data/graph_dataset_expected_fidelity.pt
+2026-10-09 07:12:35,047  genstudy.data             INFO     Loaded 17056 graphs
+2026-10-09 07:12:35,802  run_experiment            INFO     Compiler layouts (evaluations/compile_check/results/compiler_layouts_v6pilot.pt): 16994/17056 circuits
+2026-10-09 07:12:38,373  run_experiment            INFO     Calibration variants (evaluations/compile_check/results/v8b): 8 variant sets, 16994/17056 circuits
+2026-10-09 07:12:38,893  run_experiment            INFO     Compiler counts (evaluations/compile_check/results/compiler_counts_v8.pt): 16994/17056 circuits
+2026-10-09 07:12:38,899  genstudy.io               INFO     Wrote evaluations/generalization_v8/results/v8b_c001/random_control/dataset_summary.json
+2026-10-09 07:12:39,016  run_experiment            INFO     [1/1] random_seed5
+2026-10-09 07:12:39,019  gsv3.experiment           INFO     === random / random_seed5 ===
+2026-10-09 07:12:39,019  gsv3.experiment           INFO     Random split stratified by fidelity (test_fraction=0.3, seed=5): train = 11939, test = 5117 circuits; families and sizes appear on both sides.
+2026-10-09 07:12:39,020  gsv3.experiment           INFO     train=9551  val=2388 ({'mode': 'random'})  test=5117
+2026-10-09 07:12:39,155  gsv3.training             INFO     [random:random_seed5] calibration augmentation: 8 variant sets, p(orig) = 0.25
+2026-10-09 07:12:39,156  gsv3.training             INFO     [random:random_seed5] model=sinkhorn (979423 params) train=9551 val=2388 lr=0.0003 clip=1.0 alpha=0.00
+2026-10-09 07:13:56,127  gsv3.training             INFO     [random:random_seed5] epoch 0001  count_mse=1.1688  count_rel_err_2q=0.602
+2026-10-09 07:13:56,128  gsv3.training             INFO     [random:random_seed5] epoch 0001  region_bce=0.7019  dist_mse=0.2760  region_overlap=0.629
+2026-10-09 07:13:56,130  gsv3.training             INFO     [random:random_seed5] epoch 0001  train_log_mse=0.40751  val_log_mse=0.47187  val_mse=0.002417  max_grad=551.74  patience=0/30
+2026-10-09 07:15:12,524  gsv3.training             INFO     [random:random_seed5] epoch 0002  count_mse=0.7461  count_rel_err_2q=0.397
+2026-10-09 07:15:12,524  gsv3.training             INFO     [random:random_seed5] epoch 0002  region_bce=0.4647  dist_mse=0.2145  region_overlap=0.679
+2026-10-09 07:15:12,526  gsv3.training             INFO     [random:random_seed5] epoch 0002  train_log_mse=0.05211  val_log_mse=0.21164  val_mse=0.001648  max_grad=10.46  patience=0/30
+2026-10-09 07:16:28,859  gsv3.training             INFO     [random:random_seed5] epoch 0003  count_mse=0.4787  count_rel_err_2q=0.364
+2026-10-09 07:16:28,860  gsv3.training             INFO     [random:random_seed5] epoch 0003  region_bce=0.4217  dist_mse=0.2018  region_overlap=0.703
+2026-10-09 07:16:28,860  gsv3.training             INFO     [random:random_seed5] epoch 0003  train_log_mse=0.03476  val_log_mse=0.22428  val_mse=0.002081  max_grad=7.70  patience=1/30
+2026-10-09 07:17:45,503  gsv3.training             INFO     [random:random_seed5] epoch 0004  count_mse=0.3823  count_rel_err_2q=0.346
+2026-10-09 07:17:45,504  gsv3.training             INFO     [random:random_seed5] epoch 0004  region_bce=0.3961  dist_mse=0.1922  region_overlap=0.721
+2026-10-09 07:17:45,506  gsv3.training             INFO     [random:random_seed5] epoch 0004  train_log_mse=0.03148  val_log_mse=0.26210  val_mse=0.001223  max_grad=14.44  patience=0/30
+2026-10-09 07:19:02,191  gsv3.training             INFO     [random:random_seed5] epoch 0005  count_mse=0.3201  count_rel_err_2q=0.326
+2026-10-09 07:19:02,191  gsv3.training             INFO     [random:random_seed5] epoch 0005  region_bce=0.3727  dist_mse=0.1795  region_overlap=0.735
+2026-10-09 07:19:02,191  gsv3.training             INFO     [random:random_seed5] epoch 0005  train_log_mse=0.02056  val_log_mse=0.16600  val_mse=0.001274  max_grad=4.31  patience=1/30
+2026-10-09 07:20:18,784  gsv3.training             INFO     [random:random_seed5] epoch 0006  count_mse=0.2881  count_rel_err_2q=0.318
+2026-10-09 07:20:18,785  gsv3.training             INFO     [random:random_seed5] epoch 0006  region_bce=0.3627  dist_mse=0.1754  region_overlap=0.741
+2026-10-09 07:20:18,785  gsv3.training             INFO     [random:random_seed5] epoch 0006  train_log_mse=0.02146  val_log_mse=0.11922  val_mse=0.001298  max_grad=7.12  patience=2/30
+2026-10-09 07:21:35,464  gsv3.training             INFO     [random:random_seed5] epoch 0007  count_mse=0.2661  count_rel_err_2q=0.309
+2026-10-09 07:21:35,465  gsv3.training             INFO     [random:random_seed5] epoch 0007  region_bce=0.3506  dist_mse=0.1711  region_overlap=0.749
+2026-10-09 07:21:35,466  gsv3.training             INFO     [random:random_seed5] epoch 0007  train_log_mse=0.01835  val_log_mse=0.11651  val_mse=0.001000  max_grad=5.38  patience=0/30
+2026-10-09 07:22:52,656  gsv3.training             INFO     [random:random_seed5] epoch 0008  count_mse=0.2497  count_rel_err_2q=0.307
+2026-10-09 07:22:52,657  gsv3.training             INFO     [random:random_seed5] epoch 0008  region_bce=0.3471  dist_mse=0.1694  region_overlap=0.752
+2026-10-09 07:22:52,657  gsv3.training             INFO     [random:random_seed5] epoch 0008  train_log_mse=0.01935  val_log_mse=0.13458  val_mse=0.001217  max_grad=5.68  patience=1/30
+2026-10-09 07:24:10,065  gsv3.training             INFO     [random:random_seed5] epoch 0009  count_mse=0.2287  count_rel_err_2q=0.297
+2026-10-09 07:24:10,066  gsv3.training             INFO     [random:random_seed5] epoch 0009  region_bce=0.3335  dist_mse=0.1632  region_overlap=0.761
+2026-10-09 07:24:10,066  gsv3.training             INFO     [random:random_seed5] epoch 0009  train_log_mse=0.01555  val_log_mse=0.16274  val_mse=0.001060  max_grad=3.23  patience=2/30
+2026-10-09 07:25:27,031  gsv3.training             INFO     [random:random_seed5] epoch 0010  count_mse=0.2197  count_rel_err_2q=0.300
+2026-10-09 07:25:27,032  gsv3.training             INFO     [random:random_seed5] epoch 0010  region_bce=0.3307  dist_mse=0.1603  region_overlap=0.762
+2026-10-09 07:25:27,032  gsv3.training             INFO     [random:random_seed5] epoch 0010  train_log_mse=0.01620  val_log_mse=0.13009  val_mse=0.001490  max_grad=4.93  patience=3/30
+2026-10-09 07:26:43,984  gsv3.training             INFO     [random:random_seed5] epoch 0011  count_mse=0.2043  count_rel_err_2q=0.293
+2026-10-09 07:26:43,984  gsv3.training             INFO     [random:random_seed5] epoch 0011  region_bce=0.3250  dist_mse=0.1561  region_overlap=0.766
+2026-10-09 07:26:43,984  gsv3.training             INFO     [random:random_seed5] epoch 0011  train_log_mse=0.01361  val_log_mse=0.10883  val_mse=0.001082  max_grad=4.09  patience=4/30
+2026-10-09 07:28:00,579  gsv3.training             INFO     [random:random_seed5] epoch 0012  count_mse=0.1959  count_rel_err_2q=0.292
+2026-10-09 07:28:00,580  gsv3.training             INFO     [random:random_seed5] epoch 0012  region_bce=0.3178  dist_mse=0.1531  region_overlap=0.771
+2026-10-09 07:28:00,580  gsv3.training             INFO     [random:random_seed5] epoch 0012  train_log_mse=0.01671  val_log_mse=0.13127  val_mse=0.001130  max_grad=5.31  patience=5/30
+2026-10-09 07:29:17,516  gsv3.training             INFO     [random:random_seed5] epoch 0013  count_mse=0.1793  count_rel_err_2q=0.286
+2026-10-09 07:29:17,517  gsv3.training             INFO     [random:random_seed5] epoch 0013  region_bce=0.3081  dist_mse=0.1471  region_overlap=0.777
+2026-10-09 07:29:17,519  gsv3.training             INFO     [random:random_seed5] epoch 0013  train_log_mse=0.01176  val_log_mse=0.08416  val_mse=0.000784  max_grad=1.87  patience=0/30
+2026-10-09 07:30:34,381  gsv3.training             INFO     [random:random_seed5] epoch 0014  count_mse=0.1665  count_rel_err_2q=0.279
+2026-10-09 07:30:34,381  gsv3.training             INFO     [random:random_seed5] epoch 0014  region_bce=0.3017  dist_mse=0.1431  region_overlap=0.781
+2026-10-09 07:30:34,381  gsv3.training             INFO     [random:random_seed5] epoch 0014  train_log_mse=0.01160  val_log_mse=0.13594  val_mse=0.000999  max_grad=3.27  patience=1/30
+2026-10-09 07:31:51,398  gsv3.training             INFO     [random:random_seed5] epoch 0015  count_mse=0.1676  count_rel_err_2q=0.276
+2026-10-09 07:31:51,399  gsv3.training             INFO     [random:random_seed5] epoch 0015  region_bce=0.2959  dist_mse=0.1405  region_overlap=0.785
+2026-10-09 07:31:51,399  gsv3.training             INFO     [random:random_seed5] epoch 0015  train_log_mse=0.01256  val_log_mse=0.09296  val_mse=0.000858  max_grad=3.36  patience=2/30
+2026-10-09 07:33:08,180  gsv3.training             INFO     [random:random_seed5] epoch 0016  count_mse=0.1579  count_rel_err_2q=0.272
+2026-10-09 07:33:08,181  gsv3.training             INFO     [random:random_seed5] epoch 0016  region_bce=0.2900  dist_mse=0.1380  region_overlap=0.789
+2026-10-09 07:33:08,181  gsv3.training             INFO     [random:random_seed5] epoch 0016  train_log_mse=0.01185  val_log_mse=0.12421  val_mse=0.001233  max_grad=2.66  patience=3/30
+2026-10-09 07:34:25,703  gsv3.training             INFO     [random:random_seed5] epoch 0017  count_mse=0.1629  count_rel_err_2q=0.280
+2026-10-09 07:34:25,703  gsv3.training             INFO     [random:random_seed5] epoch 0017  region_bce=0.2941  dist_mse=0.1370  region_overlap=0.787
+2026-10-09 07:34:25,703  gsv3.training             INFO     [random:random_seed5] epoch 0017  train_log_mse=0.01156  val_log_mse=0.08589  val_mse=0.000791  max_grad=2.78  patience=4/30
+2026-10-09 07:35:42,854  gsv3.training             INFO     [random:random_seed5] epoch 0018  count_mse=0.1549  count_rel_err_2q=0.273
+2026-10-09 07:35:42,854  gsv3.training             INFO     [random:random_seed5] epoch 0018  region_bce=0.2887  dist_mse=0.1352  region_overlap=0.790
+2026-10-09 07:35:42,854  gsv3.training             INFO     [random:random_seed5] epoch 0018  train_log_mse=0.01058  val_log_mse=0.14852  val_mse=0.000901  max_grad=2.43  patience=5/30
+2026-10-09 07:36:59,504  gsv3.training             INFO     [random:random_seed5] epoch 0019  count_mse=0.1495  count_rel_err_2q=0.270
+2026-10-09 07:36:59,505  gsv3.training             INFO     [random:random_seed5] epoch 0019  region_bce=0.2861  dist_mse=0.1335  region_overlap=0.792
+2026-10-09 07:36:59,507  gsv3.training             INFO     [random:random_seed5] epoch 0019  train_log_mse=0.01072  val_log_mse=0.21395  val_mse=0.000768  max_grad=2.58  patience=0/30
+2026-10-09 07:38:16,652  gsv3.training             INFO     [random:random_seed5] epoch 0020  count_mse=0.1447  count_rel_err_2q=0.266
+2026-10-09 07:38:16,653  gsv3.training             INFO     [random:random_seed5] epoch 0020  region_bce=0.2789  dist_mse=0.1310  region_overlap=0.798
+2026-10-09 07:38:16,653  gsv3.training             INFO     [random:random_seed5] epoch 0020  train_log_mse=0.01071  val_log_mse=0.08041  val_mse=0.000868  max_grad=2.47  patience=1/30
+2026-10-09 07:39:33,303  gsv3.training             INFO     [random:random_seed5] epoch 0021  count_mse=0.1417  count_rel_err_2q=0.265
+2026-10-09 07:39:33,303  gsv3.training             INFO     [random:random_seed5] epoch 0021  region_bce=0.2764  dist_mse=0.1301  region_overlap=0.799
+2026-10-09 07:39:33,305  gsv3.training             INFO     [random:random_seed5] epoch 0021  train_log_mse=0.00957  val_log_mse=0.10379  val_mse=0.000730  max_grad=3.17  patience=0/30
+2026-10-09 07:40:50,117  gsv3.training             INFO     [random:random_seed5] epoch 0022  count_mse=0.1388  count_rel_err_2q=0.262
+2026-10-09 07:40:50,118  gsv3.training             INFO     [random:random_seed5] epoch 0022  region_bce=0.2780  dist_mse=0.1289  region_overlap=0.799
+2026-10-09 07:40:50,118  gsv3.training             INFO     [random:random_seed5] epoch 0022  train_log_mse=0.00956  val_log_mse=0.09396  val_mse=0.000773  max_grad=2.74  patience=1/30
+2026-10-09 07:42:06,848  gsv3.training             INFO     [random:random_seed5] epoch 0023  count_mse=0.1322  count_rel_err_2q=0.256
+2026-10-09 07:42:06,848  gsv3.training             INFO     [random:random_seed5] epoch 0023  region_bce=0.2727  dist_mse=0.1267  region_overlap=0.802
+2026-10-09 07:42:06,850  gsv3.training             INFO     [random:random_seed5] epoch 0023  train_log_mse=0.00904  val_log_mse=0.08652  val_mse=0.000684  max_grad=2.15  patience=0/30
+2026-10-09 07:43:23,153  gsv3.training             INFO     [random:random_seed5] epoch 0024  count_mse=0.1385  count_rel_err_2q=0.260
+2026-10-09 07:43:23,156  gsv3.training             INFO     [random:random_seed5] epoch 0024  region_bce=0.2714  dist_mse=0.1266  region_overlap=0.803
+2026-10-09 07:43:23,158  gsv3.training             INFO     [random:random_seed5] epoch 0024  train_log_mse=0.01124  val_log_mse=0.07898  val_mse=0.000651  max_grad=9.48  patience=0/30
+2026-10-09 07:44:39,636  gsv3.training             INFO     [random:random_seed5] epoch 0025  count_mse=0.1294  count_rel_err_2q=0.252
+2026-10-09 07:44:39,637  gsv3.training             INFO     [random:random_seed5] epoch 0025  region_bce=0.2673  dist_mse=0.1250  region_overlap=0.805
+2026-10-09 07:44:39,637  gsv3.training             INFO     [random:random_seed5] epoch 0025  train_log_mse=0.00894  val_log_mse=0.08999  val_mse=0.000734  max_grad=2.15  patience=1/30
+2026-10-09 07:45:56,417  gsv3.training             INFO     [random:random_seed5] epoch 0026  count_mse=0.1271  count_rel_err_2q=0.250
+2026-10-09 07:45:56,418  gsv3.training             INFO     [random:random_seed5] epoch 0026  region_bce=0.2659  dist_mse=0.1242  region_overlap=0.805
+2026-10-09 07:45:56,418  gsv3.training             INFO     [random:random_seed5] epoch 0026  train_log_mse=0.00867  val_log_mse=0.13000  val_mse=0.000754  max_grad=2.14  patience=2/30
+2026-10-09 07:47:13,100  gsv3.training             INFO     [random:random_seed5] epoch 0027  count_mse=0.1281  count_rel_err_2q=0.252
+2026-10-09 07:47:13,100  gsv3.training             INFO     [random:random_seed5] epoch 0027  region_bce=0.2629  dist_mse=0.1237  region_overlap=0.808
+2026-10-09 07:47:13,103  gsv3.training             INFO     [random:random_seed5] epoch 0027  train_log_mse=0.00887  val_log_mse=0.08880  val_mse=0.000647  max_grad=3.57  patience=0/30
+2026-10-09 07:48:29,133  gsv3.training             INFO     [random:random_seed5] epoch 0028  count_mse=0.1300  count_rel_err_2q=0.252
+2026-10-09 07:48:29,133  gsv3.training             INFO     [random:random_seed5] epoch 0028  region_bce=0.2568  dist_mse=0.1224  region_overlap=0.813
+2026-10-09 07:48:29,133  gsv3.training             INFO     [random:random_seed5] epoch 0028  train_log_mse=0.00981  val_log_mse=0.07362  val_mse=0.000668  max_grad=2.72  patience=1/30
+2026-10-09 07:49:45,576  gsv3.training             INFO     [random:random_seed5] epoch 0029  count_mse=0.1237  count_rel_err_2q=0.246
+2026-10-09 07:49:45,576  gsv3.training             INFO     [random:random_seed5] epoch 0029  region_bce=0.2565  dist_mse=0.1208  region_overlap=0.812
+2026-10-09 07:49:45,576  gsv3.training             INFO     [random:random_seed5] epoch 0029  train_log_mse=0.00736  val_log_mse=0.08498  val_mse=0.000716  max_grad=1.61  patience=2/30
+2026-10-09 07:51:02,224  gsv3.training             INFO     [random:random_seed5] epoch 0030  count_mse=0.1230  count_rel_err_2q=0.244
+2026-10-09 07:51:02,225  gsv3.training             INFO     [random:random_seed5] epoch 0030  region_bce=0.2602  dist_mse=0.1216  region_overlap=0.810
+2026-10-09 07:51:02,226  gsv3.training             INFO     [random:random_seed5] epoch 0030  train_log_mse=0.00932  val_log_mse=0.11658  val_mse=0.000639  max_grad=2.64  patience=0/30
+2026-10-09 07:52:19,245  gsv3.training             INFO     [random:random_seed5] epoch 0031  count_mse=0.1212  count_rel_err_2q=0.243
+2026-10-09 07:52:19,246  gsv3.training             INFO     [random:random_seed5] epoch 0031  region_bce=0.2552  dist_mse=0.1198  region_overlap=0.813
+2026-10-09 07:52:19,246  gsv3.training             INFO     [random:random_seed5] epoch 0031  train_log_mse=0.00819  val_log_mse=0.09360  val_mse=0.000733  max_grad=4.51  patience=1/30
+2026-10-09 07:53:35,850  gsv3.training             INFO     [random:random_seed5] epoch 0032  count_mse=0.1204  count_rel_err_2q=0.241
+2026-10-09 07:53:35,851  gsv3.training             INFO     [random:random_seed5] epoch 0032  region_bce=0.2543  dist_mse=0.1193  region_overlap=0.814
+2026-10-09 07:53:35,853  gsv3.training             INFO     [random:random_seed5] epoch 0032  train_log_mse=0.00711  val_log_mse=0.07147  val_mse=0.000579  max_grad=1.39  patience=0/30
+2026-10-09 07:54:52,761  gsv3.training             INFO     [random:random_seed5] epoch 0033  count_mse=0.1201  count_rel_err_2q=0.239
+2026-10-09 07:54:52,762  gsv3.training             INFO     [random:random_seed5] epoch 0033  region_bce=0.2519  dist_mse=0.1180  region_overlap=0.815
+2026-10-09 07:54:52,762  gsv3.training             INFO     [random:random_seed5] epoch 0033  train_log_mse=0.00740  val_log_mse=0.10464  val_mse=0.000743  max_grad=1.78  patience=1/30
+2026-10-09 07:56:09,582  gsv3.training             INFO     [random:random_seed5] epoch 0034  count_mse=0.1211  count_rel_err_2q=0.241
+2026-10-09 07:56:09,583  gsv3.training             INFO     [random:random_seed5] epoch 0034  region_bce=0.2526  dist_mse=0.1184  region_overlap=0.814
+2026-10-09 07:56:09,583  gsv3.training             INFO     [random:random_seed5] epoch 0034  train_log_mse=0.00804  val_log_mse=0.10768  val_mse=0.000751  max_grad=1.86  patience=2/30
+2026-10-09 07:57:27,059  gsv3.training             INFO     [random:random_seed5] epoch 0035  count_mse=0.1194  count_rel_err_2q=0.237
+2026-10-09 07:57:27,059  gsv3.training             INFO     [random:random_seed5] epoch 0035  region_bce=0.2501  dist_mse=0.1163  region_overlap=0.816
+2026-10-09 07:57:27,060  gsv3.training             INFO     [random:random_seed5] epoch 0035  train_log_mse=0.00705  val_log_mse=0.07593  val_mse=0.000678  max_grad=1.98  patience=3/30
+2026-10-09 07:58:43,708  gsv3.training             INFO     [random:random_seed5] epoch 0036  count_mse=0.1166  count_rel_err_2q=0.237
+2026-10-09 07:58:43,709  gsv3.training             INFO     [random:random_seed5] epoch 0036  region_bce=0.2468  dist_mse=0.1149  region_overlap=0.818
+2026-10-09 07:58:43,709  gsv3.training             INFO     [random:random_seed5] epoch 0036  train_log_mse=0.00693  val_log_mse=0.08722  val_mse=0.000674  max_grad=2.49  patience=4/30
+2026-10-09 07:59:59,975  gsv3.training             INFO     [random:random_seed5] epoch 0037  count_mse=0.1179  count_rel_err_2q=0.237
+2026-10-09 07:59:59,976  gsv3.training             INFO     [random:random_seed5] epoch 0037  region_bce=0.2414  dist_mse=0.1136  region_overlap=0.821
+2026-10-09 07:59:59,976  gsv3.training             INFO     [random:random_seed5] epoch 0037  train_log_mse=0.00699  val_log_mse=0.07420  val_mse=0.000583  max_grad=2.01  patience=5/30
+2026-10-09 08:01:16,962  gsv3.training             INFO     [random:random_seed5] epoch 0038  count_mse=0.1186  count_rel_err_2q=0.237
+2026-10-09 08:01:16,962  gsv3.training             INFO     [random:random_seed5] epoch 0038  region_bce=0.2446  dist_mse=0.1136  region_overlap=0.820
+2026-10-09 08:01:16,962  gsv3.training             INFO     [random:random_seed5] epoch 0038  train_log_mse=0.00702  val_log_mse=0.08051  val_mse=0.000679  max_grad=1.28  patience=6/30
+2026-10-09 08:02:33,493  gsv3.training             INFO     [random:random_seed5] epoch 0039  count_mse=0.1130  count_rel_err_2q=0.232
+2026-10-09 08:02:33,494  gsv3.training             INFO     [random:random_seed5] epoch 0039  region_bce=0.2431  dist_mse=0.1126  region_overlap=0.820
+2026-10-09 08:02:33,494  gsv3.training             INFO     [random:random_seed5] epoch 0039  train_log_mse=0.00682  val_log_mse=0.09265  val_mse=0.000644  max_grad=1.20  patience=7/30
+2026-10-09 08:03:50,369  gsv3.training             INFO     [random:random_seed5] epoch 0040  count_mse=0.1127  count_rel_err_2q=0.232
+2026-10-09 08:03:50,369  gsv3.training             INFO     [random:random_seed5] epoch 0040  region_bce=0.2404  dist_mse=0.1104  region_overlap=0.822
+2026-10-09 08:03:50,369  gsv3.training             INFO     [random:random_seed5] epoch 0040  train_log_mse=0.00690  val_log_mse=0.12414  val_mse=0.000667  max_grad=1.52  patience=8/30
+2026-10-09 08:05:07,244  gsv3.training             INFO     [random:random_seed5] epoch 0041  count_mse=0.1172  count_rel_err_2q=0.239
+2026-10-09 08:05:07,245  gsv3.training             INFO     [random:random_seed5] epoch 0041  region_bce=0.2403  dist_mse=0.1108  region_overlap=0.823
+2026-10-09 08:05:07,247  gsv3.training             INFO     [random:random_seed5] epoch 0041  train_log_mse=0.00809  val_log_mse=0.08881  val_mse=0.000573  max_grad=1.61  patience=0/30
+2026-10-09 08:06:24,331  gsv3.training             INFO     [random:random_seed5] epoch 0042  count_mse=0.1119  count_rel_err_2q=0.230
+2026-10-09 08:06:24,331  gsv3.training             INFO     [random:random_seed5] epoch 0042  region_bce=0.2434  dist_mse=0.1092  region_overlap=0.821
+2026-10-09 08:06:24,331  gsv3.training             INFO     [random:random_seed5] epoch 0042  train_log_mse=0.00715  val_log_mse=0.12033  val_mse=0.000601  max_grad=2.08  patience=1/30
+2026-10-09 08:07:41,122  gsv3.training             INFO     [random:random_seed5] epoch 0043  count_mse=0.1128  count_rel_err_2q=0.231
+2026-10-09 08:07:41,122  gsv3.training             INFO     [random:random_seed5] epoch 0043  region_bce=0.2379  dist_mse=0.1078  region_overlap=0.824
+2026-10-09 08:07:41,122  gsv3.training             INFO     [random:random_seed5] epoch 0043  train_log_mse=0.00617  val_log_mse=0.08098  val_mse=0.000600  max_grad=1.08  patience=2/30
+2026-10-09 08:08:57,608  gsv3.training             INFO     [random:random_seed5] epoch 0044  count_mse=0.1143  count_rel_err_2q=0.233
+2026-10-09 08:08:57,609  gsv3.training             INFO     [random:random_seed5] epoch 0044  region_bce=0.2394  dist_mse=0.1072  region_overlap=0.823
+2026-10-09 08:08:57,609  gsv3.training             INFO     [random:random_seed5] epoch 0044  train_log_mse=0.00677  val_log_mse=0.07059  val_mse=0.000604  max_grad=1.33  patience=3/30
+2026-10-09 08:10:14,365  gsv3.training             INFO     [random:random_seed5] epoch 0045  count_mse=0.1080  count_rel_err_2q=0.226
+2026-10-09 08:10:14,366  gsv3.training             INFO     [random:random_seed5] epoch 0045  region_bce=0.2312  dist_mse=0.1045  region_overlap=0.828
+2026-10-09 08:10:14,366  gsv3.training             INFO     [random:random_seed5] epoch 0045  train_log_mse=0.00605  val_log_mse=0.08169  val_mse=0.000716  max_grad=1.28  patience=4/30
+2026-10-09 08:11:31,295  gsv3.training             INFO     [random:random_seed5] epoch 0046  count_mse=0.1094  count_rel_err_2q=0.227
+2026-10-09 08:11:31,296  gsv3.training             INFO     [random:random_seed5] epoch 0046  region_bce=0.2336  dist_mse=0.1051  region_overlap=0.827
+2026-10-09 08:11:31,297  gsv3.training             INFO     [random:random_seed5] epoch 0046  train_log_mse=0.00613  val_log_mse=0.06577  val_mse=0.000552  max_grad=1.75  patience=0/30
+2026-10-09 08:12:47,742  gsv3.training             INFO     [random:random_seed5] epoch 0047  count_mse=0.1138  count_rel_err_2q=0.231
+2026-10-09 08:12:47,742  gsv3.training             INFO     [random:random_seed5] epoch 0047  region_bce=0.2369  dist_mse=0.1053  region_overlap=0.825
+2026-10-09 08:12:47,742  gsv3.training             INFO     [random:random_seed5] epoch 0047  train_log_mse=0.00836  val_log_mse=0.09727  val_mse=0.000650  max_grad=1.57  patience=1/30
+2026-10-09 08:14:04,254  gsv3.training             INFO     [random:random_seed5] epoch 0048  count_mse=0.1100  count_rel_err_2q=0.228
+2026-10-09 08:14:04,254  gsv3.training             INFO     [random:random_seed5] epoch 0048  region_bce=0.2393  dist_mse=0.1051  region_overlap=0.824
+2026-10-09 08:14:04,254  gsv3.training             INFO     [random:random_seed5] epoch 0048  train_log_mse=0.00703  val_log_mse=0.06248  val_mse=0.000598  max_grad=5.11  patience=2/30
+2026-10-09 08:15:21,145  gsv3.training             INFO     [random:random_seed5] epoch 0049  count_mse=0.1102  count_rel_err_2q=0.226
+2026-10-09 08:15:21,145  gsv3.training             INFO     [random:random_seed5] epoch 0049  region_bce=0.2304  dist_mse=0.1034  region_overlap=0.829
+2026-10-09 08:15:21,145  gsv3.training             INFO     [random:random_seed5] epoch 0049  train_log_mse=0.00627  val_log_mse=0.09564  val_mse=0.000674  max_grad=1.52  patience=3/30
+2026-10-09 08:16:39,187  gsv3.training             INFO     [random:random_seed5] epoch 0050  count_mse=0.1033  count_rel_err_2q=0.220
+2026-10-09 08:16:39,188  gsv3.training             INFO     [random:random_seed5] epoch 0050  region_bce=0.2259  dist_mse=0.1020  region_overlap=0.831
+2026-10-09 08:16:39,188  gsv3.training             INFO     [random:random_seed5] epoch 0050  train_log_mse=0.00562  val_log_mse=0.06039  val_mse=0.000581  max_grad=1.09  patience=4/30
+2026-10-09 08:17:56,331  gsv3.training             INFO     [random:random_seed5] epoch 0051  count_mse=0.1034  count_rel_err_2q=0.221
+2026-10-09 08:17:56,332  gsv3.training             INFO     [random:random_seed5] epoch 0051  region_bce=0.2260  dist_mse=0.1009  region_overlap=0.831
+2026-10-09 08:17:56,332  gsv3.training             INFO     [random:random_seed5] epoch 0051  train_log_mse=0.00491  val_log_mse=0.06281  val_mse=0.000588  max_grad=0.85  patience=5/30
+2026-10-09 08:19:13,712  gsv3.training             INFO     [random:random_seed5] epoch 0052  count_mse=0.1024  count_rel_err_2q=0.220
+2026-10-09 08:19:13,713  gsv3.training             INFO     [random:random_seed5] epoch 0052  region_bce=0.2269  dist_mse=0.1012  region_overlap=0.832
+2026-10-09 08:19:13,713  gsv3.training             INFO     [random:random_seed5] epoch 0052  train_log_mse=0.00571  val_log_mse=0.08378  val_mse=0.000690  max_grad=4.48  patience=6/30
+2026-10-09 08:20:30,725  gsv3.training             INFO     [random:random_seed5] epoch 0053  count_mse=0.1042  count_rel_err_2q=0.222
+2026-10-09 08:20:30,725  gsv3.training             INFO     [random:random_seed5] epoch 0053  region_bce=0.2227  dist_mse=0.0998  region_overlap=0.833
+2026-10-09 08:20:30,725  gsv3.training             INFO     [random:random_seed5] epoch 0053  train_log_mse=0.00492  val_log_mse=0.06643  val_mse=0.000617  max_grad=1.07  patience=7/30
+2026-10-09 08:21:48,142  gsv3.training             INFO     [random:random_seed5] epoch 0054  count_mse=0.1000  count_rel_err_2q=0.217
+2026-10-09 08:21:48,143  gsv3.training             INFO     [random:random_seed5] epoch 0054  region_bce=0.2243  dist_mse=0.0995  region_overlap=0.833
+2026-10-09 08:21:48,143  gsv3.training             INFO     [random:random_seed5] epoch 0054  train_log_mse=0.00488  val_log_mse=0.07348  val_mse=0.000589  max_grad=0.83  patience=8/30
+2026-10-09 08:23:05,535  gsv3.training             INFO     [random:random_seed5] epoch 0055  count_mse=0.1017  count_rel_err_2q=0.222
+2026-10-09 08:23:05,536  gsv3.training             INFO     [random:random_seed5] epoch 0055  region_bce=0.2239  dist_mse=0.1005  region_overlap=0.833
+2026-10-09 08:23:05,536  gsv3.training             INFO     [random:random_seed5] epoch 0055  train_log_mse=0.00703  val_log_mse=0.10518  val_mse=0.000641  max_grad=1.87  patience=9/30
+2026-10-09 08:24:22,580  gsv3.training             INFO     [random:random_seed5] epoch 0056  count_mse=0.1002  count_rel_err_2q=0.216
+2026-10-09 08:24:22,581  gsv3.training             INFO     [random:random_seed5] epoch 0056  region_bce=0.2214  dist_mse=0.0992  region_overlap=0.834
+2026-10-09 08:24:22,584  gsv3.training             INFO     [random:random_seed5] epoch 0056  train_log_mse=0.00541  val_log_mse=0.06523  val_mse=0.000510  max_grad=1.10  patience=0/30
+2026-10-09 08:25:39,700  gsv3.training             INFO     [random:random_seed5] epoch 0057  count_mse=0.0998  count_rel_err_2q=0.218
+2026-10-09 08:25:39,701  gsv3.training             INFO     [random:random_seed5] epoch 0057  region_bce=0.2217  dist_mse=0.0990  region_overlap=0.834
+2026-10-09 08:25:39,701  gsv3.training             INFO     [random:random_seed5] epoch 0057  train_log_mse=0.00560  val_log_mse=0.07344  val_mse=0.000582  max_grad=1.34  patience=1/30
+2026-10-09 08:26:57,394  gsv3.training             INFO     [random:random_seed5] epoch 0058  count_mse=0.1009  count_rel_err_2q=0.219
+2026-10-09 08:26:57,395  gsv3.training             INFO     [random:random_seed5] epoch 0058  region_bce=0.2181  dist_mse=0.0983  region_overlap=0.836
+2026-10-09 08:26:57,395  gsv3.training             INFO     [random:random_seed5] epoch 0058  train_log_mse=0.00657  val_log_mse=0.06832  val_mse=0.000530  max_grad=1.51  patience=2/30
+2026-10-09 08:28:15,380  gsv3.training             INFO     [random:random_seed5] epoch 0059  count_mse=0.0992  count_rel_err_2q=0.217
+2026-10-09 08:28:15,380  gsv3.training             INFO     [random:random_seed5] epoch 0059  region_bce=0.2173  dist_mse=0.0979  region_overlap=0.837
+2026-10-09 08:28:15,380  gsv3.training             INFO     [random:random_seed5] epoch 0059  train_log_mse=0.00540  val_log_mse=0.06985  val_mse=0.000599  max_grad=1.05  patience=3/30
+2026-10-09 08:29:32,144  gsv3.training             INFO     [random:random_seed5] epoch 0060  count_mse=0.0968  count_rel_err_2q=0.215
+2026-10-09 08:29:32,145  gsv3.training             INFO     [random:random_seed5] epoch 0060  region_bce=0.2196  dist_mse=0.0981  region_overlap=0.836
+2026-10-09 08:29:32,145  gsv3.training             INFO     [random:random_seed5] epoch 0060  train_log_mse=0.00608  val_log_mse=0.09288  val_mse=0.000564  max_grad=1.86  patience=4/30
+2026-10-09 08:30:49,118  gsv3.training             INFO     [random:random_seed5] epoch 0061  count_mse=0.0971  count_rel_err_2q=0.215
+2026-10-09 08:30:49,119  gsv3.training             INFO     [random:random_seed5] epoch 0061  region_bce=0.2172  dist_mse=0.0980  region_overlap=0.836
+2026-10-09 08:30:49,119  gsv3.training             INFO     [random:random_seed5] epoch 0061  train_log_mse=0.00568  val_log_mse=0.12762  val_mse=0.000550  max_grad=1.26  patience=5/30
+2026-10-09 08:32:06,198  gsv3.training             INFO     [random:random_seed5] epoch 0062  count_mse=0.0967  count_rel_err_2q=0.216
+2026-10-09 08:32:06,199  gsv3.training             INFO     [random:random_seed5] epoch 0062  region_bce=0.2149  dist_mse=0.0977  region_overlap=0.838
+2026-10-09 08:32:06,201  gsv3.training             INFO     [random:random_seed5] epoch 0062  train_log_mse=0.00600  val_log_mse=0.06496  val_mse=0.000488  max_grad=1.78  patience=0/30
+2026-10-09 08:33:23,378  gsv3.training             INFO     [random:random_seed5] epoch 0063  count_mse=0.0964  count_rel_err_2q=0.213
+2026-10-09 08:33:23,378  gsv3.training             INFO     [random:random_seed5] epoch 0063  region_bce=0.2158  dist_mse=0.0971  region_overlap=0.838
+2026-10-09 08:33:23,378  gsv3.training             INFO     [random:random_seed5] epoch 0063  train_log_mse=0.00532  val_log_mse=0.06688  val_mse=0.000518  max_grad=1.90  patience=1/30
+2026-10-09 08:34:41,631  gsv3.training             INFO     [random:random_seed5] epoch 0064  count_mse=0.0948  count_rel_err_2q=0.212
+2026-10-09 08:34:41,632  gsv3.training             INFO     [random:random_seed5] epoch 0064  region_bce=0.2144  dist_mse=0.0963  region_overlap=0.839
+2026-10-09 08:34:41,632  gsv3.training             INFO     [random:random_seed5] epoch 0064  train_log_mse=0.00566  val_log_mse=0.07961  val_mse=0.000603  max_grad=1.28  patience=2/30
+2026-10-09 08:35:59,401  gsv3.training             INFO     [random:random_seed5] epoch 0065  count_mse=0.0942  count_rel_err_2q=0.213
+2026-10-09 08:35:59,401  gsv3.training             INFO     [random:random_seed5] epoch 0065  region_bce=0.2098  dist_mse=0.0955  region_overlap=0.841
+2026-10-09 08:35:59,401  gsv3.training             INFO     [random:random_seed5] epoch 0065  train_log_mse=0.00528  val_log_mse=0.05991  val_mse=0.000494  max_grad=1.30  patience=3/30
+2026-10-09 08:37:17,355  gsv3.training             INFO     [random:random_seed5] epoch 0066  count_mse=0.0921  count_rel_err_2q=0.212
+2026-10-09 08:37:17,356  gsv3.training             INFO     [random:random_seed5] epoch 0066  region_bce=0.2100  dist_mse=0.0952  region_overlap=0.841
+2026-10-09 08:37:17,356  gsv3.training             INFO     [random:random_seed5] epoch 0066  train_log_mse=0.00444  val_log_mse=0.06132  val_mse=0.000506  max_grad=0.90  patience=4/30
+2026-10-09 08:38:34,933  gsv3.training             INFO     [random:random_seed5] epoch 0067  count_mse=0.0940  count_rel_err_2q=0.214
+2026-10-09 08:38:34,934  gsv3.training             INFO     [random:random_seed5] epoch 0067  region_bce=0.2076  dist_mse=0.0948  region_overlap=0.842
+2026-10-09 08:38:34,934  gsv3.training             INFO     [random:random_seed5] epoch 0067  train_log_mse=0.00425  val_log_mse=0.07551  val_mse=0.000662  max_grad=0.85  patience=5/30
+2026-10-09 08:39:52,611  gsv3.training             INFO     [random:random_seed5] epoch 0068  count_mse=0.0886  count_rel_err_2q=0.208
+2026-10-09 08:39:52,611  gsv3.training             INFO     [random:random_seed5] epoch 0068  region_bce=0.2056  dist_mse=0.0944  region_overlap=0.844
+2026-10-09 08:39:52,611  gsv3.training             INFO     [random:random_seed5] epoch 0068  train_log_mse=0.00463  val_log_mse=0.06543  val_mse=0.000507  max_grad=1.13  patience=6/30
+2026-10-09 08:41:10,593  gsv3.training             INFO     [random:random_seed5] epoch 0069  count_mse=0.0959  count_rel_err_2q=0.216
+2026-10-09 08:41:10,594  gsv3.training             INFO     [random:random_seed5] epoch 0069  region_bce=0.2111  dist_mse=0.0959  region_overlap=0.841
+2026-10-09 08:41:10,594  gsv3.training             INFO     [random:random_seed5] epoch 0069  train_log_mse=0.00671  val_log_mse=0.06113  val_mse=0.000496  max_grad=3.03  patience=7/30
+2026-10-09 08:42:28,838  gsv3.training             INFO     [random:random_seed5] epoch 0070  count_mse=0.0902  count_rel_err_2q=0.211
+2026-10-09 08:42:28,838  gsv3.training             INFO     [random:random_seed5] epoch 0070  region_bce=0.2042  dist_mse=0.0937  region_overlap=0.844
+2026-10-09 08:42:28,838  gsv3.training             INFO     [random:random_seed5] epoch 0070  train_log_mse=0.00431  val_log_mse=0.06721  val_mse=0.000653  max_grad=0.86  patience=8/30
+2026-10-09 08:43:46,252  gsv3.training             INFO     [random:random_seed5] epoch 0071  count_mse=0.0889  count_rel_err_2q=0.208
+2026-10-09 08:43:46,252  gsv3.training             INFO     [random:random_seed5] epoch 0071  region_bce=0.2032  dist_mse=0.0932  region_overlap=0.846
+2026-10-09 08:43:46,252  gsv3.training             INFO     [random:random_seed5] epoch 0071  train_log_mse=0.00459  val_log_mse=0.08861  val_mse=0.000673  max_grad=0.83  patience=9/30
+2026-10-09 08:45:03,852  gsv3.training             INFO     [random:random_seed5] epoch 0072  count_mse=0.0899  count_rel_err_2q=0.208
+2026-10-09 08:45:03,852  gsv3.training             INFO     [random:random_seed5] epoch 0072  region_bce=0.2026  dist_mse=0.0931  region_overlap=0.846
+2026-10-09 08:45:03,852  gsv3.training             INFO     [random:random_seed5] epoch 0072  train_log_mse=0.00467  val_log_mse=0.07283  val_mse=0.000536  max_grad=0.79  patience=10/30
+2026-10-09 08:46:21,429  gsv3.training             INFO     [random:random_seed5] epoch 0073  count_mse=0.0903  count_rel_err_2q=0.210
+2026-10-09 08:46:21,429  gsv3.training             INFO     [random:random_seed5] epoch 0073  region_bce=0.1996  dist_mse=0.0929  region_overlap=0.847
+2026-10-09 08:46:21,429  gsv3.training             INFO     [random:random_seed5] epoch 0073  train_log_mse=0.00446  val_log_mse=0.06677  val_mse=0.000538  max_grad=1.14  patience=11/30
+2026-10-09 08:47:39,159  gsv3.training             INFO     [random:random_seed5] epoch 0074  count_mse=0.0904  count_rel_err_2q=0.211
+2026-10-09 08:47:39,160  gsv3.training             INFO     [random:random_seed5] epoch 0074  region_bce=0.1994  dist_mse=0.0924  region_overlap=0.848
+2026-10-09 08:47:39,160  gsv3.training             INFO     [random:random_seed5] epoch 0074  train_log_mse=0.00466  val_log_mse=0.06801  val_mse=0.000498  max_grad=1.33  patience=12/30
+2026-10-09 08:48:56,441  gsv3.training             INFO     [random:random_seed5] epoch 0075  count_mse=0.0843  count_rel_err_2q=0.203
+2026-10-09 08:48:56,442  gsv3.training             INFO     [random:random_seed5] epoch 0075  region_bce=0.1982  dist_mse=0.0919  region_overlap=0.848
+2026-10-09 08:48:56,444  gsv3.training             INFO     [random:random_seed5] epoch 0075  train_log_mse=0.00454  val_log_mse=0.05640  val_mse=0.000461  max_grad=1.31  patience=0/30
+2026-10-09 08:50:14,386  gsv3.training             INFO     [random:random_seed5] epoch 0076  count_mse=0.0898  count_rel_err_2q=0.210
+2026-10-09 08:50:14,386  gsv3.training             INFO     [random:random_seed5] epoch 0076  region_bce=0.2013  dist_mse=0.0931  region_overlap=0.847
+2026-10-09 08:50:14,386  gsv3.training             INFO     [random:random_seed5] epoch 0076  train_log_mse=0.00626  val_log_mse=0.09281  val_mse=0.000510  max_grad=1.28  patience=1/30
+2026-10-09 08:51:32,144  gsv3.training             INFO     [random:random_seed5] epoch 0077  count_mse=0.0876  count_rel_err_2q=0.210
+2026-10-09 08:51:32,144  gsv3.training             INFO     [random:random_seed5] epoch 0077  region_bce=0.2005  dist_mse=0.0930  region_overlap=0.848
+2026-10-09 08:51:32,145  gsv3.training             INFO     [random:random_seed5] epoch 0077  train_log_mse=0.00482  val_log_mse=0.05835  val_mse=0.000490  max_grad=1.19  patience=2/30
+2026-10-09 08:52:49,721  gsv3.training             INFO     [random:random_seed5] epoch 0078  count_mse=0.0862  count_rel_err_2q=0.205
+2026-10-09 08:52:49,721  gsv3.training             INFO     [random:random_seed5] epoch 0078  region_bce=0.1975  dist_mse=0.0917  region_overlap=0.849
+2026-10-09 08:52:49,723  gsv3.training             INFO     [random:random_seed5] epoch 0078  train_log_mse=0.00387  val_log_mse=0.06116  val_mse=0.000458  max_grad=0.60  patience=0/30
+2026-10-09 08:54:07,538  gsv3.training             INFO     [random:random_seed5] epoch 0079  count_mse=0.0870  count_rel_err_2q=0.208
+2026-10-09 08:54:07,538  gsv3.training             INFO     [random:random_seed5] epoch 0079  region_bce=0.2003  dist_mse=0.0930  region_overlap=0.847
+2026-10-09 08:54:07,538  gsv3.training             INFO     [random:random_seed5] epoch 0079  train_log_mse=0.00490  val_log_mse=0.09226  val_mse=0.000555  max_grad=0.92  patience=1/30
+2026-10-09 08:55:25,065  gsv3.training             INFO     [random:random_seed5] epoch 0080  count_mse=0.0864  count_rel_err_2q=0.209
+2026-10-09 08:55:25,065  gsv3.training             INFO     [random:random_seed5] epoch 0080  region_bce=0.1944  dist_mse=0.0919  region_overlap=0.851
+2026-10-09 08:55:25,065  gsv3.training             INFO     [random:random_seed5] epoch 0080  train_log_mse=0.00473  val_log_mse=0.06900  val_mse=0.000591  max_grad=1.83  patience=2/30
+2026-10-09 08:56:42,516  gsv3.training             INFO     [random:random_seed5] epoch 0081  count_mse=0.0870  count_rel_err_2q=0.210
+2026-10-09 08:56:42,517  gsv3.training             INFO     [random:random_seed5] epoch 0081  region_bce=0.1947  dist_mse=0.0922  region_overlap=0.851
+2026-10-09 08:56:42,517  gsv3.training             INFO     [random:random_seed5] epoch 0081  train_log_mse=0.00446  val_log_mse=0.06758  val_mse=0.000546  max_grad=0.89  patience=3/30
+2026-10-09 08:58:00,535  gsv3.training             INFO     [random:random_seed5] epoch 0082  count_mse=0.0852  count_rel_err_2q=0.207
+2026-10-09 08:58:00,536  gsv3.training             INFO     [random:random_seed5] epoch 0082  region_bce=0.1938  dist_mse=0.0914  region_overlap=0.851
+2026-10-09 08:58:00,536  gsv3.training             INFO     [random:random_seed5] epoch 0082  train_log_mse=0.00420  val_log_mse=0.06238  val_mse=0.000471  max_grad=0.74  patience=4/30
+2026-10-09 08:59:17,771  gsv3.training             INFO     [random:random_seed5] epoch 0083  count_mse=0.0849  count_rel_err_2q=0.206
+2026-10-09 08:59:17,771  gsv3.training             INFO     [random:random_seed5] epoch 0083  region_bce=0.1939  dist_mse=0.0909  region_overlap=0.851
+2026-10-09 08:59:17,771  gsv3.training             INFO     [random:random_seed5] epoch 0083  train_log_mse=0.00350  val_log_mse=0.07188  val_mse=0.000481  max_grad=0.54  patience=5/30
+2026-10-09 09:00:35,390  gsv3.training             INFO     [random:random_seed5] epoch 0084  count_mse=0.0865  count_rel_err_2q=0.208
+2026-10-09 09:00:35,390  gsv3.training             INFO     [random:random_seed5] epoch 0084  region_bce=0.1979  dist_mse=0.0918  region_overlap=0.850
+2026-10-09 09:00:35,390  gsv3.training             INFO     [random:random_seed5] epoch 0084  train_log_mse=0.00590  val_log_mse=0.06692  val_mse=0.000552  max_grad=1.38  patience=6/30
+2026-10-09 09:01:52,748  gsv3.training             INFO     [random:random_seed5] epoch 0085  count_mse=0.0846  count_rel_err_2q=0.209
+2026-10-09 09:01:52,749  gsv3.training             INFO     [random:random_seed5] epoch 0085  region_bce=0.1954  dist_mse=0.0911  region_overlap=0.851
+2026-10-09 09:01:52,750  gsv3.training             INFO     [random:random_seed5] epoch 0085  train_log_mse=0.00374  val_log_mse=0.05694  val_mse=0.000444  max_grad=0.60  patience=0/30
+2026-10-09 09:03:04,863  gsv3.training             INFO     [random:random_seed5] epoch 0086  count_mse=0.0842  count_rel_err_2q=0.206
+2026-10-09 09:03:04,863  gsv3.training             INFO     [random:random_seed5] epoch 0086  region_bce=0.1901  dist_mse=0.0905  region_overlap=0.854
+2026-10-09 09:03:04,863  gsv3.training             INFO     [random:random_seed5] epoch 0086  train_log_mse=0.00457  val_log_mse=0.07623  val_mse=0.000515  max_grad=1.31  patience=1/30
+2026-10-09 09:04:16,799  gsv3.training             INFO     [random:random_seed5] epoch 0087  count_mse=0.0855  count_rel_err_2q=0.209
+2026-10-09 09:04:16,799  gsv3.training             INFO     [random:random_seed5] epoch 0087  region_bce=0.1895  dist_mse=0.0903  region_overlap=0.854
+2026-10-09 09:04:16,799  gsv3.training             INFO     [random:random_seed5] epoch 0087  train_log_mse=0.00369  val_log_mse=0.05941  val_mse=0.000453  max_grad=0.70  patience=2/30
+2026-10-09 09:05:28,830  gsv3.training             INFO     [random:random_seed5] epoch 0088  count_mse=0.0824  count_rel_err_2q=0.207
+2026-10-09 09:05:28,831  gsv3.training             INFO     [random:random_seed5] epoch 0088  region_bce=0.1900  dist_mse=0.0896  region_overlap=0.854
+2026-10-09 09:05:28,831  gsv3.training             INFO     [random:random_seed5] epoch 0088  train_log_mse=0.00396  val_log_mse=0.07054  val_mse=0.000487  max_grad=0.70  patience=3/30
+2026-10-09 09:06:40,986  gsv3.training             INFO     [random:random_seed5] epoch 0089  count_mse=0.0818  count_rel_err_2q=0.205
+2026-10-09 09:06:40,986  gsv3.training             INFO     [random:random_seed5] epoch 0089  region_bce=0.1884  dist_mse=0.0899  region_overlap=0.855
+2026-10-09 09:06:40,986  gsv3.training             INFO     [random:random_seed5] epoch 0089  train_log_mse=0.00452  val_log_mse=0.07194  val_mse=0.000499  max_grad=0.87  patience=4/30
+2026-10-09 09:07:53,507  gsv3.training             INFO     [random:random_seed5] epoch 0090  count_mse=0.0827  count_rel_err_2q=0.205
+2026-10-09 09:07:53,508  gsv3.training             INFO     [random:random_seed5] epoch 0090  region_bce=0.1872  dist_mse=0.0898  region_overlap=0.856
+2026-10-09 09:07:53,508  gsv3.training             INFO     [random:random_seed5] epoch 0090  train_log_mse=0.00420  val_log_mse=0.06064  val_mse=0.000485  max_grad=0.81  patience=5/30
+2026-10-09 09:09:05,721  gsv3.training             INFO     [random:random_seed5] epoch 0091  count_mse=0.0807  count_rel_err_2q=0.204
+2026-10-09 09:09:05,721  gsv3.training             INFO     [random:random_seed5] epoch 0091  region_bce=0.1818  dist_mse=0.0885  region_overlap=0.859
+2026-10-09 09:09:05,721  gsv3.training             INFO     [random:random_seed5] epoch 0091  train_log_mse=0.00351  val_log_mse=0.09835  val_mse=0.000908  max_grad=0.75  patience=6/30
+2026-10-09 09:10:17,477  gsv3.training             INFO     [random:random_seed5] epoch 0092  count_mse=0.0835  count_rel_err_2q=0.209
+2026-10-09 09:10:17,478  gsv3.training             INFO     [random:random_seed5] epoch 0092  region_bce=0.1889  dist_mse=0.0898  region_overlap=0.855
+2026-10-09 09:10:17,478  gsv3.training             INFO     [random:random_seed5] epoch 0092  train_log_mse=0.00480  val_log_mse=0.07364  val_mse=0.000514  max_grad=2.00  patience=7/30
+2026-10-09 09:11:29,287  gsv3.training             INFO     [random:random_seed5] epoch 0093  count_mse=0.0824  count_rel_err_2q=0.205
+2026-10-09 09:11:29,288  gsv3.training             INFO     [random:random_seed5] epoch 0093  region_bce=0.1856  dist_mse=0.0893  region_overlap=0.856
+2026-10-09 09:11:29,288  gsv3.training             INFO     [random:random_seed5] epoch 0093  train_log_mse=0.00391  val_log_mse=0.06933  val_mse=0.000495  max_grad=0.80  patience=8/30
+2026-10-09 09:12:41,485  gsv3.training             INFO     [random:random_seed5] epoch 0094  count_mse=0.0846  count_rel_err_2q=0.207
+2026-10-09 09:12:41,486  gsv3.training             INFO     [random:random_seed5] epoch 0094  region_bce=0.1864  dist_mse=0.0895  region_overlap=0.857
+2026-10-09 09:12:41,486  gsv3.training             INFO     [random:random_seed5] epoch 0094  train_log_mse=0.00554  val_log_mse=0.06022  val_mse=0.000468  max_grad=2.26  patience=9/30
+2026-10-09 09:13:53,333  gsv3.training             INFO     [random:random_seed5] epoch 0095  count_mse=0.0831  count_rel_err_2q=0.209
+2026-10-09 09:13:53,334  gsv3.training             INFO     [random:random_seed5] epoch 0095  region_bce=0.1800  dist_mse=0.0885  region_overlap=0.860
+2026-10-09 09:13:53,336  gsv3.training             INFO     [random:random_seed5] epoch 0095  train_log_mse=0.00356  val_log_mse=0.06064  val_mse=0.000440  max_grad=0.77  patience=0/30
+2026-10-09 09:15:05,164  gsv3.training             INFO     [random:random_seed5] epoch 0096  count_mse=0.0808  count_rel_err_2q=0.206
+2026-10-09 09:15:05,165  gsv3.training             INFO     [random:random_seed5] epoch 0096  region_bce=0.1820  dist_mse=0.0880  region_overlap=0.859
+2026-10-09 09:15:05,165  gsv3.training             INFO     [random:random_seed5] epoch 0096  train_log_mse=0.00366  val_log_mse=0.06351  val_mse=0.000447  max_grad=0.80  patience=1/30
+2026-10-09 09:16:17,314  gsv3.training             INFO     [random:random_seed5] epoch 0097  count_mse=0.0797  count_rel_err_2q=0.204
+2026-10-09 09:16:17,315  gsv3.training             INFO     [random:random_seed5] epoch 0097  region_bce=0.1864  dist_mse=0.0893  region_overlap=0.856
+2026-10-09 09:16:17,315  gsv3.training             INFO     [random:random_seed5] epoch 0097  train_log_mse=0.00418  val_log_mse=0.06531  val_mse=0.000489  max_grad=0.90  patience=2/30
+2026-10-09 09:17:29,372  gsv3.training             INFO     [random:random_seed5] epoch 0098  count_mse=0.0794  count_rel_err_2q=0.205
+2026-10-09 09:17:29,373  gsv3.training             INFO     [random:random_seed5] epoch 0098  region_bce=0.1811  dist_mse=0.0880  region_overlap=0.859
+2026-10-09 09:17:29,373  gsv3.training             INFO     [random:random_seed5] epoch 0098  train_log_mse=0.00363  val_log_mse=0.06297  val_mse=0.000471  max_grad=0.57  patience=3/30
+2026-10-09 09:18:41,753  gsv3.training             INFO     [random:random_seed5] epoch 0099  count_mse=0.0804  count_rel_err_2q=0.206
+2026-10-09 09:18:41,753  gsv3.training             INFO     [random:random_seed5] epoch 0099  region_bce=0.1811  dist_mse=0.0880  region_overlap=0.859
+2026-10-09 09:18:41,753  gsv3.training             INFO     [random:random_seed5] epoch 0099  train_log_mse=0.00381  val_log_mse=0.06809  val_mse=0.000455  max_grad=0.65  patience=4/30
+2026-10-09 09:19:54,111  gsv3.training             INFO     [random:random_seed5] epoch 0100  count_mse=0.0799  count_rel_err_2q=0.205
+2026-10-09 09:19:54,112  gsv3.training             INFO     [random:random_seed5] epoch 0100  region_bce=0.1816  dist_mse=0.0880  region_overlap=0.859
+2026-10-09 09:19:54,112  gsv3.training             INFO     [random:random_seed5] epoch 0100  train_log_mse=0.00430  val_log_mse=0.08193  val_mse=0.000598  max_grad=1.09  patience=5/30
+2026-10-09 09:21:06,152  gsv3.training             INFO     [random:random_seed5] epoch 0101  count_mse=0.0808  count_rel_err_2q=0.209
+2026-10-09 09:21:06,153  gsv3.training             INFO     [random:random_seed5] epoch 0101  region_bce=0.1808  dist_mse=0.0886  region_overlap=0.860
+2026-10-09 09:21:06,155  gsv3.training             INFO     [random:random_seed5] epoch 0101  train_log_mse=0.00439  val_log_mse=0.05875  val_mse=0.000438  max_grad=1.26  patience=0/30
+2026-10-09 09:22:17,891  gsv3.training             INFO     [random:random_seed5] epoch 0102  count_mse=0.0764  count_rel_err_2q=0.201
+2026-10-09 09:22:17,891  gsv3.training             INFO     [random:random_seed5] epoch 0102  region_bce=0.1755  dist_mse=0.0872  region_overlap=0.863
+2026-10-09 09:22:17,893  gsv3.training             INFO     [random:random_seed5] epoch 0102  train_log_mse=0.00347  val_log_mse=0.06401  val_mse=0.000417  max_grad=0.66  patience=0/30
+2026-10-09 09:23:30,007  gsv3.training             INFO     [random:random_seed5] epoch 0103  count_mse=0.0813  count_rel_err_2q=0.206
+2026-10-09 09:23:30,008  gsv3.training             INFO     [random:random_seed5] epoch 0103  region_bce=0.1817  dist_mse=0.0882  region_overlap=0.860
+2026-10-09 09:23:30,008  gsv3.training             INFO     [random:random_seed5] epoch 0103  train_log_mse=0.00423  val_log_mse=0.05793  val_mse=0.000438  max_grad=0.90  patience=1/30
+2026-10-09 09:24:41,768  gsv3.training             INFO     [random:random_seed5] epoch 0104  count_mse=0.0797  count_rel_err_2q=0.205
+2026-10-09 09:24:41,768  gsv3.training             INFO     [random:random_seed5] epoch 0104  region_bce=0.1804  dist_mse=0.0879  region_overlap=0.860
+2026-10-09 09:24:41,768  gsv3.training             INFO     [random:random_seed5] epoch 0104  train_log_mse=0.00428  val_log_mse=0.09895  val_mse=0.000488  max_grad=1.29  patience=2/30
+2026-10-09 09:25:53,946  gsv3.training             INFO     [random:random_seed5] epoch 0105  count_mse=0.0782  count_rel_err_2q=0.204
+2026-10-09 09:25:53,947  gsv3.training             INFO     [random:random_seed5] epoch 0105  region_bce=0.1777  dist_mse=0.0876  region_overlap=0.862
+2026-10-09 09:25:53,947  gsv3.training             INFO     [random:random_seed5] epoch 0105  train_log_mse=0.00406  val_log_mse=0.05708  val_mse=0.000452  max_grad=5.22  patience=3/30
+2026-10-09 09:27:05,566  gsv3.training             INFO     [random:random_seed5] epoch 0106  count_mse=0.0781  count_rel_err_2q=0.206
+2026-10-09 09:27:05,567  gsv3.training             INFO     [random:random_seed5] epoch 0106  region_bce=0.1764  dist_mse=0.0872  region_overlap=0.863
+2026-10-09 09:27:05,567  gsv3.training             INFO     [random:random_seed5] epoch 0106  train_log_mse=0.00404  val_log_mse=0.06297  val_mse=0.000464  max_grad=1.05  patience=4/30
+2026-10-09 09:28:17,259  gsv3.training             INFO     [random:random_seed5] epoch 0107  count_mse=0.0785  count_rel_err_2q=0.204
+2026-10-09 09:28:17,260  gsv3.training             INFO     [random:random_seed5] epoch 0107  region_bce=0.1762  dist_mse=0.0877  region_overlap=0.863
+2026-10-09 09:28:17,260  gsv3.training             INFO     [random:random_seed5] epoch 0107  train_log_mse=0.00384  val_log_mse=0.05579  val_mse=0.000439  max_grad=1.26  patience=5/30
+2026-10-09 09:29:29,677  gsv3.training             INFO     [random:random_seed5] epoch 0108  count_mse=0.0788  count_rel_err_2q=0.204
+2026-10-09 09:29:29,678  gsv3.training             INFO     [random:random_seed5] epoch 0108  region_bce=0.1745  dist_mse=0.0868  region_overlap=0.864
+2026-10-09 09:29:29,678  gsv3.training             INFO     [random:random_seed5] epoch 0108  train_log_mse=0.00346  val_log_mse=0.06125  val_mse=0.000503  max_grad=1.25  patience=6/30
+2026-10-09 09:30:41,834  gsv3.training             INFO     [random:random_seed5] epoch 0109  count_mse=0.0793  count_rel_err_2q=0.208
+2026-10-09 09:30:41,834  gsv3.training             INFO     [random:random_seed5] epoch 0109  region_bce=0.1743  dist_mse=0.0873  region_overlap=0.864
+2026-10-09 09:30:41,834  gsv3.training             INFO     [random:random_seed5] epoch 0109  train_log_mse=0.00378  val_log_mse=0.06201  val_mse=0.000422  max_grad=0.75  patience=7/30
+2026-10-09 09:31:55,137  gsv3.training             INFO     [random:random_seed5] epoch 0110  count_mse=0.0784  count_rel_err_2q=0.207
+2026-10-09 09:31:55,138  gsv3.training             INFO     [random:random_seed5] epoch 0110  region_bce=0.1767  dist_mse=0.0878  region_overlap=0.863
+2026-10-09 09:31:55,138  gsv3.training             INFO     [random:random_seed5] epoch 0110  train_log_mse=0.00471  val_log_mse=0.08212  val_mse=0.000469  max_grad=1.65  patience=8/30
+2026-10-09 09:33:08,936  gsv3.training             INFO     [random:random_seed5] epoch 0111  count_mse=0.0766  count_rel_err_2q=0.202
+2026-10-09 09:33:08,936  gsv3.training             INFO     [random:random_seed5] epoch 0111  region_bce=0.1743  dist_mse=0.0870  region_overlap=0.864
+2026-10-09 09:33:08,936  gsv3.training             INFO     [random:random_seed5] epoch 0111  train_log_mse=0.00369  val_log_mse=0.05593  val_mse=0.000463  max_grad=0.82  patience=9/30
+2026-10-09 09:34:22,614  gsv3.training             INFO     [random:random_seed5] epoch 0112  count_mse=0.0754  count_rel_err_2q=0.202
+2026-10-09 09:34:22,614  gsv3.training             INFO     [random:random_seed5] epoch 0112  region_bce=0.1757  dist_mse=0.0867  region_overlap=0.863
+2026-10-09 09:34:22,614  gsv3.training             INFO     [random:random_seed5] epoch 0112  train_log_mse=0.00438  val_log_mse=0.09073  val_mse=0.000502  max_grad=1.25  patience=10/30
+2026-10-09 09:35:36,207  gsv3.training             INFO     [random:random_seed5] epoch 0113  count_mse=0.0770  count_rel_err_2q=0.203
+2026-10-09 09:35:36,207  gsv3.training             INFO     [random:random_seed5] epoch 0113  region_bce=0.1755  dist_mse=0.0870  region_overlap=0.863
+2026-10-09 09:35:36,207  gsv3.training             INFO     [random:random_seed5] epoch 0113  train_log_mse=0.00407  val_log_mse=0.06606  val_mse=0.000455  max_grad=1.77  patience=11/30
+2026-10-09 09:36:49,993  gsv3.training             INFO     [random:random_seed5] epoch 0114  count_mse=0.0749  count_rel_err_2q=0.202
+2026-10-09 09:36:49,994  gsv3.training             INFO     [random:random_seed5] epoch 0114  region_bce=0.1695  dist_mse=0.0854  region_overlap=0.867
+2026-10-09 09:36:49,994  gsv3.training             INFO     [random:random_seed5] epoch 0114  train_log_mse=0.00304  val_log_mse=0.05192  val_mse=0.000452  max_grad=0.69  patience=12/30
+2026-10-09 09:38:04,214  gsv3.training             INFO     [random:random_seed5] epoch 0115  count_mse=0.0753  count_rel_err_2q=0.203
+2026-10-09 09:38:04,215  gsv3.training             INFO     [random:random_seed5] epoch 0115  region_bce=0.1689  dist_mse=0.0854  region_overlap=0.867
+2026-10-09 09:38:04,215  gsv3.training             INFO     [random:random_seed5] epoch 0115  train_log_mse=0.00324  val_log_mse=0.04938  val_mse=0.000444  max_grad=0.65  patience=13/30
+2026-10-09 09:39:18,165  gsv3.training             INFO     [random:random_seed5] epoch 0116  count_mse=0.0748  count_rel_err_2q=0.204
+2026-10-09 09:39:18,166  gsv3.training             INFO     [random:random_seed5] epoch 0116  region_bce=0.1656  dist_mse=0.0844  region_overlap=0.870
+2026-10-09 09:39:18,166  gsv3.training             INFO     [random:random_seed5] epoch 0116  train_log_mse=0.00300  val_log_mse=0.07210  val_mse=0.000484  max_grad=0.79  patience=14/30
+2026-10-09 09:40:31,029  gsv3.training             INFO     [random:random_seed5] epoch 0117  count_mse=0.0754  count_rel_err_2q=0.204
+2026-10-09 09:40:31,029  gsv3.training             INFO     [random:random_seed5] epoch 0117  region_bce=0.1661  dist_mse=0.0851  region_overlap=0.869
+2026-10-09 09:40:31,029  gsv3.training             INFO     [random:random_seed5] epoch 0117  train_log_mse=0.00343  val_log_mse=0.05456  val_mse=0.000440  max_grad=0.59  patience=15/30
+2026-10-09 09:41:42,677  gsv3.training             INFO     [random:random_seed5] epoch 0118  count_mse=0.0764  count_rel_err_2q=0.205
+2026-10-09 09:41:42,678  gsv3.training             INFO     [random:random_seed5] epoch 0118  region_bce=0.1703  dist_mse=0.0858  region_overlap=0.866
+2026-10-09 09:41:42,678  gsv3.training             INFO     [random:random_seed5] epoch 0118  train_log_mse=0.00353  val_log_mse=0.05780  val_mse=0.000454  max_grad=0.64  patience=16/30
+2026-10-09 09:42:54,589  gsv3.training             INFO     [random:random_seed5] epoch 0119  count_mse=0.0743  count_rel_err_2q=0.202
+2026-10-09 09:42:54,589  gsv3.training             INFO     [random:random_seed5] epoch 0119  region_bce=0.1666  dist_mse=0.0848  region_overlap=0.869
+2026-10-09 09:42:54,589  gsv3.training             INFO     [random:random_seed5] epoch 0119  train_log_mse=0.00390  val_log_mse=0.06094  val_mse=0.000442  max_grad=1.09  patience=17/30
+2026-10-09 09:44:07,916  gsv3.training             INFO     [random:random_seed5] epoch 0120  count_mse=0.0754  count_rel_err_2q=0.205
+2026-10-09 09:44:07,916  gsv3.training             INFO     [random:random_seed5] epoch 0120  region_bce=0.1693  dist_mse=0.0855  region_overlap=0.867
+2026-10-09 09:44:07,916  gsv3.training             INFO     [random:random_seed5] epoch 0120  train_log_mse=0.00404  val_log_mse=0.06161  val_mse=0.000443  max_grad=1.01  patience=18/30
+2026-10-09 09:45:21,115  gsv3.training             INFO     [random:random_seed5] epoch 0121  count_mse=0.0740  count_rel_err_2q=0.203
+2026-10-09 09:45:21,116  gsv3.training             INFO     [random:random_seed5] epoch 0121  region_bce=0.1682  dist_mse=0.0849  region_overlap=0.868
+2026-10-09 09:45:21,116  gsv3.training             INFO     [random:random_seed5] epoch 0121  train_log_mse=0.00360  val_log_mse=0.06049  val_mse=0.000428  max_grad=0.82  patience=19/30
+2026-10-09 09:46:35,107  gsv3.training             INFO     [random:random_seed5] epoch 0122  count_mse=0.0737  count_rel_err_2q=0.202
+2026-10-09 09:46:35,108  gsv3.training             INFO     [random:random_seed5] epoch 0122  region_bce=0.1634  dist_mse=0.0840  region_overlap=0.871
+2026-10-09 09:46:35,110  gsv3.training             INFO     [random:random_seed5] epoch 0122  train_log_mse=0.00302  val_log_mse=0.06530  val_mse=0.000414  max_grad=0.66  patience=0/30
+2026-10-09 09:47:49,426  gsv3.training             INFO     [random:random_seed5] epoch 0123  count_mse=0.0741  count_rel_err_2q=0.203
+2026-10-09 09:47:49,427  gsv3.training             INFO     [random:random_seed5] epoch 0123  region_bce=0.1635  dist_mse=0.0841  region_overlap=0.871
+2026-10-09 09:47:49,427  gsv3.training             INFO     [random:random_seed5] epoch 0123  train_log_mse=0.00319  val_log_mse=0.05338  val_mse=0.000433  max_grad=0.66  patience=1/30
+2026-10-09 09:49:04,320  gsv3.training             INFO     [random:random_seed5] epoch 0124  count_mse=0.0718  count_rel_err_2q=0.201
+2026-10-09 09:49:04,321  gsv3.training             INFO     [random:random_seed5] epoch 0124  region_bce=0.1637  dist_mse=0.0839  region_overlap=0.871
+2026-10-09 09:49:04,321  gsv3.training             INFO     [random:random_seed5] epoch 0124  train_log_mse=0.00322  val_log_mse=0.05942  val_mse=0.000437  max_grad=0.79  patience=2/30
+2026-10-09 09:50:19,341  gsv3.training             INFO     [random:random_seed5] epoch 0125  count_mse=0.0748  count_rel_err_2q=0.204
+2026-10-09 09:50:19,342  gsv3.training             INFO     [random:random_seed5] epoch 0125  region_bce=0.1656  dist_mse=0.0846  region_overlap=0.870
+2026-10-09 09:50:19,342  gsv3.training             INFO     [random:random_seed5] epoch 0125  train_log_mse=0.00453  val_log_mse=0.05625  val_mse=0.000428  max_grad=1.19  patience=3/30
+2026-10-09 09:51:33,536  gsv3.training             INFO     [random:random_seed5] epoch 0126  count_mse=0.0708  count_rel_err_2q=0.200
+2026-10-09 09:51:33,536  gsv3.training             INFO     [random:random_seed5] epoch 0126  region_bce=0.1648  dist_mse=0.0839  region_overlap=0.870
+2026-10-09 09:51:33,536  gsv3.training             INFO     [random:random_seed5] epoch 0126  train_log_mse=0.00299  val_log_mse=0.05405  val_mse=0.000440  max_grad=0.69  patience=4/30
+2026-10-09 09:52:48,756  gsv3.training             INFO     [random:random_seed5] epoch 0127  count_mse=0.0760  count_rel_err_2q=0.205
+2026-10-09 09:52:48,756  gsv3.training             INFO     [random:random_seed5] epoch 0127  region_bce=0.1616  dist_mse=0.0841  region_overlap=0.871
+2026-10-09 09:52:48,756  gsv3.training             INFO     [random:random_seed5] epoch 0127  train_log_mse=0.00369  val_log_mse=0.05579  val_mse=0.000417  max_grad=0.79  patience=5/30
+2026-10-09 09:54:04,096  gsv3.training             INFO     [random:random_seed5] epoch 0128  count_mse=0.0727  count_rel_err_2q=0.203
+2026-10-09 09:54:04,096  gsv3.training             INFO     [random:random_seed5] epoch 0128  region_bce=0.1611  dist_mse=0.0833  region_overlap=0.872
+2026-10-09 09:54:04,096  gsv3.training             INFO     [random:random_seed5] epoch 0128  train_log_mse=0.00282  val_log_mse=0.08058  val_mse=0.000424  max_grad=0.51  patience=6/30
+2026-10-09 09:55:20,505  gsv3.training             INFO     [random:random_seed5] epoch 0129  count_mse=0.0749  count_rel_err_2q=0.204
+2026-10-09 09:55:20,506  gsv3.training             INFO     [random:random_seed5] epoch 0129  region_bce=0.1637  dist_mse=0.0840  region_overlap=0.870
+2026-10-09 09:55:20,506  gsv3.training             INFO     [random:random_seed5] epoch 0129  train_log_mse=0.00354  val_log_mse=0.06155  val_mse=0.000436  max_grad=0.61  patience=7/30
+2026-10-09 09:56:36,484  gsv3.training             INFO     [random:random_seed5] epoch 0130  count_mse=0.0714  count_rel_err_2q=0.202
+2026-10-09 09:56:36,485  gsv3.training             INFO     [random:random_seed5] epoch 0130  region_bce=0.1593  dist_mse=0.0835  region_overlap=0.873
+2026-10-09 09:56:36,485  gsv3.training             INFO     [random:random_seed5] epoch 0130  train_log_mse=0.00314  val_log_mse=0.05423  val_mse=0.000431  max_grad=0.92  patience=8/30
+2026-10-09 09:57:53,602  gsv3.training             INFO     [random:random_seed5] epoch 0131  count_mse=0.0698  count_rel_err_2q=0.204
+2026-10-09 09:57:53,603  gsv3.training             INFO     [random:random_seed5] epoch 0131  region_bce=0.1571  dist_mse=0.0824  region_overlap=0.874
+2026-10-09 09:57:53,605  gsv3.training             INFO     [random:random_seed5] epoch 0131  train_log_mse=0.00302  val_log_mse=0.05928  val_mse=0.000402  max_grad=0.62  patience=0/30
+2026-10-09 09:59:07,623  gsv3.training             INFO     [random:random_seed5] epoch 0132  count_mse=0.0711  count_rel_err_2q=0.202
+2026-10-09 09:59:07,624  gsv3.training             INFO     [random:random_seed5] epoch 0132  region_bce=0.1602  dist_mse=0.0830  region_overlap=0.873
+2026-10-09 09:59:07,624  gsv3.training             INFO     [random:random_seed5] epoch 0132  train_log_mse=0.00318  val_log_mse=0.05679  val_mse=0.000428  max_grad=0.66  patience=1/30
+2026-10-09 10:00:20,631  gsv3.training             INFO     [random:random_seed5] epoch 0133  count_mse=0.0722  count_rel_err_2q=0.201
+2026-10-09 10:00:20,632  gsv3.training             INFO     [random:random_seed5] epoch 0133  region_bce=0.1583  dist_mse=0.0831  region_overlap=0.874
+2026-10-09 10:00:20,632  gsv3.training             INFO     [random:random_seed5] epoch 0133  train_log_mse=0.00395  val_log_mse=0.06255  val_mse=0.000459  max_grad=0.80  patience=2/30
+2026-10-09 10:01:32,692  gsv3.training             INFO     [random:random_seed5] epoch 0134  count_mse=0.0704  count_rel_err_2q=0.204
+2026-10-09 10:01:32,692  gsv3.training             INFO     [random:random_seed5] epoch 0134  region_bce=0.1559  dist_mse=0.0825  region_overlap=0.875
+2026-10-09 10:01:32,693  gsv3.training             INFO     [random:random_seed5] epoch 0134  train_log_mse=0.00301  val_log_mse=0.05867  val_mse=0.000418  max_grad=0.44  patience=3/30
+2026-10-09 10:02:44,730  gsv3.training             INFO     [random:random_seed5] epoch 0135  count_mse=0.0731  count_rel_err_2q=0.205
+2026-10-09 10:02:44,732  gsv3.training             INFO     [random:random_seed5] epoch 0135  region_bce=0.1576  dist_mse=0.0832  region_overlap=0.874
+2026-10-09 10:02:44,732  gsv3.training             INFO     [random:random_seed5] epoch 0135  train_log_mse=0.00305  val_log_mse=0.05319  val_mse=0.000402  max_grad=0.69  patience=4/30
+2026-10-09 10:03:56,912  gsv3.training             INFO     [random:random_seed5] epoch 0136  count_mse=0.0691  count_rel_err_2q=0.200
+2026-10-09 10:03:56,915  gsv3.training             INFO     [random:random_seed5] epoch 0136  region_bce=0.1538  dist_mse=0.0819  region_overlap=0.877
+2026-10-09 10:03:56,915  gsv3.training             INFO     [random:random_seed5] epoch 0136  train_log_mse=0.00296  val_log_mse=0.06224  val_mse=0.000476  max_grad=0.57  patience=5/30
+2026-10-09 10:05:11,313  gsv3.training             INFO     [random:random_seed5] epoch 0137  count_mse=0.0720  count_rel_err_2q=0.203
+2026-10-09 10:05:11,313  gsv3.training             INFO     [random:random_seed5] epoch 0137  region_bce=0.1577  dist_mse=0.0832  region_overlap=0.875
+2026-10-09 10:05:11,313  gsv3.training             INFO     [random:random_seed5] epoch 0137  train_log_mse=0.00401  val_log_mse=0.05309  val_mse=0.000532  max_grad=2.40  patience=6/30
+2026-10-09 10:06:26,314  gsv3.training             INFO     [random:random_seed5] epoch 0138  count_mse=0.0707  count_rel_err_2q=0.204
+2026-10-09 10:06:26,315  gsv3.training             INFO     [random:random_seed5] epoch 0138  region_bce=0.1552  dist_mse=0.0821  region_overlap=0.876
+2026-10-09 10:06:26,315  gsv3.training             INFO     [random:random_seed5] epoch 0138  train_log_mse=0.00314  val_log_mse=0.05824  val_mse=0.000419  max_grad=0.63  patience=7/30
+2026-10-09 10:07:41,669  gsv3.training             INFO     [random:random_seed5] epoch 0139  count_mse=0.0694  count_rel_err_2q=0.201
+2026-10-09 10:07:41,670  gsv3.training             INFO     [random:random_seed5] epoch 0139  region_bce=0.1535  dist_mse=0.0816  region_overlap=0.877
+2026-10-09 10:07:41,670  gsv3.training             INFO     [random:random_seed5] epoch 0139  train_log_mse=0.00286  val_log_mse=0.05329  val_mse=0.000414  max_grad=1.09  patience=8/30
+2026-10-09 10:08:57,218  gsv3.training             INFO     [random:random_seed5] epoch 0140  count_mse=0.0695  count_rel_err_2q=0.201
+2026-10-09 10:08:57,219  gsv3.training             INFO     [random:random_seed5] epoch 0140  region_bce=0.1566  dist_mse=0.0823  region_overlap=0.874
+2026-10-09 10:08:57,219  gsv3.training             INFO     [random:random_seed5] epoch 0140  train_log_mse=0.00298  val_log_mse=0.06322  val_mse=0.000475  max_grad=1.01  patience=9/30
+2026-10-09 10:10:12,347  gsv3.training             INFO     [random:random_seed5] epoch 0141  count_mse=0.0710  count_rel_err_2q=0.202
+2026-10-09 10:10:12,347  gsv3.training             INFO     [random:random_seed5] epoch 0141  region_bce=0.1543  dist_mse=0.0819  region_overlap=0.877
+2026-10-09 10:10:12,347  gsv3.training             INFO     [random:random_seed5] epoch 0141  train_log_mse=0.00317  val_log_mse=0.06147  val_mse=0.000422  max_grad=0.45  patience=10/30
+2026-10-09 10:11:27,800  gsv3.training             INFO     [random:random_seed5] epoch 0142  count_mse=0.0698  count_rel_err_2q=0.204
+2026-10-09 10:11:27,801  gsv3.training             INFO     [random:random_seed5] epoch 0142  region_bce=0.1499  dist_mse=0.0814  region_overlap=0.879
+2026-10-09 10:11:27,801  gsv3.training             INFO     [random:random_seed5] epoch 0142  train_log_mse=0.00298  val_log_mse=0.06491  val_mse=0.000408  max_grad=0.68  patience=11/30
+2026-10-09 10:12:43,157  gsv3.training             INFO     [random:random_seed5] epoch 0143  count_mse=0.0694  count_rel_err_2q=0.202
+2026-10-09 10:12:43,158  gsv3.training             INFO     [random:random_seed5] epoch 0143  region_bce=0.1500  dist_mse=0.0813  region_overlap=0.879
+2026-10-09 10:12:43,160  gsv3.training             INFO     [random:random_seed5] epoch 0143  train_log_mse=0.00276  val_log_mse=0.05506  val_mse=0.000401  max_grad=0.57  patience=0/30
+2026-10-09 10:13:58,655  gsv3.training             INFO     [random:random_seed5] epoch 0144  count_mse=0.0711  count_rel_err_2q=0.202
+2026-10-09 10:13:58,655  gsv3.training             INFO     [random:random_seed5] epoch 0144  region_bce=0.1517  dist_mse=0.0819  region_overlap=0.878
+2026-10-09 10:13:58,656  gsv3.training             INFO     [random:random_seed5] epoch 0144  train_log_mse=0.00330  val_log_mse=0.05927  val_mse=0.000422  max_grad=0.82  patience=1/30
+2026-10-09 10:15:14,872  gsv3.training             INFO     [random:random_seed5] epoch 0145  count_mse=0.0699  count_rel_err_2q=0.204
+2026-10-09 10:15:14,873  gsv3.training             INFO     [random:random_seed5] epoch 0145  region_bce=0.1552  dist_mse=0.0823  region_overlap=0.876
+2026-10-09 10:15:14,873  gsv3.training             INFO     [random:random_seed5] epoch 0145  train_log_mse=0.00377  val_log_mse=0.05768  val_mse=0.000420  max_grad=5.29  patience=2/30
+2026-10-09 10:16:28,090  gsv3.training             INFO     [random:random_seed5] epoch 0146  count_mse=0.0679  count_rel_err_2q=0.200
+2026-10-09 10:16:28,091  gsv3.training             INFO     [random:random_seed5] epoch 0146  region_bce=0.1544  dist_mse=0.0826  region_overlap=0.877
+2026-10-09 10:16:28,091  gsv3.training             INFO     [random:random_seed5] epoch 0146  train_log_mse=0.00337  val_log_mse=0.09181  val_mse=0.000521  max_grad=1.12  patience=3/30
+2026-10-09 10:17:39,858  gsv3.training             INFO     [random:random_seed5] epoch 0147  count_mse=0.0686  count_rel_err_2q=0.204
+2026-10-09 10:17:39,858  gsv3.training             INFO     [random:random_seed5] epoch 0147  region_bce=0.1571  dist_mse=0.0829  region_overlap=0.876
+2026-10-09 10:17:39,858  gsv3.training             INFO     [random:random_seed5] epoch 0147  train_log_mse=0.00407  val_log_mse=0.07032  val_mse=0.000501  max_grad=3.34  patience=4/30
+2026-10-09 10:18:51,978  gsv3.training             INFO     [random:random_seed5] epoch 0148  count_mse=0.0700  count_rel_err_2q=0.202
+2026-10-09 10:18:51,979  gsv3.training             INFO     [random:random_seed5] epoch 0148  region_bce=0.1537  dist_mse=0.0825  region_overlap=0.877
+2026-10-09 10:18:51,979  gsv3.training             INFO     [random:random_seed5] epoch 0148  train_log_mse=0.00308  val_log_mse=0.07640  val_mse=0.000407  max_grad=1.11  patience=5/30
+2026-10-09 10:20:05,061  gsv3.training             INFO     [random:random_seed5] epoch 0149  count_mse=0.0683  count_rel_err_2q=0.202
+2026-10-09 10:20:05,061  gsv3.training             INFO     [random:random_seed5] epoch 0149  region_bce=0.1502  dist_mse=0.0811  region_overlap=0.879
+2026-10-09 10:20:05,061  gsv3.training             INFO     [random:random_seed5] epoch 0149  train_log_mse=0.00330  val_log_mse=0.06912  val_mse=0.000412  max_grad=3.17  patience=6/30
+2026-10-09 10:21:18,381  gsv3.training             INFO     [random:random_seed5] epoch 0150  count_mse=0.0702  count_rel_err_2q=0.204
+2026-10-09 10:21:18,382  gsv3.training             INFO     [random:random_seed5] epoch 0150  region_bce=0.1564  dist_mse=0.0829  region_overlap=0.876
+2026-10-09 10:21:18,382  gsv3.training             INFO     [random:random_seed5] epoch 0150  train_log_mse=0.00483  val_log_mse=0.07383  val_mse=0.000412  max_grad=14.60  patience=7/30
+2026-10-09 10:22:32,021  gsv3.training             INFO     [random:random_seed5] epoch 0151  count_mse=0.0691  count_rel_err_2q=0.204
+2026-10-09 10:22:32,022  gsv3.training             INFO     [random:random_seed5] epoch 0151  region_bce=0.1519  dist_mse=0.0818  region_overlap=0.878
+2026-10-09 10:22:32,022  gsv3.training             INFO     [random:random_seed5] epoch 0151  train_log_mse=0.00294  val_log_mse=0.08375  val_mse=0.000459  max_grad=0.70  patience=8/30
+2026-10-09 10:23:46,502  gsv3.training             INFO     [random:random_seed5] epoch 0152  count_mse=0.0685  count_rel_err_2q=0.203
+2026-10-09 10:23:46,503  gsv3.training             INFO     [random:random_seed5] epoch 0152  region_bce=0.1501  dist_mse=0.0815  region_overlap=0.880
+2026-10-09 10:23:46,505  gsv3.training             INFO     [random:random_seed5] epoch 0152  train_log_mse=0.00338  val_log_mse=0.05987  val_mse=0.000390  max_grad=2.65  patience=0/30
+2026-10-09 10:25:01,076  gsv3.training             INFO     [random:random_seed5] epoch 0153  count_mse=0.0681  count_rel_err_2q=0.203
+2026-10-09 10:25:01,077  gsv3.training             INFO     [random:random_seed5] epoch 0153  region_bce=0.1476  dist_mse=0.0807  region_overlap=0.881
+2026-10-09 10:25:01,077  gsv3.training             INFO     [random:random_seed5] epoch 0153  train_log_mse=0.00286  val_log_mse=0.06447  val_mse=0.000397  max_grad=0.53  patience=1/30
+2026-10-09 10:26:14,992  gsv3.training             INFO     [random:random_seed5] epoch 0154  count_mse=0.0678  count_rel_err_2q=0.203
+2026-10-09 10:26:14,993  gsv3.training             INFO     [random:random_seed5] epoch 0154  region_bce=0.1466  dist_mse=0.0804  region_overlap=0.881
+2026-10-09 10:26:14,994  gsv3.training             INFO     [random:random_seed5] epoch 0154  train_log_mse=0.00260  val_log_mse=0.05577  val_mse=0.000368  max_grad=0.65  patience=0/30
+2026-10-09 10:27:27,075  gsv3.training             INFO     [random:random_seed5] epoch 0155  count_mse=0.0696  count_rel_err_2q=0.206
+2026-10-09 10:27:27,075  gsv3.training             INFO     [random:random_seed5] epoch 0155  region_bce=0.1507  dist_mse=0.0814  region_overlap=0.879
+2026-10-09 10:27:27,075  gsv3.training             INFO     [random:random_seed5] epoch 0155  train_log_mse=0.00330  val_log_mse=0.08320  val_mse=0.000394  max_grad=1.14  patience=1/30
+2026-10-09 10:28:39,307  gsv3.training             INFO     [random:random_seed5] epoch 0156  count_mse=0.0667  count_rel_err_2q=0.201
+2026-10-09 10:28:39,308  gsv3.training             INFO     [random:random_seed5] epoch 0156  region_bce=0.1444  dist_mse=0.0803  region_overlap=0.883
+2026-10-09 10:28:39,308  gsv3.training             INFO     [random:random_seed5] epoch 0156  train_log_mse=0.00297  val_log_mse=0.06381  val_mse=0.000393  max_grad=0.67  patience=2/30
+2026-10-09 10:29:51,323  gsv3.training             INFO     [random:random_seed5] epoch 0157  count_mse=0.0688  count_rel_err_2q=0.206
+2026-10-09 10:29:51,323  gsv3.training             INFO     [random:random_seed5] epoch 0157  region_bce=0.1465  dist_mse=0.0805  region_overlap=0.882
+2026-10-09 10:29:51,323  gsv3.training             INFO     [random:random_seed5] epoch 0157  train_log_mse=0.00296  val_log_mse=0.06685  val_mse=0.000437  max_grad=1.72  patience=3/30
+2026-10-09 10:31:03,489  gsv3.training             INFO     [random:random_seed5] epoch 0158  count_mse=0.0696  count_rel_err_2q=0.204
+2026-10-09 10:31:03,490  gsv3.training             INFO     [random:random_seed5] epoch 0158  region_bce=0.1482  dist_mse=0.0808  region_overlap=0.880
+2026-10-09 10:31:03,490  gsv3.training             INFO     [random:random_seed5] epoch 0158  train_log_mse=0.00387  val_log_mse=0.07907  val_mse=0.000465  max_grad=0.95  patience=4/30
+2026-10-09 10:32:15,725  gsv3.training             INFO     [random:random_seed5] epoch 0159  count_mse=0.0681  count_rel_err_2q=0.204
+2026-10-09 10:32:15,725  gsv3.training             INFO     [random:random_seed5] epoch 0159  region_bce=0.1443  dist_mse=0.0800  region_overlap=0.882
+2026-10-09 10:32:15,725  gsv3.training             INFO     [random:random_seed5] epoch 0159  train_log_mse=0.00309  val_log_mse=0.06095  val_mse=0.000400  max_grad=0.58  patience=5/30
+2026-10-09 10:33:27,410  gsv3.training             INFO     [random:random_seed5] epoch 0160  count_mse=0.0695  count_rel_err_2q=0.205
+2026-10-09 10:33:27,411  gsv3.training             INFO     [random:random_seed5] epoch 0160  region_bce=0.1455  dist_mse=0.0801  region_overlap=0.882
+2026-10-09 10:33:27,411  gsv3.training             INFO     [random:random_seed5] epoch 0160  train_log_mse=0.00302  val_log_mse=0.05847  val_mse=0.000404  max_grad=0.60  patience=6/30
+2026-10-09 10:34:39,148  gsv3.training             INFO     [random:random_seed5] epoch 0161  count_mse=0.0659  count_rel_err_2q=0.201
+2026-10-09 10:34:39,149  gsv3.training             INFO     [random:random_seed5] epoch 0161  region_bce=0.1420  dist_mse=0.0792  region_overlap=0.884
+2026-10-09 10:34:39,149  gsv3.training             INFO     [random:random_seed5] epoch 0161  train_log_mse=0.00261  val_log_mse=0.06725  val_mse=0.000419  max_grad=0.52  patience=7/30
+2026-10-09 10:35:51,261  gsv3.training             INFO     [random:random_seed5] epoch 0162  count_mse=0.0667  count_rel_err_2q=0.202
+2026-10-09 10:35:51,262  gsv3.training             INFO     [random:random_seed5] epoch 0162  region_bce=0.1414  dist_mse=0.0795  region_overlap=0.885
+2026-10-09 10:35:51,262  gsv3.training             INFO     [random:random_seed5] epoch 0162  train_log_mse=0.00274  val_log_mse=0.05864  val_mse=0.000417  max_grad=0.69  patience=8/30
+2026-10-09 10:37:03,256  gsv3.training             INFO     [random:random_seed5] epoch 0163  count_mse=0.0679  count_rel_err_2q=0.205
+2026-10-09 10:37:03,257  gsv3.training             INFO     [random:random_seed5] epoch 0163  region_bce=0.1432  dist_mse=0.0798  region_overlap=0.883
+2026-10-09 10:37:03,257  gsv3.training             INFO     [random:random_seed5] epoch 0163  train_log_mse=0.00303  val_log_mse=0.06478  val_mse=0.000404  max_grad=0.49  patience=9/30
+2026-10-09 10:38:15,418  gsv3.training             INFO     [random:random_seed5] epoch 0164  count_mse=0.0681  count_rel_err_2q=0.203
+2026-10-09 10:38:15,419  gsv3.training             INFO     [random:random_seed5] epoch 0164  region_bce=0.1466  dist_mse=0.0806  region_overlap=0.881
+2026-10-09 10:38:15,419  gsv3.training             INFO     [random:random_seed5] epoch 0164  train_log_mse=0.00305  val_log_mse=0.05591  val_mse=0.000435  max_grad=0.84  patience=10/30
+2026-10-09 10:39:27,467  gsv3.training             INFO     [random:random_seed5] epoch 0165  count_mse=0.0672  count_rel_err_2q=0.204
+2026-10-09 10:39:27,468  gsv3.training             INFO     [random:random_seed5] epoch 0165  region_bce=0.1441  dist_mse=0.0798  region_overlap=0.883
+2026-10-09 10:39:27,468  gsv3.training             INFO     [random:random_seed5] epoch 0165  train_log_mse=0.00315  val_log_mse=0.06263  val_mse=0.000419  max_grad=0.60  patience=11/30
+2026-10-09 10:40:39,050  gsv3.training             INFO     [random:random_seed5] epoch 0166  count_mse=0.0672  count_rel_err_2q=0.204
+2026-10-09 10:40:39,051  gsv3.training             INFO     [random:random_seed5] epoch 0166  region_bce=0.1451  dist_mse=0.0805  region_overlap=0.882
+2026-10-09 10:40:39,051  gsv3.training             INFO     [random:random_seed5] epoch 0166  train_log_mse=0.00358  val_log_mse=0.05879  val_mse=0.000419  max_grad=1.17  patience=12/30
+2026-10-09 10:41:51,228  gsv3.training             INFO     [random:random_seed5] epoch 0167  count_mse=0.0673  count_rel_err_2q=0.207
+2026-10-09 10:41:51,228  gsv3.training             INFO     [random:random_seed5] epoch 0167  region_bce=0.1401  dist_mse=0.0793  region_overlap=0.885
+2026-10-09 10:41:51,228  gsv3.training             INFO     [random:random_seed5] epoch 0167  train_log_mse=0.00292  val_log_mse=0.05441  val_mse=0.000390  max_grad=0.75  patience=13/30
+2026-10-09 10:43:03,198  gsv3.training             INFO     [random:random_seed5] epoch 0168  count_mse=0.0645  count_rel_err_2q=0.202
+2026-10-09 10:43:03,199  gsv3.training             INFO     [random:random_seed5] epoch 0168  region_bce=0.1394  dist_mse=0.0791  region_overlap=0.886
+2026-10-09 10:43:03,199  gsv3.training             INFO     [random:random_seed5] epoch 0168  train_log_mse=0.00264  val_log_mse=0.06012  val_mse=0.000427  max_grad=0.58  patience=14/30
+2026-10-09 10:44:15,820  gsv3.training             INFO     [random:random_seed5] epoch 0169  count_mse=0.0633  count_rel_err_2q=0.201
+2026-10-09 10:44:15,821  gsv3.training             INFO     [random:random_seed5] epoch 0169  region_bce=0.1400  dist_mse=0.0788  region_overlap=0.886
+2026-10-09 10:44:15,821  gsv3.training             INFO     [random:random_seed5] epoch 0169  train_log_mse=0.00326  val_log_mse=0.16265  val_mse=0.000582  max_grad=1.05  patience=15/30
+2026-10-09 10:45:29,712  gsv3.training             INFO     [random:random_seed5] epoch 0170  count_mse=0.0660  count_rel_err_2q=0.204
+2026-10-09 10:45:29,713  gsv3.training             INFO     [random:random_seed5] epoch 0170  region_bce=0.1384  dist_mse=0.0791  region_overlap=0.887
+2026-10-09 10:45:29,713  gsv3.training             INFO     [random:random_seed5] epoch 0170  train_log_mse=0.00295  val_log_mse=0.06177  val_mse=0.000393  max_grad=1.28  patience=16/30
+2026-10-09 10:46:44,259  gsv3.training             INFO     [random:random_seed5] epoch 0171  count_mse=0.0656  count_rel_err_2q=0.202
+2026-10-09 10:46:44,260  gsv3.training             INFO     [random:random_seed5] epoch 0171  region_bce=0.1344  dist_mse=0.0779  region_overlap=0.889
+2026-10-09 10:46:44,260  gsv3.training             INFO     [random:random_seed5] epoch 0171  train_log_mse=0.00279  val_log_mse=0.06013  val_mse=0.000380  max_grad=0.53  patience=17/30
+2026-10-09 10:47:58,979  gsv3.training             INFO     [random:random_seed5] epoch 0172  count_mse=0.0651  count_rel_err_2q=0.203
+2026-10-09 10:47:58,980  gsv3.training             INFO     [random:random_seed5] epoch 0172  region_bce=0.1411  dist_mse=0.0787  region_overlap=0.886
+2026-10-09 10:47:58,980  gsv3.training             INFO     [random:random_seed5] epoch 0172  train_log_mse=0.00250  val_log_mse=0.05927  val_mse=0.000395  max_grad=0.34  patience=18/30
+2026-10-09 10:49:14,143  gsv3.training             INFO     [random:random_seed5] epoch 0173  count_mse=0.0661  count_rel_err_2q=0.204
+2026-10-09 10:49:14,144  gsv3.training             INFO     [random:random_seed5] epoch 0173  region_bce=0.1364  dist_mse=0.0784  region_overlap=0.887
+2026-10-09 10:49:14,144  gsv3.training             INFO     [random:random_seed5] epoch 0173  train_log_mse=0.00266  val_log_mse=0.05994  val_mse=0.000390  max_grad=0.60  patience=19/30
+2026-10-09 10:50:28,844  gsv3.training             INFO     [random:random_seed5] epoch 0174  count_mse=0.0648  count_rel_err_2q=0.204
+2026-10-09 10:50:28,845  gsv3.training             INFO     [random:random_seed5] epoch 0174  region_bce=0.1377  dist_mse=0.0782  region_overlap=0.887
+2026-10-09 10:50:28,845  gsv3.training             INFO     [random:random_seed5] epoch 0174  train_log_mse=0.00303  val_log_mse=0.06194  val_mse=0.000385  max_grad=0.59  patience=20/30
+2026-10-09 10:51:44,417  gsv3.training             INFO     [random:random_seed5] epoch 0175  count_mse=0.0644  count_rel_err_2q=0.201
+2026-10-09 10:51:44,418  gsv3.training             INFO     [random:random_seed5] epoch 0175  region_bce=0.1349  dist_mse=0.0776  region_overlap=0.889
+2026-10-09 10:51:44,418  gsv3.training             INFO     [random:random_seed5] epoch 0175  train_log_mse=0.00256  val_log_mse=0.06362  val_mse=0.000384  max_grad=0.47  patience=21/30
+2026-10-09 10:53:00,140  gsv3.training             INFO     [random:random_seed5] epoch 0176  count_mse=0.0654  count_rel_err_2q=0.203
+2026-10-09 10:53:00,140  gsv3.training             INFO     [random:random_seed5] epoch 0176  region_bce=0.1385  dist_mse=0.0784  region_overlap=0.886
+2026-10-09 10:53:00,140  gsv3.training             INFO     [random:random_seed5] epoch 0176  train_log_mse=0.00286  val_log_mse=0.05733  val_mse=0.000376  max_grad=0.59  patience=22/30
+2026-10-09 10:54:16,953  gsv3.training             INFO     [random:random_seed5] epoch 0177  count_mse=0.0642  count_rel_err_2q=0.204
+2026-10-09 10:54:16,953  gsv3.training             INFO     [random:random_seed5] epoch 0177  region_bce=0.1377  dist_mse=0.0782  region_overlap=0.887
+2026-10-09 10:54:16,954  gsv3.training             INFO     [random:random_seed5] epoch 0177  train_log_mse=0.00262  val_log_mse=0.05369  val_mse=0.000375  max_grad=0.54  patience=23/30
+2026-10-09 10:55:30,325  gsv3.training             INFO     [random:random_seed5] epoch 0178  count_mse=0.0643  count_rel_err_2q=0.203
+2026-10-09 10:55:30,326  gsv3.training             INFO     [random:random_seed5] epoch 0178  region_bce=0.1359  dist_mse=0.0782  region_overlap=0.888
+2026-10-09 10:55:30,326  gsv3.training             INFO     [random:random_seed5] epoch 0178  train_log_mse=0.00303  val_log_mse=0.06456  val_mse=0.000369  max_grad=0.67  patience=24/30
+2026-10-09 10:56:42,855  gsv3.training             INFO     [random:random_seed5] epoch 0179  count_mse=0.0648  count_rel_err_2q=0.204
+2026-10-09 10:56:42,856  gsv3.training             INFO     [random:random_seed5] epoch 0179  region_bce=0.1381  dist_mse=0.0786  region_overlap=0.887
+2026-10-09 10:56:42,856  gsv3.training             INFO     [random:random_seed5] epoch 0179  train_log_mse=0.00315  val_log_mse=0.05683  val_mse=0.000392  max_grad=0.88  patience=25/30
+2026-10-09 10:57:54,678  gsv3.training             INFO     [random:random_seed5] epoch 0180  count_mse=0.0625  count_rel_err_2q=0.202
+2026-10-09 10:57:54,678  gsv3.training             INFO     [random:random_seed5] epoch 0180  region_bce=0.1308  dist_mse=0.0771  region_overlap=0.891
+2026-10-09 10:57:54,678  gsv3.training             INFO     [random:random_seed5] epoch 0180  train_log_mse=0.00254  val_log_mse=0.06584  val_mse=0.000403  max_grad=0.35  patience=26/30
+2026-10-09 10:59:06,863  gsv3.training             INFO     [random:random_seed5] epoch 0181  count_mse=0.0636  count_rel_err_2q=0.202
+2026-10-09 10:59:06,863  gsv3.training             INFO     [random:random_seed5] epoch 0181  region_bce=0.1333  dist_mse=0.0777  region_overlap=0.890
+2026-10-09 10:59:06,863  gsv3.training             INFO     [random:random_seed5] epoch 0181  train_log_mse=0.00295  val_log_mse=0.05911  val_mse=0.000428  max_grad=0.56  patience=27/30
+2026-10-09 11:00:18,920  gsv3.training             INFO     [random:random_seed5] epoch 0182  count_mse=0.0664  count_rel_err_2q=0.203
+2026-10-09 11:00:18,921  gsv3.training             INFO     [random:random_seed5] epoch 0182  region_bce=0.1347  dist_mse=0.0783  region_overlap=0.889
+2026-10-09 11:00:18,921  gsv3.training             INFO     [random:random_seed5] epoch 0182  train_log_mse=0.00308  val_log_mse=0.05586  val_mse=0.000379  max_grad=0.73  patience=28/30
+2026-10-09 11:01:30,625  gsv3.training             INFO     [random:random_seed5] epoch 0183  count_mse=0.0619  count_rel_err_2q=0.204
+2026-10-09 11:01:30,626  gsv3.training             INFO     [random:random_seed5] epoch 0183  region_bce=0.1297  dist_mse=0.0768  region_overlap=0.892
+2026-10-09 11:01:30,628  gsv3.training             INFO     [random:random_seed5] epoch 0183  train_log_mse=0.00255  val_log_mse=0.05673  val_mse=0.000359  max_grad=0.43  patience=0/30
+2026-10-09 11:02:42,275  gsv3.training             INFO     [random:random_seed5] epoch 0184  count_mse=0.0633  count_rel_err_2q=0.205
+2026-10-09 11:02:42,276  gsv3.training             INFO     [random:random_seed5] epoch 0184  region_bce=0.1327  dist_mse=0.0772  region_overlap=0.890
+2026-10-09 11:02:42,276  gsv3.training             INFO     [random:random_seed5] epoch 0184  train_log_mse=0.00272  val_log_mse=0.05690  val_mse=0.000395  max_grad=0.40  patience=1/30
+2026-10-09 11:03:54,130  gsv3.training             INFO     [random:random_seed5] epoch 0185  count_mse=0.0641  count_rel_err_2q=0.205
+2026-10-09 11:03:54,130  gsv3.training             INFO     [random:random_seed5] epoch 0185  region_bce=0.1312  dist_mse=0.0769  region_overlap=0.891
+2026-10-09 11:03:54,132  gsv3.training             INFO     [random:random_seed5] epoch 0185  train_log_mse=0.00276  val_log_mse=0.05314  val_mse=0.000358  max_grad=0.63  patience=0/30
+2026-10-09 11:05:06,368  gsv3.training             INFO     [random:random_seed5] epoch 0186  count_mse=0.0646  count_rel_err_2q=0.204
+2026-10-09 11:05:06,369  gsv3.training             INFO     [random:random_seed5] epoch 0186  region_bce=0.1336  dist_mse=0.0777  region_overlap=0.890
+2026-10-09 11:05:06,369  gsv3.training             INFO     [random:random_seed5] epoch 0186  train_log_mse=0.00262  val_log_mse=0.06062  val_mse=0.000393  max_grad=0.52  patience=1/30
+2026-10-09 11:06:17,765  gsv3.training             INFO     [random:random_seed5] epoch 0187  count_mse=0.0639  count_rel_err_2q=0.202
+2026-10-09 11:06:17,766  gsv3.training             INFO     [random:random_seed5] epoch 0187  region_bce=0.1331  dist_mse=0.0777  region_overlap=0.890
+2026-10-09 11:06:17,766  gsv3.training             INFO     [random:random_seed5] epoch 0187  train_log_mse=0.00307  val_log_mse=0.06635  val_mse=0.000438  max_grad=0.64  patience=2/30
+2026-10-09 11:07:27,709  gsv3.training             INFO     [random:random_seed5] epoch 0188  count_mse=0.0633  count_rel_err_2q=0.204
+2026-10-09 11:07:27,710  gsv3.training             INFO     [random:random_seed5] epoch 0188  region_bce=0.1312  dist_mse=0.0768  region_overlap=0.891
+2026-10-09 11:07:27,710  gsv3.training             INFO     [random:random_seed5] epoch 0188  train_log_mse=0.00269  val_log_mse=0.05999  val_mse=0.000394  max_grad=0.50  patience=3/30
+2026-10-09 11:08:39,456  gsv3.training             INFO     [random:random_seed5] epoch 0189  count_mse=0.0633  count_rel_err_2q=0.203
+2026-10-09 11:08:39,456  gsv3.training             INFO     [random:random_seed5] epoch 0189  region_bce=0.1304  dist_mse=0.0769  region_overlap=0.892
+2026-10-09 11:08:39,456  gsv3.training             INFO     [random:random_seed5] epoch 0189  train_log_mse=0.00301  val_log_mse=0.05589  val_mse=0.000393  max_grad=0.60  patience=4/30
+2026-10-09 11:09:50,934  gsv3.training             INFO     [random:random_seed5] epoch 0190  count_mse=0.0615  count_rel_err_2q=0.203
+2026-10-09 11:09:50,935  gsv3.training             INFO     [random:random_seed5] epoch 0190  region_bce=0.1270  dist_mse=0.0762  region_overlap=0.894
+2026-10-09 11:09:50,935  gsv3.training             INFO     [random:random_seed5] epoch 0190  train_log_mse=0.00235  val_log_mse=0.05340  val_mse=0.000368  max_grad=0.46  patience=5/30
+2026-10-09 11:11:02,691  gsv3.training             INFO     [random:random_seed5] epoch 0191  count_mse=0.0641  count_rel_err_2q=0.201
+2026-10-09 11:11:02,692  gsv3.training             INFO     [random:random_seed5] epoch 0191  region_bce=0.1303  dist_mse=0.0773  region_overlap=0.892
+2026-10-09 11:11:02,692  gsv3.training             INFO     [random:random_seed5] epoch 0191  train_log_mse=0.00301  val_log_mse=0.06061  val_mse=0.000388  max_grad=0.71  patience=6/30
+2026-10-09 11:12:13,700  gsv3.training             INFO     [random:random_seed5] epoch 0192  count_mse=0.0624  count_rel_err_2q=0.203
+2026-10-09 11:12:13,700  gsv3.training             INFO     [random:random_seed5] epoch 0192  region_bce=0.1293  dist_mse=0.0763  region_overlap=0.892
+2026-10-09 11:12:13,700  gsv3.training             INFO     [random:random_seed5] epoch 0192  train_log_mse=0.00268  val_log_mse=0.07023  val_mse=0.000410  max_grad=0.79  patience=7/30
+2026-10-09 11:13:23,789  gsv3.training             INFO     [random:random_seed5] epoch 0193  count_mse=0.0646  count_rel_err_2q=0.207
+2026-10-09 11:13:23,790  gsv3.training             INFO     [random:random_seed5] epoch 0193  region_bce=0.1297  dist_mse=0.0771  region_overlap=0.892
+2026-10-09 11:13:23,790  gsv3.training             INFO     [random:random_seed5] epoch 0193  train_log_mse=0.00284  val_log_mse=0.05609  val_mse=0.000363  max_grad=0.43  patience=8/30
+2026-10-09 11:14:34,568  gsv3.training             INFO     [random:random_seed5] epoch 0194  count_mse=0.0623  count_rel_err_2q=0.202
+2026-10-09 11:14:34,568  gsv3.training             INFO     [random:random_seed5] epoch 0194  region_bce=0.1300  dist_mse=0.0767  region_overlap=0.892
+2026-10-09 11:14:34,568  gsv3.training             INFO     [random:random_seed5] epoch 0194  train_log_mse=0.00242  val_log_mse=0.05471  val_mse=0.000374  max_grad=0.51  patience=9/30
+2026-10-09 11:15:46,276  gsv3.training             INFO     [random:random_seed5] epoch 0195  count_mse=0.0628  count_rel_err_2q=0.204
+2026-10-09 11:15:46,277  gsv3.training             INFO     [random:random_seed5] epoch 0195  region_bce=0.1232  dist_mse=0.0755  region_overlap=0.896
+2026-10-09 11:15:46,277  gsv3.training             INFO     [random:random_seed5] epoch 0195  train_log_mse=0.00232  val_log_mse=0.06840  val_mse=0.000360  max_grad=0.45  patience=10/30
+2026-10-09 11:16:58,302  gsv3.training             INFO     [random:random_seed5] epoch 0196  count_mse=0.0623  count_rel_err_2q=0.203
+2026-10-09 11:16:58,302  gsv3.training             INFO     [random:random_seed5] epoch 0196  region_bce=0.1277  dist_mse=0.0764  region_overlap=0.893
+2026-10-09 11:16:58,302  gsv3.training             INFO     [random:random_seed5] epoch 0196  train_log_mse=0.00276  val_log_mse=0.06480  val_mse=0.000384  max_grad=0.49  patience=11/30
+2026-10-09 11:18:09,855  gsv3.training             INFO     [random:random_seed5] epoch 0197  count_mse=0.0621  count_rel_err_2q=0.204
+2026-10-09 11:18:09,856  gsv3.training             INFO     [random:random_seed5] epoch 0197  region_bce=0.1266  dist_mse=0.0762  region_overlap=0.894
+2026-10-09 11:18:09,856  gsv3.training             INFO     [random:random_seed5] epoch 0197  train_log_mse=0.00243  val_log_mse=0.05847  val_mse=0.000379  max_grad=0.69  patience=12/30
+2026-10-09 11:19:21,888  gsv3.training             INFO     [random:random_seed5] epoch 0198  count_mse=0.0626  count_rel_err_2q=0.203
+2026-10-09 11:19:21,889  gsv3.training             INFO     [random:random_seed5] epoch 0198  region_bce=0.1275  dist_mse=0.0761  region_overlap=0.893
+2026-10-09 11:19:21,889  gsv3.training             INFO     [random:random_seed5] epoch 0198  train_log_mse=0.00276  val_log_mse=0.06343  val_mse=0.000383  max_grad=0.49  patience=13/30
+2026-10-09 11:20:34,218  gsv3.training             INFO     [random:random_seed5] epoch 0199  count_mse=0.0622  count_rel_err_2q=0.205
+2026-10-09 11:20:34,218  gsv3.training             INFO     [random:random_seed5] epoch 0199  region_bce=0.1265  dist_mse=0.0759  region_overlap=0.894
+2026-10-09 11:20:34,218  gsv3.training             INFO     [random:random_seed5] epoch 0199  train_log_mse=0.00254  val_log_mse=0.06301  val_mse=0.000411  max_grad=0.59  patience=14/30
+2026-10-09 11:21:46,106  gsv3.training             INFO     [random:random_seed5] epoch 0200  count_mse=0.0621  count_rel_err_2q=0.203
+2026-10-09 11:21:46,107  gsv3.training             INFO     [random:random_seed5] epoch 0200  region_bce=0.1250  dist_mse=0.0758  region_overlap=0.895
+2026-10-09 11:21:46,109  gsv3.training             INFO     [random:random_seed5] epoch 0200  train_log_mse=0.00230  val_log_mse=0.05638  val_mse=0.000354  max_grad=0.39  patience=0/30
+2026-10-09 11:22:57,984  gsv3.training             INFO     [random:random_seed5] epoch 0201  count_mse=0.0624  count_rel_err_2q=0.205
+2026-10-09 11:22:57,984  gsv3.training             INFO     [random:random_seed5] epoch 0201  region_bce=0.1255  dist_mse=0.0759  region_overlap=0.895
+2026-10-09 11:22:57,984  gsv3.training             INFO     [random:random_seed5] epoch 0201  train_log_mse=0.00229  val_log_mse=0.06823  val_mse=0.000374  max_grad=0.37  patience=1/30
+2026-10-09 11:24:09,875  gsv3.training             INFO     [random:random_seed5] epoch 0202  count_mse=0.0609  count_rel_err_2q=0.202
+2026-10-09 11:24:09,876  gsv3.training             INFO     [random:random_seed5] epoch 0202  region_bce=0.1250  dist_mse=0.0757  region_overlap=0.895
+2026-10-09 11:24:09,876  gsv3.training             INFO     [random:random_seed5] epoch 0202  train_log_mse=0.00276  val_log_mse=0.06775  val_mse=0.000398  max_grad=0.68  patience=2/30
+2026-10-09 11:25:21,727  gsv3.training             INFO     [random:random_seed5] epoch 0203  count_mse=0.0633  count_rel_err_2q=0.204
+2026-10-09 11:25:21,728  gsv3.training             INFO     [random:random_seed5] epoch 0203  region_bce=0.1290  dist_mse=0.0766  region_overlap=0.893
+2026-10-09 11:25:21,728  gsv3.training             INFO     [random:random_seed5] epoch 0203  train_log_mse=0.00315  val_log_mse=0.06728  val_mse=0.000378  max_grad=0.70  patience=3/30
+2026-10-09 11:26:33,653  gsv3.training             INFO     [random:random_seed5] epoch 0204  count_mse=0.0640  count_rel_err_2q=0.205
+2026-10-09 11:26:33,654  gsv3.training             INFO     [random:random_seed5] epoch 0204  region_bce=0.1293  dist_mse=0.0768  region_overlap=0.892
+2026-10-09 11:26:33,654  gsv3.training             INFO     [random:random_seed5] epoch 0204  train_log_mse=0.00281  val_log_mse=0.05757  val_mse=0.000377  max_grad=0.68  patience=4/30
+2026-10-09 11:27:45,192  gsv3.training             INFO     [random:random_seed5] epoch 0205  count_mse=0.0616  count_rel_err_2q=0.205
+2026-10-09 11:27:45,192  gsv3.training             INFO     [random:random_seed5] epoch 0205  region_bce=0.1256  dist_mse=0.0758  region_overlap=0.895
+2026-10-09 11:27:45,192  gsv3.training             INFO     [random:random_seed5] epoch 0205  train_log_mse=0.00235  val_log_mse=0.05615  val_mse=0.000374  max_grad=0.72  patience=5/30
+2026-10-09 11:28:56,737  gsv3.training             INFO     [random:random_seed5] epoch 0206  count_mse=0.0609  count_rel_err_2q=0.205
+2026-10-09 11:28:56,738  gsv3.training             INFO     [random:random_seed5] epoch 0206  region_bce=0.1252  dist_mse=0.0753  region_overlap=0.895
+2026-10-09 11:28:56,738  gsv3.training             INFO     [random:random_seed5] epoch 0206  train_log_mse=0.00230  val_log_mse=0.06119  val_mse=0.000377  max_grad=0.41  patience=6/30
+2026-10-09 11:30:08,434  gsv3.training             INFO     [random:random_seed5] epoch 0207  count_mse=0.0607  count_rel_err_2q=0.204
+2026-10-09 11:30:08,435  gsv3.training             INFO     [random:random_seed5] epoch 0207  region_bce=0.1224  dist_mse=0.0751  region_overlap=0.897
+2026-10-09 11:30:08,435  gsv3.training             INFO     [random:random_seed5] epoch 0207  train_log_mse=0.00210  val_log_mse=0.05961  val_mse=0.000379  max_grad=0.32  patience=7/30
+2026-10-09 11:31:20,842  gsv3.training             INFO     [random:random_seed5] epoch 0208  count_mse=0.0618  count_rel_err_2q=0.205
+2026-10-09 11:31:20,842  gsv3.training             INFO     [random:random_seed5] epoch 0208  region_bce=0.1220  dist_mse=0.0752  region_overlap=0.897
+2026-10-09 11:31:20,842  gsv3.training             INFO     [random:random_seed5] epoch 0208  train_log_mse=0.00227  val_log_mse=0.06091  val_mse=0.000379  max_grad=0.40  patience=8/30
+2026-10-09 11:32:32,752  gsv3.training             INFO     [random:random_seed5] epoch 0209  count_mse=0.0615  count_rel_err_2q=0.205
+2026-10-09 11:32:32,752  gsv3.training             INFO     [random:random_seed5] epoch 0209  region_bce=0.1250  dist_mse=0.0756  region_overlap=0.895
+2026-10-09 11:32:32,752  gsv3.training             INFO     [random:random_seed5] epoch 0209  train_log_mse=0.00271  val_log_mse=0.06132  val_mse=0.000368  max_grad=0.50  patience=9/30
+2026-10-09 11:33:44,709  gsv3.training             INFO     [random:random_seed5] epoch 0210  count_mse=0.0604  count_rel_err_2q=0.205
+2026-10-09 11:33:44,710  gsv3.training             INFO     [random:random_seed5] epoch 0210  region_bce=0.1212  dist_mse=0.0750  region_overlap=0.897
+2026-10-09 11:33:44,710  gsv3.training             INFO     [random:random_seed5] epoch 0210  train_log_mse=0.00277  val_log_mse=0.05658  val_mse=0.000388  max_grad=0.71  patience=10/30
+2026-10-09 11:34:56,680  gsv3.training             INFO     [random:random_seed5] epoch 0211  count_mse=0.0614  count_rel_err_2q=0.205
+2026-10-09 11:34:56,681  gsv3.training             INFO     [random:random_seed5] epoch 0211  region_bce=0.1227  dist_mse=0.0756  region_overlap=0.896
+2026-10-09 11:34:56,681  gsv3.training             INFO     [random:random_seed5] epoch 0211  train_log_mse=0.00267  val_log_mse=0.05840  val_mse=0.000368  max_grad=0.63  patience=11/30
+2026-10-09 11:36:08,026  gsv3.training             INFO     [random:random_seed5] epoch 0212  count_mse=0.0612  count_rel_err_2q=0.207
+2026-10-09 11:36:08,027  gsv3.training             INFO     [random:random_seed5] epoch 0212  region_bce=0.1209  dist_mse=0.0746  region_overlap=0.898
+2026-10-09 11:36:08,027  gsv3.training             INFO     [random:random_seed5] epoch 0212  train_log_mse=0.00223  val_log_mse=0.05523  val_mse=0.000366  max_grad=0.46  patience=12/30
+2026-10-09 11:37:19,599  gsv3.training             INFO     [random:random_seed5] epoch 0213  count_mse=0.0614  count_rel_err_2q=0.204
+2026-10-09 11:37:19,600  gsv3.training             INFO     [random:random_seed5] epoch 0213  region_bce=0.1210  dist_mse=0.0749  region_overlap=0.897
+2026-10-09 11:37:19,600  gsv3.training             INFO     [random:random_seed5] epoch 0213  train_log_mse=0.00250  val_log_mse=0.05754  val_mse=0.000369  max_grad=0.49  patience=13/30
+2026-10-09 11:38:31,058  gsv3.training             INFO     [random:random_seed5] epoch 0214  count_mse=0.0622  count_rel_err_2q=0.204
+2026-10-09 11:38:31,059  gsv3.training             INFO     [random:random_seed5] epoch 0214  region_bce=0.1195  dist_mse=0.0746  region_overlap=0.898
+2026-10-09 11:38:31,059  gsv3.training             INFO     [random:random_seed5] epoch 0214  train_log_mse=0.00253  val_log_mse=0.07208  val_mse=0.000378  max_grad=0.81  patience=14/30
+2026-10-09 11:39:42,721  gsv3.training             INFO     [random:random_seed5] epoch 0215  count_mse=0.0610  count_rel_err_2q=0.206
+2026-10-09 11:39:42,721  gsv3.training             INFO     [random:random_seed5] epoch 0215  region_bce=0.1213  dist_mse=0.0744  region_overlap=0.898
+2026-10-09 11:39:42,721  gsv3.training             INFO     [random:random_seed5] epoch 0215  train_log_mse=0.00268  val_log_mse=0.06505  val_mse=0.000372  max_grad=0.52  patience=15/30
+2026-10-09 11:40:54,545  gsv3.training             INFO     [random:random_seed5] epoch 0216  count_mse=0.0590  count_rel_err_2q=0.204
+2026-10-09 11:40:54,545  gsv3.training             INFO     [random:random_seed5] epoch 0216  region_bce=0.1189  dist_mse=0.0744  region_overlap=0.899
+2026-10-09 11:40:54,547  gsv3.training             INFO     [random:random_seed5] epoch 0216  train_log_mse=0.00230  val_log_mse=0.06143  val_mse=0.000344  max_grad=0.44  patience=0/30
+2026-10-09 11:42:06,015  gsv3.training             INFO     [random:random_seed5] epoch 0217  count_mse=0.0619  count_rel_err_2q=0.203
+2026-10-09 11:42:06,015  gsv3.training             INFO     [random:random_seed5] epoch 0217  region_bce=0.1264  dist_mse=0.0757  region_overlap=0.895
+2026-10-09 11:42:06,015  gsv3.training             INFO     [random:random_seed5] epoch 0217  train_log_mse=0.00269  val_log_mse=0.06262  val_mse=0.000359  max_grad=0.58  patience=1/30
+2026-10-09 11:43:18,385  gsv3.training             INFO     [random:random_seed5] epoch 0218  count_mse=0.0591  count_rel_err_2q=0.202
+2026-10-09 11:43:18,386  gsv3.training             INFO     [random:random_seed5] epoch 0218  region_bce=0.1184  dist_mse=0.0741  region_overlap=0.899
+2026-10-09 11:43:18,386  gsv3.training             INFO     [random:random_seed5] epoch 0218  train_log_mse=0.00236  val_log_mse=0.06133  val_mse=0.000353  max_grad=0.32  patience=2/30
+2026-10-09 11:44:30,282  gsv3.training             INFO     [random:random_seed5] epoch 0219  count_mse=0.0606  count_rel_err_2q=0.205
+2026-10-09 11:44:30,282  gsv3.training             INFO     [random:random_seed5] epoch 0219  region_bce=0.1226  dist_mse=0.0754  region_overlap=0.896
+2026-10-09 11:44:30,282  gsv3.training             INFO     [random:random_seed5] epoch 0219  train_log_mse=0.00227  val_log_mse=0.06046  val_mse=0.000366  max_grad=0.65  patience=3/30
+2026-10-09 11:45:41,997  gsv3.training             INFO     [random:random_seed5] epoch 0220  count_mse=0.0607  count_rel_err_2q=0.207
+2026-10-09 11:45:41,997  gsv3.training             INFO     [random:random_seed5] epoch 0220  region_bce=0.1217  dist_mse=0.0754  region_overlap=0.898
+2026-10-09 11:45:41,997  gsv3.training             INFO     [random:random_seed5] epoch 0220  train_log_mse=0.00286  val_log_mse=0.10401  val_mse=0.000393  max_grad=1.98  patience=4/30
+2026-10-09 11:46:53,919  gsv3.training             INFO     [random:random_seed5] epoch 0221  count_mse=0.0633  count_rel_err_2q=0.208
+2026-10-09 11:46:53,920  gsv3.training             INFO     [random:random_seed5] epoch 0221  region_bce=0.1227  dist_mse=0.0757  region_overlap=0.897
+2026-10-09 11:46:53,920  gsv3.training             INFO     [random:random_seed5] epoch 0221  train_log_mse=0.00402  val_log_mse=0.06722  val_mse=0.000357  max_grad=2.18  patience=5/30
+2026-10-09 11:48:05,296  gsv3.training             INFO     [random:random_seed5] epoch 0222  count_mse=0.0626  count_rel_err_2q=0.204
+2026-10-09 11:48:05,297  gsv3.training             INFO     [random:random_seed5] epoch 0222  region_bce=0.1213  dist_mse=0.0750  region_overlap=0.898
+2026-10-09 11:48:05,297  gsv3.training             INFO     [random:random_seed5] epoch 0222  train_log_mse=0.00259  val_log_mse=0.07251  val_mse=0.000367  max_grad=3.41  patience=6/30
+2026-10-09 11:49:16,998  gsv3.training             INFO     [random:random_seed5] epoch 0223  count_mse=0.0615  count_rel_err_2q=0.206
+2026-10-09 11:49:16,999  gsv3.training             INFO     [random:random_seed5] epoch 0223  region_bce=0.1170  dist_mse=0.0741  region_overlap=0.900
+2026-10-09 11:49:16,999  gsv3.training             INFO     [random:random_seed5] epoch 0223  train_log_mse=0.00246  val_log_mse=0.08389  val_mse=0.000350  max_grad=0.73  patience=7/30
+2026-10-09 11:50:29,113  gsv3.training             INFO     [random:random_seed5] epoch 0224  count_mse=0.0609  count_rel_err_2q=0.205
+2026-10-09 11:50:29,113  gsv3.training             INFO     [random:random_seed5] epoch 0224  region_bce=0.1212  dist_mse=0.0748  region_overlap=0.898
+2026-10-09 11:50:29,113  gsv3.training             INFO     [random:random_seed5] epoch 0224  train_log_mse=0.00254  val_log_mse=0.07952  val_mse=0.000371  max_grad=1.06  patience=8/30
+2026-10-09 11:51:40,775  gsv3.training             INFO     [random:random_seed5] epoch 0225  count_mse=0.0606  count_rel_err_2q=0.206
+2026-10-09 11:51:40,776  gsv3.training             INFO     [random:random_seed5] epoch 0225  region_bce=0.1154  dist_mse=0.0741  region_overlap=0.901
+2026-10-09 11:51:40,776  gsv3.training             INFO     [random:random_seed5] epoch 0225  train_log_mse=0.00263  val_log_mse=0.06680  val_mse=0.000381  max_grad=0.58  patience=9/30
+2026-10-09 11:52:53,057  gsv3.training             INFO     [random:random_seed5] epoch 0226  count_mse=0.0597  count_rel_err_2q=0.204
+2026-10-09 11:52:53,058  gsv3.training             INFO     [random:random_seed5] epoch 0226  region_bce=0.1175  dist_mse=0.0740  region_overlap=0.900
+2026-10-09 11:52:53,058  gsv3.training             INFO     [random:random_seed5] epoch 0226  train_log_mse=0.00262  val_log_mse=0.07288  val_mse=0.000394  max_grad=0.75  patience=10/30
+2026-10-09 11:54:04,877  gsv3.training             INFO     [random:random_seed5] epoch 0227  count_mse=0.0623  count_rel_err_2q=0.206
+2026-10-09 11:54:04,878  gsv3.training             INFO     [random:random_seed5] epoch 0227  region_bce=0.1175  dist_mse=0.0748  region_overlap=0.900
+2026-10-09 11:54:04,878  gsv3.training             INFO     [random:random_seed5] epoch 0227  train_log_mse=0.00260  val_log_mse=0.05799  val_mse=0.000370  max_grad=0.44  patience=11/30
+2026-10-09 11:55:16,877  gsv3.training             INFO     [random:random_seed5] epoch 0228  count_mse=0.0597  count_rel_err_2q=0.207
+2026-10-09 11:55:16,877  gsv3.training             INFO     [random:random_seed5] epoch 0228  region_bce=0.1199  dist_mse=0.0748  region_overlap=0.898
+2026-10-09 11:55:16,877  gsv3.training             INFO     [random:random_seed5] epoch 0228  train_log_mse=0.00251  val_log_mse=0.06529  val_mse=0.000388  max_grad=3.28  patience=12/30
+2026-10-09 11:56:28,601  gsv3.training             INFO     [random:random_seed5] epoch 0229  count_mse=0.0600  count_rel_err_2q=0.205
+2026-10-09 11:56:28,602  gsv3.training             INFO     [random:random_seed5] epoch 0229  region_bce=0.1160  dist_mse=0.0739  region_overlap=0.900
+2026-10-09 11:56:28,602  gsv3.training             INFO     [random:random_seed5] epoch 0229  train_log_mse=0.00250  val_log_mse=0.06868  val_mse=0.000370  max_grad=0.43  patience=13/30
+2026-10-09 11:57:40,421  gsv3.training             INFO     [random:random_seed5] epoch 0230  count_mse=0.0607  count_rel_err_2q=0.207
+2026-10-09 11:57:40,422  gsv3.training             INFO     [random:random_seed5] epoch 0230  region_bce=0.1182  dist_mse=0.0745  region_overlap=0.899
+2026-10-09 11:57:40,422  gsv3.training             INFO     [random:random_seed5] epoch 0230  train_log_mse=0.00264  val_log_mse=0.06878  val_mse=0.000388  max_grad=1.95  patience=14/30
+2026-10-09 11:58:52,654  gsv3.training             INFO     [random:random_seed5] epoch 0231  count_mse=0.0589  count_rel_err_2q=0.205
+2026-10-09 11:58:52,654  gsv3.training             INFO     [random:random_seed5] epoch 0231  region_bce=0.1163  dist_mse=0.0741  region_overlap=0.901
+2026-10-09 11:58:52,654  gsv3.training             INFO     [random:random_seed5] epoch 0231  train_log_mse=0.00246  val_log_mse=0.07971  val_mse=0.000366  max_grad=0.98  patience=15/30
+2026-10-09 12:00:03,865  gsv3.training             INFO     [random:random_seed5] epoch 0232  count_mse=0.0610  count_rel_err_2q=0.205
+2026-10-09 12:00:03,865  gsv3.training             INFO     [random:random_seed5] epoch 0232  region_bce=0.1164  dist_mse=0.0741  region_overlap=0.900
+2026-10-09 12:00:03,865  gsv3.training             INFO     [random:random_seed5] epoch 0232  train_log_mse=0.00237  val_log_mse=0.06928  val_mse=0.000394  max_grad=0.39  patience=16/30
+2026-10-09 12:01:15,196  gsv3.training             INFO     [random:random_seed5] epoch 0233  count_mse=0.0595  count_rel_err_2q=0.207
+2026-10-09 12:01:15,196  gsv3.training             INFO     [random:random_seed5] epoch 0233  region_bce=0.1144  dist_mse=0.0735  region_overlap=0.902
+2026-10-09 12:01:15,196  gsv3.training             INFO     [random:random_seed5] epoch 0233  train_log_mse=0.00224  val_log_mse=0.08039  val_mse=0.000436  max_grad=1.65  patience=17/30
+2026-10-09 12:02:27,024  gsv3.training             INFO     [random:random_seed5] epoch 0234  count_mse=0.0610  count_rel_err_2q=0.209
+2026-10-09 12:02:27,024  gsv3.training             INFO     [random:random_seed5] epoch 0234  region_bce=0.1238  dist_mse=0.0756  region_overlap=0.897
+2026-10-09 12:02:27,025  gsv3.training             INFO     [random:random_seed5] epoch 0234  train_log_mse=0.00274  val_log_mse=0.05972  val_mse=0.000384  max_grad=3.75  patience=18/30
+2026-10-09 12:03:39,160  gsv3.training             INFO     [random:random_seed5] epoch 0235  count_mse=0.0593  count_rel_err_2q=0.204
+2026-10-09 12:03:39,161  gsv3.training             INFO     [random:random_seed5] epoch 0235  region_bce=0.1179  dist_mse=0.0738  region_overlap=0.899
+2026-10-09 12:03:39,161  gsv3.training             INFO     [random:random_seed5] epoch 0235  train_log_mse=0.00233  val_log_mse=0.06832  val_mse=0.000365  max_grad=2.86  patience=19/30
+2026-10-09 12:04:51,435  gsv3.training             INFO     [random:random_seed5] epoch 0236  count_mse=0.0577  count_rel_err_2q=0.206
+2026-10-09 12:04:51,436  gsv3.training             INFO     [random:random_seed5] epoch 0236  region_bce=0.1147  dist_mse=0.0731  region_overlap=0.901
+2026-10-09 12:04:51,436  gsv3.training             INFO     [random:random_seed5] epoch 0236  train_log_mse=0.00224  val_log_mse=0.06313  val_mse=0.000363  max_grad=0.92  patience=20/30
+2026-10-09 12:06:09,687  gsv3.training             INFO     [random:random_seed5] epoch 0237  count_mse=0.0594  count_rel_err_2q=0.207
+2026-10-09 12:06:09,688  gsv3.training             INFO     [random:random_seed5] epoch 0237  region_bce=0.1119  dist_mse=0.0730  region_overlap=0.903
+2026-10-09 12:06:09,688  gsv3.training             INFO     [random:random_seed5] epoch 0237  train_log_mse=0.00228  val_log_mse=0.07134  val_mse=0.000360  max_grad=0.41  patience=21/30
+2026-10-09 12:07:28,655  gsv3.training             INFO     [random:random_seed5] epoch 0238  count_mse=0.0586  count_rel_err_2q=0.205
+2026-10-09 12:07:28,656  gsv3.training             INFO     [random:random_seed5] epoch 0238  region_bce=0.1144  dist_mse=0.0736  region_overlap=0.901
+2026-10-09 12:07:28,656  gsv3.training             INFO     [random:random_seed5] epoch 0238  train_log_mse=0.00248  val_log_mse=0.06049  val_mse=0.000370  max_grad=0.66  patience=22/30
+2026-10-09 12:08:43,361  gsv3.training             INFO     [random:random_seed5] epoch 0239  count_mse=0.0586  count_rel_err_2q=0.206
+2026-10-09 12:08:43,362  gsv3.training             INFO     [random:random_seed5] epoch 0239  region_bce=0.1111  dist_mse=0.0723  region_overlap=0.904
+2026-10-09 12:08:43,362  gsv3.training             INFO     [random:random_seed5] epoch 0239  train_log_mse=0.00224  val_log_mse=0.06379  val_mse=0.000365  max_grad=0.48  patience=23/30
+2026-10-09 12:09:55,279  gsv3.training             INFO     [random:random_seed5] epoch 0240  count_mse=0.0574  count_rel_err_2q=0.207
+2026-10-09 12:09:55,280  gsv3.training             INFO     [random:random_seed5] epoch 0240  region_bce=0.1109  dist_mse=0.0726  region_overlap=0.904
+2026-10-09 12:09:55,280  gsv3.training             INFO     [random:random_seed5] epoch 0240  train_log_mse=0.00226  val_log_mse=0.06100  val_mse=0.000361  max_grad=0.38  patience=24/30
+2026-10-09 12:11:06,667  gsv3.training             INFO     [random:random_seed5] epoch 0241  count_mse=0.0591  count_rel_err_2q=0.206
+2026-10-09 12:11:06,668  gsv3.training             INFO     [random:random_seed5] epoch 0241  region_bce=0.1129  dist_mse=0.0735  region_overlap=0.903
+2026-10-09 12:11:06,668  gsv3.training             INFO     [random:random_seed5] epoch 0241  train_log_mse=0.00264  val_log_mse=0.06609  val_mse=0.000366  max_grad=0.72  patience=25/30
+2026-10-09 12:12:18,515  gsv3.training             INFO     [random:random_seed5] epoch 0242  count_mse=0.0596  count_rel_err_2q=0.204
+2026-10-09 12:12:18,515  gsv3.training             INFO     [random:random_seed5] epoch 0242  region_bce=0.1148  dist_mse=0.0742  region_overlap=0.902
+2026-10-09 12:12:18,515  gsv3.training             INFO     [random:random_seed5] epoch 0242  train_log_mse=0.00315  val_log_mse=0.06113  val_mse=0.000362  max_grad=0.87  patience=26/30
+2026-10-09 12:13:30,447  gsv3.training             INFO     [random:random_seed5] epoch 0243  count_mse=0.0585  count_rel_err_2q=0.204
+2026-10-09 12:13:30,448  gsv3.training             INFO     [random:random_seed5] epoch 0243  region_bce=0.1107  dist_mse=0.0725  region_overlap=0.904
+2026-10-09 12:13:30,449  gsv3.training             INFO     [random:random_seed5] epoch 0243  train_log_mse=0.00202  val_log_mse=0.06129  val_mse=0.000336  max_grad=0.44  patience=0/30
+2026-10-09 12:14:41,857  gsv3.training             INFO     [random:random_seed5] epoch 0244  count_mse=0.0589  count_rel_err_2q=0.205
+2026-10-09 12:14:41,858  gsv3.training             INFO     [random:random_seed5] epoch 0244  region_bce=0.1112  dist_mse=0.0725  region_overlap=0.903
+2026-10-09 12:14:41,859  gsv3.training             INFO     [random:random_seed5] epoch 0244  train_log_mse=0.00201  val_log_mse=0.06324  val_mse=0.000346  max_grad=0.58  patience=1/30
+2026-10-09 12:15:53,482  gsv3.training             INFO     [random:random_seed5] epoch 0245  count_mse=0.0586  count_rel_err_2q=0.206
+2026-10-09 12:15:53,483  gsv3.training             INFO     [random:random_seed5] epoch 0245  region_bce=0.1104  dist_mse=0.0724  region_overlap=0.904
+2026-10-09 12:15:53,483  gsv3.training             INFO     [random:random_seed5] epoch 0245  train_log_mse=0.00199  val_log_mse=0.06468  val_mse=0.000361  max_grad=0.35  patience=2/30
+2026-10-09 12:17:04,752  gsv3.training             INFO     [random:random_seed5] epoch 0246  count_mse=0.0581  count_rel_err_2q=0.204
+2026-10-09 12:17:04,753  gsv3.training             INFO     [random:random_seed5] epoch 0246  region_bce=0.1160  dist_mse=0.0741  region_overlap=0.901
+2026-10-09 12:17:04,753  gsv3.training             INFO     [random:random_seed5] epoch 0246  train_log_mse=0.00315  val_log_mse=0.07208  val_mse=0.000388  max_grad=1.33  patience=3/30
+2026-10-09 12:18:16,256  gsv3.training             INFO     [random:random_seed5] epoch 0247  count_mse=0.0605  count_rel_err_2q=0.210
+2026-10-09 12:18:16,257  gsv3.training             INFO     [random:random_seed5] epoch 0247  region_bce=0.1166  dist_mse=0.0745  region_overlap=0.900
+2026-10-09 12:18:16,257  gsv3.training             INFO     [random:random_seed5] epoch 0247  train_log_mse=0.00272  val_log_mse=0.09107  val_mse=0.000390  max_grad=1.88  patience=4/30
+2026-10-09 12:19:28,101  gsv3.training             INFO     [random:random_seed5] epoch 0248  count_mse=0.0614  count_rel_err_2q=0.210
+2026-10-09 12:19:28,101  gsv3.training             INFO     [random:random_seed5] epoch 0248  region_bce=0.1201  dist_mse=0.0750  region_overlap=0.899
+2026-10-09 12:19:28,101  gsv3.training             INFO     [random:random_seed5] epoch 0248  train_log_mse=0.00298  val_log_mse=0.09379  val_mse=0.000369  max_grad=5.28  patience=5/30
+2026-10-09 12:20:39,694  gsv3.training             INFO     [random:random_seed5] epoch 0249  count_mse=0.0629  count_rel_err_2q=0.208
+2026-10-09 12:20:39,695  gsv3.training             INFO     [random:random_seed5] epoch 0249  region_bce=0.1179  dist_mse=0.0743  region_overlap=0.900
+2026-10-09 12:20:39,695  gsv3.training             INFO     [random:random_seed5] epoch 0249  train_log_mse=0.00334  val_log_mse=0.08119  val_mse=0.000358  max_grad=7.06  patience=6/30
+2026-10-09 12:21:51,841  gsv3.training             INFO     [random:random_seed5] epoch 0250  count_mse=0.0579  count_rel_err_2q=0.208
+2026-10-09 12:21:51,842  gsv3.training             INFO     [random:random_seed5] epoch 0250  region_bce=0.1101  dist_mse=0.0729  region_overlap=0.904
+2026-10-09 12:21:51,842  gsv3.training             INFO     [random:random_seed5] epoch 0250  train_log_mse=0.00229  val_log_mse=0.06751  val_mse=0.000365  max_grad=0.48  patience=7/30
+2026-10-09 12:23:03,569  gsv3.training             INFO     [random:random_seed5] epoch 0251  count_mse=0.0584  count_rel_err_2q=0.210
+2026-10-09 12:23:03,569  gsv3.training             INFO     [random:random_seed5] epoch 0251  region_bce=0.1100  dist_mse=0.0721  region_overlap=0.905
+2026-10-09 12:23:03,569  gsv3.training             INFO     [random:random_seed5] epoch 0251  train_log_mse=0.00275  val_log_mse=0.07174  val_mse=0.000350  max_grad=10.87  patience=8/30
+2026-10-09 12:24:15,397  gsv3.training             INFO     [random:random_seed5] epoch 0252  count_mse=0.0591  count_rel_err_2q=0.208
+2026-10-09 12:24:15,397  gsv3.training             INFO     [random:random_seed5] epoch 0252  region_bce=0.1100  dist_mse=0.0725  region_overlap=0.904
+2026-10-09 12:24:15,397  gsv3.training             INFO     [random:random_seed5] epoch 0252  train_log_mse=0.00216  val_log_mse=0.07331  val_mse=0.000364  max_grad=5.91  patience=9/30
+2026-10-09 12:25:27,066  gsv3.training             INFO     [random:random_seed5] epoch 0253  count_mse=0.0580  count_rel_err_2q=0.206
+2026-10-09 12:25:27,067  gsv3.training             INFO     [random:random_seed5] epoch 0253  region_bce=0.1069  dist_mse=0.0717  region_overlap=0.906
+2026-10-09 12:25:27,067  gsv3.training             INFO     [random:random_seed5] epoch 0253  train_log_mse=0.00221  val_log_mse=0.08074  val_mse=0.000344  max_grad=0.51  patience=10/30
+2026-10-09 12:26:38,587  gsv3.training             INFO     [random:random_seed5] epoch 0254  count_mse=0.0605  count_rel_err_2q=0.209
+2026-10-09 12:26:38,587  gsv3.training             INFO     [random:random_seed5] epoch 0254  region_bce=0.1129  dist_mse=0.0734  region_overlap=0.903
+2026-10-09 12:26:38,587  gsv3.training             INFO     [random:random_seed5] epoch 0254  train_log_mse=0.00253  val_log_mse=0.07058  val_mse=0.000362  max_grad=5.56  patience=11/30
+2026-10-09 12:27:51,062  gsv3.training             INFO     [random:random_seed5] epoch 0255  count_mse=0.0588  count_rel_err_2q=0.208
+2026-10-09 12:27:51,062  gsv3.training             INFO     [random:random_seed5] epoch 0255  region_bce=0.1112  dist_mse=0.0727  region_overlap=0.904
+2026-10-09 12:27:51,062  gsv3.training             INFO     [random:random_seed5] epoch 0255  train_log_mse=0.00218  val_log_mse=0.06610  val_mse=0.000363  max_grad=1.75  patience=12/30
+2026-10-09 12:29:03,010  gsv3.training             INFO     [random:random_seed5] epoch 0256  count_mse=0.0573  count_rel_err_2q=0.209
+2026-10-09 12:29:03,011  gsv3.training             INFO     [random:random_seed5] epoch 0256  region_bce=0.1112  dist_mse=0.0725  region_overlap=0.904
+2026-10-09 12:29:03,011  gsv3.training             INFO     [random:random_seed5] epoch 0256  train_log_mse=0.00207  val_log_mse=0.05955  val_mse=0.000352  max_grad=0.90  patience=13/30
+2026-10-09 12:30:14,923  gsv3.training             INFO     [random:random_seed5] epoch 0257  count_mse=0.0583  count_rel_err_2q=0.208
+2026-10-09 12:30:14,924  gsv3.training             INFO     [random:random_seed5] epoch 0257  region_bce=0.1129  dist_mse=0.0738  region_overlap=0.903
+2026-10-09 12:30:14,924  gsv3.training             INFO     [random:random_seed5] epoch 0257  train_log_mse=0.00307  val_log_mse=0.05904  val_mse=0.000356  max_grad=10.12  patience=14/30
+2026-10-09 12:31:26,584  gsv3.training             INFO     [random:random_seed5] epoch 0258  count_mse=0.0577  count_rel_err_2q=0.208
+2026-10-09 12:31:26,584  gsv3.training             INFO     [random:random_seed5] epoch 0258  region_bce=0.1116  dist_mse=0.0728  region_overlap=0.903
+2026-10-09 12:31:26,584  gsv3.training             INFO     [random:random_seed5] epoch 0258  train_log_mse=0.00245  val_log_mse=0.06004  val_mse=0.000343  max_grad=2.47  patience=15/30
+2026-10-09 12:32:38,679  gsv3.training             INFO     [random:random_seed5] epoch 0259  count_mse=0.0593  count_rel_err_2q=0.207
+2026-10-09 12:32:38,680  gsv3.training             INFO     [random:random_seed5] epoch 0259  region_bce=0.1085  dist_mse=0.0723  region_overlap=0.905
+2026-10-09 12:32:38,680  gsv3.training             INFO     [random:random_seed5] epoch 0259  train_log_mse=0.00212  val_log_mse=0.05771  val_mse=0.000353  max_grad=0.46  patience=16/30
+2026-10-09 12:33:50,803  gsv3.training             INFO     [random:random_seed5] epoch 0260  count_mse=0.0578  count_rel_err_2q=0.207
+2026-10-09 12:33:50,804  gsv3.training             INFO     [random:random_seed5] epoch 0260  region_bce=0.1065  dist_mse=0.0716  region_overlap=0.907
+2026-10-09 12:33:50,804  gsv3.training             INFO     [random:random_seed5] epoch 0260  train_log_mse=0.00203  val_log_mse=0.05574  val_mse=0.000341  max_grad=0.42  patience=17/30
+2026-10-09 12:35:02,700  gsv3.training             INFO     [random:random_seed5] epoch 0261  count_mse=0.0577  count_rel_err_2q=0.210
+2026-10-09 12:35:02,701  gsv3.training             INFO     [random:random_seed5] epoch 0261  region_bce=0.1065  dist_mse=0.0711  region_overlap=0.906
+2026-10-09 12:35:02,701  gsv3.training             INFO     [random:random_seed5] epoch 0261  train_log_mse=0.00206  val_log_mse=0.05815  val_mse=0.000377  max_grad=0.41  patience=18/30
+2026-10-09 12:36:14,427  gsv3.training             INFO     [random:random_seed5] epoch 0262  count_mse=0.0587  count_rel_err_2q=0.208
+2026-10-09 12:36:14,428  gsv3.training             INFO     [random:random_seed5] epoch 0262  region_bce=0.1053  dist_mse=0.0719  region_overlap=0.907
+2026-10-09 12:36:14,428  gsv3.training             INFO     [random:random_seed5] epoch 0262  train_log_mse=0.00290  val_log_mse=0.06264  val_mse=0.000410  max_grad=0.83  patience=19/30
+2026-10-09 12:37:26,544  gsv3.training             INFO     [random:random_seed5] epoch 0263  count_mse=0.0584  count_rel_err_2q=0.207
+2026-10-09 12:37:26,544  gsv3.training             INFO     [random:random_seed5] epoch 0263  region_bce=0.1044  dist_mse=0.0712  region_overlap=0.908
+2026-10-09 12:37:26,544  gsv3.training             INFO     [random:random_seed5] epoch 0263  train_log_mse=0.00189  val_log_mse=0.05428  val_mse=0.000337  max_grad=0.40  patience=20/30
+2026-10-09 12:38:38,018  gsv3.training             INFO     [random:random_seed5] epoch 0264  count_mse=0.0565  count_rel_err_2q=0.209
+2026-10-09 12:38:38,018  gsv3.training             INFO     [random:random_seed5] epoch 0264  region_bce=0.1041  dist_mse=0.0706  region_overlap=0.908
+2026-10-09 12:38:38,018  gsv3.training             INFO     [random:random_seed5] epoch 0264  train_log_mse=0.00196  val_log_mse=0.05611  val_mse=0.000366  max_grad=0.34  patience=21/30
+2026-10-09 12:39:50,087  gsv3.training             INFO     [random:random_seed5] epoch 0265  count_mse=0.0574  count_rel_err_2q=0.208
+2026-10-09 12:39:50,088  gsv3.training             INFO     [random:random_seed5] epoch 0265  region_bce=0.1058  dist_mse=0.0711  region_overlap=0.907
+2026-10-09 12:39:50,088  gsv3.training             INFO     [random:random_seed5] epoch 0265  train_log_mse=0.00203  val_log_mse=0.06878  val_mse=0.000352  max_grad=0.55  patience=22/30
+2026-10-09 12:41:01,839  gsv3.training             INFO     [random:random_seed5] epoch 0266  count_mse=0.0588  count_rel_err_2q=0.209
+2026-10-09 12:41:01,839  gsv3.training             INFO     [random:random_seed5] epoch 0266  region_bce=0.1080  dist_mse=0.0718  region_overlap=0.906
+2026-10-09 12:41:01,840  gsv3.training             INFO     [random:random_seed5] epoch 0266  train_log_mse=0.00216  val_log_mse=0.06215  val_mse=0.000351  max_grad=0.52  patience=23/30
+2026-10-09 12:42:13,092  gsv3.training             INFO     [random:random_seed5] epoch 0267  count_mse=0.0571  count_rel_err_2q=0.208
+2026-10-09 12:42:13,093  gsv3.training             INFO     [random:random_seed5] epoch 0267  region_bce=0.1087  dist_mse=0.0717  region_overlap=0.906
+2026-10-09 12:42:13,093  gsv3.training             INFO     [random:random_seed5] epoch 0267  train_log_mse=0.00207  val_log_mse=0.06071  val_mse=0.000433  max_grad=0.90  patience=24/30
+2026-10-09 12:43:24,518  gsv3.training             INFO     [random:random_seed5] epoch 0268  count_mse=0.0577  count_rel_err_2q=0.209
+2026-10-09 12:43:24,518  gsv3.training             INFO     [random:random_seed5] epoch 0268  region_bce=0.1080  dist_mse=0.0716  region_overlap=0.906
+2026-10-09 12:43:24,518  gsv3.training             INFO     [random:random_seed5] epoch 0268  train_log_mse=0.00240  val_log_mse=0.05394  val_mse=0.000405  max_grad=0.63  patience=25/30
+2026-10-09 12:44:35,507  gsv3.training             INFO     [random:random_seed5] epoch 0269  count_mse=0.0552  count_rel_err_2q=0.208
+2026-10-09 12:44:35,508  gsv3.training             INFO     [random:random_seed5] epoch 0269  region_bce=0.1048  dist_mse=0.0708  region_overlap=0.908
+2026-10-09 12:44:35,508  gsv3.training             INFO     [random:random_seed5] epoch 0269  train_log_mse=0.00205  val_log_mse=0.05740  val_mse=0.000352  max_grad=0.35  patience=26/30
+2026-10-09 12:45:46,883  gsv3.training             INFO     [random:random_seed5] epoch 0270  count_mse=0.0561  count_rel_err_2q=0.209
+2026-10-09 12:45:46,883  gsv3.training             INFO     [random:random_seed5] epoch 0270  region_bce=0.1032  dist_mse=0.0704  region_overlap=0.909
+2026-10-09 12:45:46,883  gsv3.training             INFO     [random:random_seed5] epoch 0270  train_log_mse=0.00207  val_log_mse=0.05647  val_mse=0.000347  max_grad=0.39  patience=27/30
+2026-10-09 12:46:58,531  gsv3.training             INFO     [random:random_seed5] epoch 0271  count_mse=0.0577  count_rel_err_2q=0.209
+2026-10-09 12:46:58,531  gsv3.training             INFO     [random:random_seed5] epoch 0271  region_bce=0.1039  dist_mse=0.0712  region_overlap=0.908
+2026-10-09 12:46:58,531  gsv3.training             INFO     [random:random_seed5] epoch 0271  train_log_mse=0.00189  val_log_mse=0.05263  val_mse=0.000342  max_grad=0.36  patience=28/30
+2026-10-09 12:48:10,415  gsv3.training             INFO     [random:random_seed5] epoch 0272  count_mse=0.0556  count_rel_err_2q=0.206
+2026-10-09 12:48:10,416  gsv3.training             INFO     [random:random_seed5] epoch 0272  region_bce=0.1029  dist_mse=0.0704  region_overlap=0.909
+2026-10-09 12:48:10,416  gsv3.training             INFO     [random:random_seed5] epoch 0272  train_log_mse=0.00190  val_log_mse=0.06330  val_mse=0.000358  max_grad=0.30  patience=29/30
+2026-10-09 12:49:22,237  gsv3.training             INFO     [random:random_seed5] epoch 0273  count_mse=0.0564  count_rel_err_2q=0.209
+2026-10-09 12:49:22,237  gsv3.training             INFO     [random:random_seed5] epoch 0273  region_bce=0.1039  dist_mse=0.0705  region_overlap=0.908
+2026-10-09 12:49:22,237  gsv3.training             INFO     [random:random_seed5] epoch 0273  train_log_mse=0.00223  val_log_mse=0.05937  val_mse=0.000342  max_grad=0.53  patience=30/30
+2026-10-09 12:49:33,659  gsv3.experiment           INFO     [random_seed5] TEST  n=5117  MAE=0.0090  R2=0.9966  device-acc=0.776  regret=0.0021
+2026-10-09 12:49:33,664  genstudy.io               INFO     Wrote evaluations/generalization_v8/results/v8b_c001/random_control/random_seed5/metrics.json
+2026-10-09 12:49:33,692  genstudy.io               INFO     Wrote evaluations/generalization_v8/results/v8b_c001/random_control/random_seed5/predictions.json
+2026-10-09 12:49:33,708  genstudy.io               INFO     Wrote evaluations/generalization_v8/results/v8b_c001/random_control/random_seed5/history.json
+2026-10-09 12:49:33,729  run_experiment            INFO     random_control finished: 1 complete, 0 skipped
+2026-10-09 12:49:59,710  genstudy.io               INFO     Logging to evaluations/generalization_v8/results/v8b_c001/random_control/run.log
+2026-10-09 12:49:59,710  run_experiment            INFO     Command line: evaluations/generalization_v3/scripts/run_experiment.py control --model sinkhorn --balance-alpha 0 --lr 3e-4 --grad-clip 1.0 --seed 5 --families x --groups x --loss mixed --val-mode random --layout-lambda 0.1 --layout-loss region_dist --layouts-path evaluations/compile_check/results/compiler_layouts_v6pilot.pt --count-lambda 0.01 --counts-path evaluations/compile_check/results/compiler_counts_v8.pt --calib-aug evaluations/compile_check/results/v8b --results-dir evaluations/generalization_v8/results/v8b_c001
+2026-10-09 12:49:59,710  gsv2.gpu                  WARNING  No CUDA device available — running on the CPU.
+2026-10-09 12:49:59,713  gsv3.model                INFO     Hyper-parameters (/home/atudisco/pred-distr-tool/src/model/best_params.json + v3 defaults): {'device_hidden': 64, 'device_layers': 3, 'fusion_dim': 128, 'qubit_layers': 2, 'attn_heads': 4, 'lap_pe': 8, 'cost_bias_init': -6.0, 'hidden_dim': 142, 'num_conv_wo_resnet': 3, 'num_resnet_layers': 1, 'dropout': 0.0, 'bidirectional': True, 'mlp': [512, 256, 128], 'lr': 0.001, 'readout': 'meanmaxsum'}
+2026-10-09 12:49:59,903  gsv3.devices              INFO     Device graphs: node features 13 (Laplacian PE 8), physical errors True
+2026-10-09 12:49:59,904  genstudy.data             INFO     Loading graph dataset: /home/atudisco/pred-distr-tool/evaluations/generalization_v3/data/graph_dataset_expected_fidelity.pt
+2026-10-09 12:50:05,085  genstudy.data             INFO     Loaded 17056 graphs
+2026-10-09 12:50:05,789  run_experiment            INFO     Compiler layouts (evaluations/compile_check/results/compiler_layouts_v6pilot.pt): 16994/17056 circuits
+2026-10-09 12:50:08,829  run_experiment            INFO     Calibration variants (evaluations/compile_check/results/v8b): 8 variant sets, 16994/17056 circuits
+2026-10-09 12:50:09,507  run_experiment            INFO     Compiler counts (evaluations/compile_check/results/compiler_counts_v8.pt): 16994/17056 circuits
+2026-10-09 12:50:09,516  genstudy.io               INFO     Wrote evaluations/generalization_v8/results/v8b_c001/random_control/dataset_summary.json
+2026-10-09 12:50:09,671  run_experiment            INFO     [1/1] random_seed5 already done — skipping
+2026-10-09 12:50:09,671  run_experiment            INFO     random_control finished: 1 complete, 0 skipped

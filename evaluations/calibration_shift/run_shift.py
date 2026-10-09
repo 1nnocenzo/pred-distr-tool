@@ -52,7 +52,7 @@ for _s in (5, 6, 7):
     MODELS[f"v4u_phys@s{_s}"] = ("phys_uniform", _control("generalization_v6", "v4u_phys", _s))
     for _lam in ("v7_l001", "v7_l01"):   # v7: Sinkhorn + region/distance layout loss
         MODELS[f"{_lam}@s{_s}"] = ("sinkhorn", _control("generalization_v7", _lam, _s))
-    for _c in ("v8a_c001", "v8a_c01"):   # v8a: v7 (λ 0.1) + count loss
+    for _c in ("v8a_c001", "v8a_c01", "v8b_c001", "v8b_c01"):   # v8a: v7 (λ 0.1) + counts; v8b: + calibration variants
         MODELS[f"{_c}@s{_s}"] = ("sinkhorn", _control("generalization_v8", _c, _s))
 
 _VARIANTS = None

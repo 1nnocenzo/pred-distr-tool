@@ -112,6 +112,27 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
       Learned scales s_k ≈ 1 everywhere: the error is in the counts n_k. Fix idea:
       **supervise the counts** (true r / measure / cz per circuit and device from the
       QPY files) so the decomposition becomes physical.
+- [ ] **v8a (v7 λ0.1 + count loss 0.01), 3 seeds (2026-10-09)** — candidate main model:
+      qaoa 0.892 ± 0.081 (0.930 / 0.947 / 0.800), qnn 0.843 ± 0.037, variational
+      0.880 ± 0.037, control 0.996; local calibration tracking **0.46 ± 0.03**
+      (v4 ≈ 0, v5 ≈ 0.05), local worst R² 0.965–0.978, moderate ±20–30 % R² 0.99.
+      Weak spot: seed 6 worst R² 0.762 on the large-scale (×0.5/×2) variants; seed 7
+      lower on qaoa (0.800). Count weight 0.1 is worse everywhere (discarded).
+      v4 for reference: 0.882 ± 0.026 / 0.670 ± 0.139 / 0.896 ± 0.002; v5: 0.709 ± 0.105 /
+      0.922 ± 0.040 / 0.798 ± 0.103.
+- [ ] **v8b (v8a + calibration variants in training, seed 5)**: qaoa 0.844 (device
+      choice 57 % vs 30 %, regret 0.0135), variational 0.801; qnn/control running;
+      calibration test queued. So far: better device ranking, worse absolute fidelity on
+      unseen families. Next if confirmed: p(orig) 0.5.
+- [ ] **Timing (2026-10-09, `evaluations/timing_v8/`)**: QASM 3 parsing was 77 % of the old
+      encode time; the compile benchmark times a circuit already in memory, so compare
+      the same way. New `gsv3/fast_encoding.py` (one pass over the instructions, ≤ 1
+      transpile, identical graphs on 3,412 circuits, |ΔF| ≤ 6e-7): encode 11.2 → 2.2 ms.
+      Exhaustive compile + fidelity vs predictor (1 thread, same 288 circuits, devices =
+      3 originals + 24 calibration variants): 3 devices 66.7 vs 12.9 ms (5.4×), 6: 7.8×,
+      12: 10.7×, 18: 12.2×, 27: 567 vs 44 ms (13.2×); q16–20 at 27 devices 2.96 s vs
+      80 ms (37×). Exhaustive grows ~21 ms/device, the predictor ~1.2 ms/device.
+      To do: GPU / multi-thread batched inference; heavy circuits (shor, large qft).
 - [ ] Option, depending on v6/v7: **train on calibration variants** (compile the training
       circuits on perturbed devices → labels and layouts that move with the
       calibration), so the placement learns to follow local changes., with seed ensembles (`generalization_v4/scripts/ensemble_seeds.py`).

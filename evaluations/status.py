@@ -43,7 +43,7 @@ KEY_SPLITS = [("control", "random_seed5", None), ("lofo", "qaoa", None), ("lofo"
               ("lofo", "iqpe", None), ("lofo", "randomcircuit", None), ("logo", "vqe", None),
               ("logo", "fourier", None), ("logo", "variational", None),
               ("logo", "variational", "qnn"), ("logo", "fourier", "iqpe")]
-CONFIGS = ["v1", "xattn_a00", "xattn_a05", "v4_xattn_mixed", "v4_phys", "v5_sinkhorn", "v5b_sinkhorn", "v6_l001", "v6_l01", "v4u_phys", "v7_l001", "v7_l01", "v8a_c001", "v8a_c01"]
+CONFIGS = ["v1", "xattn_a00", "xattn_a05", "v4_xattn_mixed", "v4_phys", "v5_sinkhorn", "v5b_sinkhorn", "v6_l001", "v6_l01", "v4u_phys", "v7_l001", "v7_l01", "v8a_c001", "v8a_c01", "v8b_c001", "v8b_c01"]
 EPOCH_RE = re.compile(r"^(\S+ \S+),\d+ .*\] epoch (\d+) .*val_mse=([\d.e-]+).*patience=(\d+)/(\d+)")
 
 

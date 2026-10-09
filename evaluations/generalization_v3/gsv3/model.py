@@ -423,7 +423,7 @@ def build_model(kind: str, params: dict[str, Any], devices, device: torch.device
     if kind == "sinkhorn":
         return SinkhornPlacementPredictor(
             params, dev_node_dim=devices.x.size(1), dev_edge_dim=devices.edge_attr.size(1),
-            devices=devices.cpu(),
+            devices=devices.clone().cpu(),   # clone: PyG .cpu() moves the batch in place
         ).to(device)
     if kind in ("xattn", "phys"):
         cls = QubitCrossAttentionPredictor if kind == "xattn" else PhysicsHeadPredictor

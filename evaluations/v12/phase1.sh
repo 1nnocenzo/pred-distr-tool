@@ -4,10 +4,12 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=02:00:00
-# v12 phase 1 on one GPU:  sbatch -p gpu_h200 --gres=gpu:2 evaluations/v12/phase1.sh [--steps N]
+# v12 phase 1, one process per working GPU:  sbatch -p gpu_h200 --gres=gpu:2 evaluations/v12/phase1.sh [--steps N]
 set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:-$PWD}"
 eval "$("$HOME/miniforge3/bin/conda" shell.bash hook)"; conda activate "${CONDA_ENV:-pred-distr}"
 export PYTHONPATH="$PWD/src"
 source evaluations/generalization_v3/slurm/pick_gpu.sh
+pick_working_gpus || exit 3
+export OMP_NUM_THREADS=2 MKL_NUM_THREADS=2
 python3 -u evaluations/v12/phase1_joint.py "$@"

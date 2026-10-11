@@ -13,17 +13,22 @@ fine-tuned with the network (started from the phase-0 network):
 Evaluation on the control test circuits, unseen calibrations aug 80-99 (local) and seen ones:
 local tracking on the learned placement (the number that decides, vs 0.737 for v11dl40), on the
 compiler's layout, placement agreement (argmax = compiler's qubit), R² of F on the original calibration.
+Data parallel over the working GPUs (one process each, gradients all-reduced): every rank draws the same
+circuits / calibration / teacher choice and takes its share of the batch, so the recipe is the same as on one GPU.
     python phase1_joint.py [--steps 20000] [--place-loss ce] [--tag _ce]
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 
 import numpy as np
 import torch
+import torch.distributed as dist
+import torch.multiprocessing as mp
 import torch.nn.functional as F
 
 from phase0_true_layout import (DEVS, KIND, LOCAL_KINDS, ORIG, ROOT, USAGE, V8D, corr, dense_layout,
@@ -90,11 +95,24 @@ def main():
     ap.add_argument("--init-net", default="phase0_network_30k.pth", help="phase-0 network in results/ ('' = zero-init)")
     ap.add_argument("--tag", default="")
     args = ap.parse_args()
-    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    world = max(1, torch.cuda.device_count())
+    if world > 1:
+        os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
+        os.environ.setdefault("MASTER_PORT", str(29500 + int(os.environ.get("SLURM_JOB_ID", "0")) % 2000))
+        mp.spawn(worker, args=(world, args), nprocs=world)
+    else:
+        worker(0, 1, args)
+
+
+def worker(rank, world, args):
+    if world > 1:
+        dist.init_process_group("nccl", rank=rank, world_size=world)
+        torch.cuda.set_device(rank)
+    dev = torch.device(f"cuda:{rank}" if torch.cuda.is_available() else "cpu")
     torch.manual_seed(0)
-    rng = np.random.default_rng(0)
+    rng = np.random.default_rng(0)          # same stream on every rank: same circuits, calibration, teacher
     t0 = time.time()
-    log = lambda m: print(f"[{time.time() - t0:6.0f} s] {m}", flush=True)
+    log = (lambda m: print(f"[{time.time() - t0:6.0f} s] {m}", flush=True)) if rank == 0 else (lambda m: None)
     log(f"args {vars(args)}")
     params = load_hparams()
     data = {d.circuit_name: d for d in torch.load(paths.DATA_DIR / "graph_dataset_expected_fidelity.pt", weights_only=False)}
@@ -124,7 +142,8 @@ def main():
     rest_p = [p for n_, p in model.named_parameters() if not n_.startswith("placed_gnn.")]
     opt = torch.optim.AdamW([{"params": rest_p, "lr": args.lr}, {"params": net_p, "lr": args.lr_net}], weight_decay=1e-4)
     log(f"{len(tr_c)} training / {len(te_c)} test circuits; unseen {js_unseen}, seen {js_seen}; "
-        f"{sum(p.numel() for p in net_p)} network + {sum(p.numel() for p in rest_p)} model parameters; device {dev}")
+        f"{sum(p.numel() for p in net_p)} network + {sum(p.numel() for p in rest_p)} model parameters; {world} GPU process(es)")
+    all_p = net_p + rest_p
 
     def batch_of(names, j):
         gs = [data[n] for n in names]
@@ -180,16 +199,22 @@ def main():
     L = ["# v12 phase 1: placement and placed-circuit network trained together", "",
          f"Fine-tuned {args.base} (control model) + network (init: {args.init_net or 'zero'}); placement loss "
          f"{args.place_loss} × {args.place_lambda} on the compiler's layout of each calibration; scheduled sampling "
-         f"p_true 1 → 0 over the first {args.anneal:.0%} of {args.steps} steps; {len(tr_c)} training circuits × "
+         f"p_true 1 → 0 over the first {args.anneal:.0%} of {args.steps} steps (batch {args.batch} over {world} GPU(s)); {len(tr_c)} training circuits × "
          f"calibrations aug 0-79; {len(te_c)} control test circuits.", "",
          "| | tracking, unseen calibrations (aug 80-99, local) | tracking, seen calibrations | placement agreement (unseen) | R² of F, original calibration |",
          "| --- | --- | --- | --- | --- |"]
-    L += report_rows("start (v11dl40 + phase-0 network)")
+    def eval_rows(label):
+        rows = report_rows(label) if rank == 0 else []
+        if world > 1:
+            dist.barrier()
+        return rows
+
+    L += eval_rows("start (v11dl40 + phase-0 network)")
     hist = []
     for step in range(1, args.steps + 1):
         p_true = max(0.0, 1.0 - step / max(1.0, args.anneal * args.steps))
         teacher = bool(rng.random() < p_true)
-        names = [tr_c[i] for i in rng.choice(len(tr_c), args.batch, replace=False)]
+        names = [tr_c[i] for i in rng.choice(len(tr_c), args.batch, replace=False)][rank::world]
         j = int(rng.choice(js_train))
         b, y_o, y_v, lay_o, lay_v, m_o, m_v = batch_of(names, j)
         lo = run(model, b, dev_o, lay_o, teacher)
@@ -206,14 +231,26 @@ def main():
                  + (okv * (torch.clamp(lv, max=0) - torch.log(y_v.clamp(min=1e-6))) ** 2).sum() / okv.sum().clamp(min=1))
         loss = l_d + l_abs + args.map_lambda * l_map + args.place_lambda * l_pl
         opt.zero_grad(); loss.backward()
+        if world > 1:                   # mean gradient over the ranks (each saw its share of the batch)
+            grads = [p.grad if p.grad is not None else torch.zeros_like(p) for p in all_p]
+            flat = torch.cat([g.reshape(-1) for g in grads])
+            dist.all_reduce(flat)
+            flat /= world
+            o = 0
+            for p_, g in zip(all_p, grads):
+                p_.grad = flat[o: o + g.numel()].view_as(g); o += g.numel()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         opt.step()
-        hist.append((l_d.item(), l_abs.item(), l_map.item(), l_pl.item()))
-        if step % 200 == 0:
+        if rank == 0:
+            hist.append((l_d.item(), l_abs.item(), l_map.item(), l_pl.item()))
+        if step % 200 == 0 and rank == 0:
             h = np.mean(hist[-200:], 0)
             log(f"step {step}: p_true {p_true:.2f}  delta {h[0]:.4f}  abs {h[1]:.4f}  maps {h[2]:.4f}  place {h[3]:.4f}")
         if step % args.eval_every == 0 or step == args.steps:
-            L += report_rows(f"step {step}")
+            L += eval_rows(f"step {step}")
+    if rank != 0:
+        dist.destroy_process_group()
+        return
     L += ["", "Reference (phase 0, same circuits and calibrations): v11dl40 learned placement 0.737 unseen / 0.692 seen; "
           "frozen v11dl40 + network on the compiler's layout 0.857 / 0.839.", "",
           "Go to the standard evaluation if the learned-placement row clearly beats 0.737 on unseen calibrations "
@@ -222,6 +259,8 @@ def main():
     (HERE / "results" / f"report_phase1{args.tag}.md").write_text("\n".join(L))
     torch.save(model.state_dict(), HERE / "results" / f"phase1_model{args.tag}.pth")
     print("\n".join(L))
+    if world > 1:
+        dist.destroy_process_group()
 
 
 if __name__ == "__main__":

@@ -3,6 +3,23 @@
 # CUDA_VISIBLE_DEVICES.  compute-7-12 has a broken GPU (0000:19:00.0) that SLURM
 # still hands out; requesting --gres=gpu:2 and picking the working one avoids it.
 
+# Keeps ALL the working GPUs among those SLURM assigned (for scripts that use several).
+pick_working_gpus() {
+  local candidates="${CUDA_VISIBLE_DEVICES:-}" good="" gpu
+  for gpu in ${candidates//,/ }; do
+    if CUDA_VISIBLE_DEVICES="$gpu" timeout 120 python3 -c \
+        "import torch; x = torch.ones(8, device='cuda') * 2; torch.cuda.synchronize(); assert float(x.sum()) == 16.0" \
+        >/dev/null 2>&1; then
+      good="${good:+$good,}$gpu"
+    else
+      echo "GPU index $gpu is not usable — skipping." >&2
+    fi
+  done
+  [ -n "$good" ] || { echo "No usable CUDA device among '${candidates}' — aborting." >&2; return 3; }
+  export CUDA_VISIBLE_DEVICES="$good"
+  echo "Using GPU indices $good"
+}
+
 pick_working_gpu() {
   local candidates="${CUDA_VISIBLE_DEVICES:-}"
   local gpu

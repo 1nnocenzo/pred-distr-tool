@@ -47,6 +47,14 @@ MODELS = {
     "v9": ("v9", "v8r + per-device relative qubit features", "running"),
     "v8r_cz": ("v8r_cz", "v8r + count loss weighted on cz (0.1 vs 0.01)", "running"),
     "v8s": ("v8s", "v8r_cz + greedy routing-cost estimate as input", "running"),
+    "v9c": ("v9c", "v8s + relative device features (all add-ons)", "running"),
+    "v8k": ("v8k", "v8s with a constrained CZ count (exact when no routing)", "running"),
+    "v8kd": ("v8kd", "v8k fine-tuned with the change loss on 100 calibrations per device", "running"),
+    "v8kd8": ("v8kd8", "same fine-tuning on the 8 v8b calibrations (control)", "running"),
+    "v8kd40": ("v8kd40", "v8kd with 40 epochs, also on the three held-out splits", "running"),
+    "v11": ("v11", "usage-map head: CZ per coupler, r and measure per qubit", "running"),
+    "v11d40": ("v11d40", "v11 fine-tuned with the change loss on 300 calibrations", "running"),
+    "v9k": ("v9k", "v8k + relative device features", "running"),
     "v9f": ("v9f", "v8r + the add-ons kept by the v9 decision", "running"),
 }
 COMPARE = ["v4_phys", "v5_sinkhorn", MAIN]           # the 3-seed comparison

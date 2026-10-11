@@ -89,11 +89,34 @@ def attach_counts(dataset, path: Path) -> None:
     logger.info("Compiler counts (%s): %d/%d circuits", path, found, len(dataset.data))
 
 
+def attach_usage(dataset, path: Path) -> None:
+    """v11: usage maps of the best compilation on the original devices (merge_usage.py):
+    ``usage_r``, ``usage_m`` (1, D, P_max) per physical qubit and ``usage_cz`` (1, D, E_max) per
+    coupler; ``-1`` everywhere for circuits without maps (the loss skips them)."""
+    import torch
+    labels = torch.load(path, weights_only=False)
+    any_ = next(iter(labels.values()))
+    p_max, e_max = any_["r"].shape[1], any_["cz"].shape[1]
+    found = 0
+    for d, name in zip(dataset.data, dataset.names):
+        r = labels.get(name)
+        if r is not None:
+            d.usage_r, d.usage_m, d.usage_cz = (r[k].unsqueeze(0).float() for k in ("r", "m", "cz"))
+            found += 1
+        else:
+            d.usage_r = torch.full((1, len(DEVICE_NAMES), p_max), -1.0)
+            d.usage_m = torch.full((1, len(DEVICE_NAMES), p_max), -1.0)
+            d.usage_cz = torch.full((1, len(DEVICE_NAMES), e_max), -1.0)
+    logger.info("Usage maps (%s): %d/%d circuits", path, found, len(dataset.data))
+
+
 def attach_calib_aug(dataset, directory: Path) -> None:
     """v8b: per-variant labels ``y_aug`` (1, A, D), layouts ``layout_aug`` (n, A, D) and
-    counts ``counts_aug`` (1, A, D, 3) from ``v8b_labels.pt``; ``-1`` where missing."""
+    counts ``counts_aug`` (1, A, D, 3) from ``v8b_labels.pt`` (v8d: ``v8d_labels.pt``, 100
+    variants per device); ``-1`` where missing."""
     import torch
-    labels = torch.load(Path(directory) / "v8b_labels.pt", weights_only=False)
+    path = Path(directory) / "v8d_labels.pt"
+    labels = torch.load(path if path.is_file() else Path(directory) / "v8b_labels.pt", weights_only=False)
     n_aug = next(iter(labels.values()))["F"].shape[0]
     n_dev, found = len(DEVICE_NAMES), 0
     for d, name in zip(dataset.data, dataset.names):
@@ -157,6 +180,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Per-kind weights of the count loss as 'r,measure,cz' (e.g. 0.1,0.1,1).")
     p.add_argument("--counts-path", type=Path, default=None,
                    help="compiler_counts.pt from evaluations/compile_check/compile_layouts.py counts.")
+    p.add_argument("--usage-lambda", type=float, default=None,
+                   help="v11: weight of the loss on the usage maps (needs --usage-path and a *_usage model).")
+    p.add_argument("--usage-path", type=Path, default=None,
+                   help="usage_labels.pt from evaluations/compile_check/merge_usage.py.")
     p.add_argument("--calib-aug", type=Path, default=None,
                    help="v8b: directory with v8b_labels.pt and variants_raw.json (calibration "
                         "variants compiled by evaluations/compile_check/v8b_variants.py).")
@@ -204,7 +231,7 @@ def main() -> int:
     # Opt-in v5b keys: only present when requested, so older configurations (and
     # their checkpoints) are unchanged.
     for key in ("epoch_budget", "swa_frac", "tau_start", "layout_lambda", "layout_loss", "count_lambda",
-                "aug_p_orig", "delta_lambda", "aug_variants", "count_weights"):
+                "aug_p_orig", "delta_lambda", "aug_variants", "count_weights", "usage_lambda"):
         if getattr(args, key) is not None:
             protocol[key] = getattr(args, key)
     if args.model == "v1":
@@ -214,17 +241,17 @@ def main() -> int:
         devices = None
     else:
         params = load_hparams(args.params_path)
-        qubit_aware = args.model in ("xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route")
+        qubit_aware = args.model in ("xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage")
         devices = load_devices(args.device_graphs, DEVICE_NAMES,
                                lap_pe=params["lap_pe"] if qubit_aware else 0,
-                               physical_errors=args.model in ("phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route"))
+                               physical_errors=args.model in ("phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage"))
 
-    if args.dataset_dir is None and args.model in ("xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route"):
+    if args.dataset_dir is None and args.model in ("xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage"):
         args.dataset_dir = paths.DATA_DIR
     dataset_dir = v1_paths.find_dataset_dir(args.dataset_dir, FIGURE_OF_MERIT)
     dataset = GraphDataset.load(dataset_dir, FIGURE_OF_MERIT)
     if args.layout_lambda:
-        if args.model not in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route") or args.layouts_path is None:
+        if args.model not in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage") or args.layouts_path is None:
             raise SystemExit("--layout-lambda needs --model sinkhorn and --layouts-path")
         attach_layouts(dataset, args.layouts_path)
     if args.calib_aug is not None:
@@ -246,9 +273,13 @@ def main() -> int:
             found += r is not None
         logger.info("Original-calibration best-of-K labels (%s): %d/%d circuits", args.orig_best, found, len(dataset.data))
     if args.count_lambda:
-        if args.model not in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "phys", "phys_uniform") or args.counts_path is None:
+        if args.model not in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "phys", "phys_uniform") or args.counts_path is None:
             raise SystemExit("--count-lambda needs a physics-head model and --counts-path")
         attach_counts(dataset, args.counts_path)
+    if args.usage_lambda:
+        if not args.model.endswith("_usage") or args.usage_path is None:
+            raise SystemExit("--usage-lambda needs a *_usage model and --usage-path")
+        attach_usage(dataset, args.usage_path)
     save_json(dataset.summary(), experiment_dir / "dataset_summary.json")
 
     if args.experiment == "control":

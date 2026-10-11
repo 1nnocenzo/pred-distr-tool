@@ -72,6 +72,29 @@ def count_loss(model, batch, kind_weights=None) -> tuple[torch.Tensor, float]:
     return loss, rel2.item()
 
 
+def usage_loss(model, batch) -> tuple[torch.Tensor, float]:
+    """v11: predicted usage maps vs the compiled circuit's (``batch.usage_r/m/cz``, -1 = no maps).
+    MSE on log1p over the real qubits / couplers of each device, the three maps weighted alike;
+    also returns the mean correlation between predicted and true CZ maps (diagnostic)."""
+    u_r, u_m, u_cz, qmask, emask = model.last_usage               # (B, D, P|E), (D, P|E)
+    loss, n = u_r.new_tensor(0.0), 0
+    for pred, true, m in ((u_r, batch.usage_r, qmask), (u_m, batch.usage_m, qmask), (u_cz, batch.usage_cz, emask)):
+        true = true.view(pred.size(0), pred.size(1), -1)[..., : pred.size(2)]
+        known = (true >= 0) & m.unsqueeze(0)
+        if known.any():
+            err = (torch.log1p(pred) - torch.log1p(true.clamp(min=0))) ** 2
+            loss = loss + (err * known).sum() / known.sum()
+            n += 1
+    tc = batch.usage_cz.view(u_cz.size(0), u_cz.size(1), -1)[..., : u_cz.size(2)]
+    ok = (tc >= 0).all(-1) & (tc.sum(-1) > 0)
+    corr = 0.0
+    if ok.any():
+        a, b = u_cz[ok].detach(), tc[ok]
+        a = a - a.mean(-1, keepdim=True); b = b - b.mean(-1, keepdim=True)
+        corr = float(((a * b).sum(-1) / (a.norm(dim=-1) * b.norm(dim=-1)).clamp(min=1e-9)).mean())
+    return loss / max(n, 1), corr
+
+
 def layout_loss(model, batch) -> tuple[torch.Tensor, torch.Tensor]:
     """v6: cross-entropy of the Sinkhorn placement vs the compiler's initial layout.
 
@@ -225,6 +248,7 @@ def train_model(
     layout_kind = protocol.get("layout_loss", "assign")
     # v8 (opt-in): weight of the count loss; needs ``counts`` on the graphs.
     count_lambda = float(protocol.get("count_lambda", 0) or 0)
+    usage_lambda = float(protocol.get("usage_lambda", 0) or 0)
     # optional per-kind weights of the count loss, "r,measure,cz" (e.g. "0.1,0.1,1": cz-heavy)
     count_w = ([float(v) for v in str(protocol["count_weights"]).split(",")]
                if protocol.get("count_weights") else None)
@@ -296,6 +320,7 @@ def train_model(
         v7_stats: dict[str, float] = {}
         cnt_loss, cnt_rel2, cnt_n = 0.0, 0.0, 0
         dl_sum, dl_n = 0.0, 0
+        us_loss, us_corr, us_n = 0.0, 0.0, 0
         for batch in loader:
             batch = batch.to(device)
             batch_devices = devices
@@ -329,6 +354,10 @@ def train_model(
                 closs, rel2 = count_loss(model, batch, count_w)
                 loss = loss + count_lambda * closs
                 cnt_loss, cnt_rel2, cnt_n = cnt_loss + closs.item(), cnt_rel2 + rel2, cnt_n + 1
+            if usage_lambda and batch_devices is devices:   # maps exist for the original devices
+                uloss, ucorr = usage_loss(model, batch)
+                loss = loss + usage_lambda * uloss
+                us_loss, us_corr, us_n = us_loss + uloss.item(), us_corr + ucorr, us_n + 1
             if delta_lambda:          # second pass on a random calibration variant
                 j = aug_ids[int(aug_rng.integers(len(aug_ids)))]
                 log_var = model(batch, aug_devices[j])
@@ -358,6 +387,11 @@ def train_model(
         if delta_lambda:
             history[-1]["train_delta_mse"] = dl_sum / max(1, dl_n)
             logger.info("[%s] epoch %04d  delta_mse=%.4f", tag, epoch, history[-1]["train_delta_mse"])
+        if usage_lambda:
+            history[-1]["train_usage_mse"] = us_loss / max(1, us_n)
+            history[-1]["train_usage_cz_corr"] = us_corr / max(1, us_n)
+            logger.info("[%s] epoch %04d  usage_mse=%.4f  usage_cz_corr=%.3f", tag, epoch,
+                        history[-1]["train_usage_mse"], history[-1]["train_usage_cz_corr"])
         if count_lambda:
             history[-1]["train_count_mse"] = cnt_loss / max(1, cnt_n)
             history[-1]["train_count_rel_err_2q"] = cnt_rel2 / max(1, cnt_n)

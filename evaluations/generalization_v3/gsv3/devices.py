@@ -57,6 +57,15 @@ def _physical_errors(raw: dict) -> torch.Tensor:
     return torch.stack([nodes[:, 0], nodes[:, 1], cz_mean], dim=1)
 
 
+def _coupler_errors(raw: dict, g) -> None:
+    """v11 usage-map head: the couplers of the device in ``raw["edges"]`` order, as local node
+    pairs (``coupler_pairs``, E x 2), their unstandardised ``-log(1-e)`` CZ error
+    (``coupler_eps``, E) and ``n_coupler`` (1,) to split them again after batching."""
+    g.coupler_pairs = torch.tensor([[min(a, b), max(a, b)] for a, b in raw["edges"]], dtype=torch.long)
+    g.coupler_eps = torch.tensor(raw["edge_feats"], dtype=torch.float32)
+    g.n_coupler = torch.tensor([len(raw["edges"])])
+
+
 def load_devices(path: Path, device_names: tuple[str, ...], lap_pe: int = 0,
                  physical_errors: bool = False) -> Batch:
     batch = load_device_batch(path, device_names)
@@ -70,6 +79,7 @@ def load_devices(path: Path, device_names: tuple[str, ...], lap_pe: int = 0,
         if physical_errors:
             g.phys = _physical_errors(raw[name])
             assert g.phys.size(0) == g.num_nodes, name
+            _coupler_errors(raw[name], g)
     logger.info("Device graphs: node features %d (Laplacian PE %d), physical errors %s",
                 graphs[0].x.size(1), lap_pe, physical_errors)
     return Batch.from_data_list(graphs)
@@ -103,5 +113,6 @@ def variant_batch(raw_variants: dict, keys: list[str], lap_pe: int, path: Path |
             g.x = torch.cat([g.x, _laplacian_pe(g.num_nodes, g.edge_index, lap_pe)], dim=1)
         g.phys = _physical_errors({"nodes": r["nodes"], "edges": [tuple(e) for e in r["edges"]],
                                    "edge_feats": r["edge_feats"]})
+        _coupler_errors(r, g)
         graphs.append(g)
     return Batch.from_data_list(graphs)

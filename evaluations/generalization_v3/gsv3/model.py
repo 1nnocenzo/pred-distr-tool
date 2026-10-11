@@ -30,6 +30,7 @@ expected fidelity.
 from __future__ import annotations
 
 import json
+import math
 import logging
 from pathlib import Path
 from typing import Any
@@ -39,7 +40,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from torch_geometric.nn import GINEConv
-from torch_geometric.utils import scatter, to_dense_batch
+from torch_geometric.utils import scatter, softmax, to_dense_batch
 
 from . import paths
 
@@ -62,7 +63,7 @@ XATTN_DEFAULTS: dict[str, Any] = {
     "cost_bias_init": -6.0,   # softplus(-6) ≈ 2.5e-3 per gate at initialisation
 }
 
-MODEL_KINDS = ("pooled", "xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route")
+MODEL_KINDS = ("pooled", "xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage")
 
 
 def load_hparams(params_path: Path | str | None = None) -> dict[str, Any]:
@@ -336,7 +337,8 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
     """
 
     def __init__(self, params: dict[str, Any], dev_node_dim: int, dev_edge_dim: int,
-                 devices, routing_flag: bool = False, routing_est: bool = False) -> None:
+                 devices, routing_flag: bool = False, routing_est: bool = False,
+                 cz_constrained: bool = False, usage_head: bool = False) -> None:
         super().__init__(params, dev_node_dim, dev_edge_dim)
         d = params["fusion_dim"]
         # ``sinkhorn_rf``: one more count-head input per (circuit, device), 1 if the circuit's
@@ -348,6 +350,27 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         # log1p(Σ_pairs count · max(hops − 1, 0) / multi-qubit gates).
         self.routing_est = routing_est
         self._re_cache: dict = {}
+        # ``*_czc`` (v8k/v9k): the CZ count is not free. Per multi-qubit gate
+        #   cz = base(gate type, parameters) · (1 + κ · extra hops per 2q gate · (1 − routing-free)),
+        # base depends on the gate alone (no circuit or device context) and κ ≥ 0 comes from the
+        # count MLP, so a circuit that needs no routing gets exactly its decomposition count.
+        self.cz_constrained = cz_constrained
+        # ``*_usage`` (v11): the head works on usage maps instead of per-gate mean errors.
+        #   U_r(p), U_m(p): the gates' r / measure counts spread over the physical qubits of their
+        #                   operands through the placement A;
+        #   U_cz(e):        each operand pair's CZ count spread over the couplers of the shortest
+        #                   paths between its placed qubits, lower-error paths preferred
+        #                   (softmax(-beta * path error), beta learned);
+        #   log F = -(s_r Σ_p U_r ε_r + s_m Σ_p U_m ε_m + s_cz Σ_e U_cz ε_cz)   — exact for true maps.
+        self.usage_head = usage_head
+        if usage_head:
+            assert cz_constrained, "the usage head builds on the constrained CZ count"
+            self.log_beta = nn.Parameter(torch.tensor(math.log(50.0)))
+            self._paths: dict = {}
+        if cz_constrained:
+            assert routing_flag and routing_est, "the constrained CZ count needs both routing inputs"
+            self.cz_base = nn.Linear(N_GATE_LOCAL, 1)
+            nn.init.constant_(self.cz_base.bias, 0.5413)   # softplus -> 1 CZ per gate at init
         self.tau = params.get("sinkhorn_tau", SINKHORN_DEFAULTS["sinkhorn_tau"])
         self.iters = params.get("sinkhorn_iters", SINKHORN_DEFAULTS["sinkhorn_iters"])
         self.w_q = nn.Linear(d, d)
@@ -457,11 +480,81 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
             feats.append(re_[gb].unsqueeze(-1))
         z = torch.cat(feats, dim=-1)
         n_ops = F.softplus(self.cost(z))                             # (G, D, 3)
-        cost = (n_ops * g_eps * self.log_scale.exp()).sum(-1)
+        if self.cz_constrained:
+            base = F.softplus(self.cz_base(circuits.x[:, :N_GATE_LOCAL])) * multi.view(-1, 1)  # (G, 1)
+            extra = torch.expm1(re_)[gb] * (1 - rf[gb])              # (G, D) extra hops per 2q gate
+            cz = base * (1 + n_ops[..., 2] * extra)
+            n_ops = torch.cat([n_ops[..., :2], cz.unsqueeze(-1)], dim=-1)
         self.last_counts = scatter(n_ops, gb, dim=0, dim_size=n_circ, reduce="sum")   # v8
+        if self.usage_head:
+            return self._usage_log_f(circuits, devices, assign, n_ops, valid, local, gb, n_circ)
+        cost = (n_ops * g_eps * self.log_scale.exp()).sum(-1)
         return -scatter(cost, gb, dim=0, dim_size=n_circ, reduce="sum")
 
+    # ------------------------------------------------------------------ v11 usage maps
+    def _route_kernel(self, devices, p_max: int):
+        """(D, P, P, E) share of a CZ between physical qubits (p, r) on each coupler: mean over
+        the shortest-hop paths p -> r weighted by softmax(-beta * path error), divided by the
+        path length (so a pair's shares sum to 1); plus (D, E) errors and (D, E) mask."""
+        n_c = devices.n_coupler.view(-1).tolist()
+        sizes = torch.bincount(devices.batch).tolist()
+        e_max = max(n_c)
+        beta = self.log_beta.exp()
+        dev = devices.coupler_eps.device
+        K = torch.zeros(len(n_c), p_max * p_max, e_max, device=dev)
+        eps = torch.zeros(len(n_c), e_max, device=dev)
+        emask = torch.zeros(len(n_c), e_max, dtype=torch.bool, device=dev)
+        off = 0
+        for d, (n, E) in enumerate(zip(sizes, n_c)):
+            pairs = devices.coupler_pairs[off: off + E]
+            e_d = devices.coupler_eps[off: off + E]
+            off += E
+            key = tuple(map(tuple, pairs.tolist()))
+            if key not in self._paths:
+                self._paths[key] = _shortest_paths(n, key)
+            pid, s_t, inc, hops = (t.to(dev) for t in self._paths[key])
+            err = inc @ e_d                                          # (Npath,)
+            w = softmax(-beta * err, pid)                            # per (s, t) pair
+            share = (w / hops).unsqueeze(-1) * inc                   # (Npath, E)
+            idx = s_t[:, 0] * p_max + s_t[:, 1]
+            idx_rev = s_t[:, 1] * p_max + s_t[:, 0]
+            K[d, :, :E] = K[d, :, :E].index_add(0, idx, share).index_add(0, idx_rev, share)
+            eps[d, :E] = e_d
+            emask[d, :E] = True
+        return K.view(len(n_c), p_max, p_max, e_max), eps, emask
 
+    def _usage_log_f(self, circuits, devices, assign, n_ops, valid, local, gb, n_circ):
+        b, n_dev, q_max, p_max = assign.shape
+        cnt = valid.sum(1).clamp(min=1).float()                      # operands per gate
+        n_r = torch.zeros(b * q_max, n_dev, device=assign.device)
+        n_m = torch.zeros_like(n_r)
+        for k in range(local.size(1)):
+            m = valid[:, k]
+            idx = (gb * q_max + local[:, k])[m]
+            n_r = n_r.index_add(0, idx, (n_ops[..., 0] / cnt.unsqueeze(1))[m])
+            n_m = n_m.index_add(0, idx, (n_ops[..., 1] / cnt.unsqueeze(1))[m])
+        u_r = torch.einsum("bqd,bdqp->bdp", n_r.view(b, q_max, n_dev), assign)
+        u_m = torch.einsum("bqd,bdqp->bdp", n_m.view(b, q_max, n_dev), assign)
+        n2 = torch.zeros(b * q_max * q_max, n_dev, device=assign.device)
+        npair = sum((valid[:, a] & valid[:, c]).float() for a, c in ((0, 1), (0, 2), (1, 2))).clamp(min=1)
+        for a, c in ((0, 1), (0, 2), (1, 2)):
+            m = valid[:, a] & valid[:, c]
+            idx = (gb * q_max * q_max + local[:, a] * q_max + local[:, c])[m]
+            n2 = n2.index_add(0, idx, (n_ops[..., 2] / npair.unsqueeze(1))[m])
+        pair_m = torch.einsum("bdqp,bqsd,bdsr->bdpr", assign, n2.view(b, q_max, q_max, n_dev), assign)
+        K, eps_e, emask = self._route_kernel(devices, p_max)
+        u_cz = torch.einsum("bdpr,dpre->bde", pair_m, K)
+        eps_q, qmask = to_dense_batch(devices.phys, devices.batch)  # (D, P, 3)
+        s = self.log_scale.exp()
+        log_f = -(s[0] * (u_r * eps_q[..., 0]).sum(-1) + s[1] * (u_m * eps_q[..., 1]).sum(-1)
+                  + s[2] * (u_cz * eps_e).sum(-1))
+        self.last_usage = (u_r, u_m, u_cz, qmask, emask)
+        return log_f
+
+
+# Gate-local inputs of the constrained CZ base: type one-hot (28), sin/cos of 3 parameters (6),
+# arity, control qubits, number of parameters — nothing about the circuit or the device.
+N_GATE_LOCAL = 28 + 6 + 3
 N_RELATIVE = 5   # per-device z-scores of the first 5 qubit features (1q err, readout, T1, T2, degree)
 
 
@@ -500,6 +593,47 @@ def _greedy_route_cost(pairs: dict, H, pdeg) -> float:
         pos[q] = best
         free.discard(best)
     return float(sum(c * max(H[pos[a]][pos[b]] - 1, 0) for (a, b), c in pairs.items()))
+
+
+def _shortest_paths(n: int, pairs: tuple, cap: int = 64):
+    """All shortest-hop paths between every two qubits of a coupling map (at most ``cap`` per
+    pair, in a fixed order): (pair id, (s, t), edge incidence (Npath, E), hops) as tensors."""
+    import collections
+    adj = collections.defaultdict(list)
+    for e, (a, c) in enumerate(pairs):
+        adj[a].append((c, e)); adj[c].append((a, e))
+    pid, st, rows, hops = [], [], [], []
+    k = 0
+    for s0 in range(n):
+        dist = {s0: 0}; front = [s0]; preds = collections.defaultdict(list)
+        while front:
+            nxt = []
+            for u in front:
+                for v, e in adj[u]:
+                    if v not in dist:
+                        dist[v] = dist[u] + 1; nxt.append(v)
+                    if dist[v] == dist[u] + 1:
+                        preds[v].append((u, e))
+            front = nxt
+        for t in range(s0 + 1, n):
+            if t not in dist:
+                continue
+            paths = [[]]
+            stack = [(t, [])]
+            paths = []
+            while stack and len(paths) < cap:
+                v, es = stack.pop()
+                if v == s0:
+                    paths.append(es); continue
+                for u, e in preds[v]:
+                    stack.append((u, es + [e]))
+            for es in paths:
+                row = [0.0] * len(pairs)
+                for e in es:
+                    row[e] = 1.0
+                pid.append(k); st.append((s0, t)); rows.append(row); hops.append(float(len(es)))
+            k += 1
+    return (torch.tensor(pid), torch.tensor(st), torch.tensor(rows), torch.tensor(hops))
 
 
 def routing_estimate(circuits, devices, cache: dict | None = None) -> torch.Tensor:
@@ -627,14 +761,16 @@ def routing_free(circuits, devices, cache: dict | None = None) -> torch.Tensor:
 def build_model(kind: str, params: dict[str, Any], devices, device: torch.device) -> nn.Module:
     if kind == "pooled":
         return build_v2_model(params, devices, device)
-    if kind in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route"):
-        rel = kind in ("sinkhorn_rf_rel", "sinkhorn_rf_rel_route")
+    if kind in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage"):
+        rel = kind in ("sinkhorn_rf_rel", "sinkhorn_rf_rel_route", "sinkhorn_rf_rel_route_czc")
         model = SinkhornPlacementPredictor(
             params, dev_node_dim=devices.x.size(1) + (N_RELATIVE if rel else 0),
             dev_edge_dim=devices.edge_attr.size(1) * (2 if rel else 1),
             devices=devices.clone().cpu(),   # clone: PyG .cpu() moves the batch in place
-            routing_flag=kind in ("sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route"),
-            routing_est=kind in ("sinkhorn_rf_route", "sinkhorn_rf_rel_route"),
+            routing_flag=kind != "sinkhorn",
+            routing_est="route" in kind,
+            cz_constrained=kind.endswith(("_czc", "_usage")),
+            usage_head=kind.endswith("_usage"),
         )
         model.relative_dev = rel
         return model.to(device)

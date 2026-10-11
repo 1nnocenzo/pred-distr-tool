@@ -59,6 +59,14 @@ for _s in (5, 6, 7):
     MODELS[f"v9@s{_s}"] = ("sinkhorn_rf_rel", _control("generalization_v9", "v9", _s))  # v8r + relative device features
     MODELS[f"v8r_cz@s{_s}"] = ("sinkhorn_rf", _control("generalization_v9", "v8r_cz", _s))  # v8r + cz-heavy count loss
     MODELS[f"v8s@s{_s}"] = ("sinkhorn_rf_route", _control("generalization_v9", "v8s", _s))  # v8r_cz + routing estimate
+    MODELS[f"v9c@s{_s}"] = ("sinkhorn_rf_rel_route", _control("generalization_v9", "v9c", _s))  # v8s + relative features
+    MODELS[f"v8k@s{_s}"] = ("sinkhorn_rf_route_czc", _control("generalization_v9", "v8k", _s))  # v8s, constrained CZ count
+    MODELS[f"v8kd@s{_s}"] = ("sinkhorn_rf_route_czc", _control("generalization_v9", "v8kd", _s))  # v8k + change loss, 100 calibrations
+    MODELS[f"v8kd8@s{_s}"] = ("sinkhorn_rf_route_czc", _control("generalization_v9", "v8kd8", _s))  # same, the 8 v8b calibrations
+    MODELS[f"v8kd40@s{_s}"] = ("sinkhorn_rf_route_czc", _control("generalization_v9", "v8kd40", _s))  # v8kd, 40 epochs
+    MODELS[f"v11@s{_s}"] = ("sinkhorn_rf_route_usage", _control("generalization_v9", "v11", _s))  # usage-map head
+    MODELS[f"v11d40@s{_s}"] = ("sinkhorn_rf_route_usage", _control("generalization_v9", "v11d40", _s))  # v11 + change loss
+    MODELS[f"v9k@s{_s}"] = ("sinkhorn_rf_rel_route_czc", _control("generalization_v9", "v9k", _s))  # v8k + relative features
 # v9f: the add-ons kept by generalization_v9/decide_v9f.py (kind written there)
 _DEC = EVAL / "generalization_v9" / "results" / "decision.json"
 if _DEC.is_file() and json.loads(_DEC.read_text()).get("run") == "v9f":

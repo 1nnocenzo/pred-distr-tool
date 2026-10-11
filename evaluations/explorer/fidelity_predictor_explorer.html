@@ -1,0 +1,900 @@
+<title>Fidelity Predictor Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a lab-notebook page. Masthead with the current best model, then the version lineage
+   (pick a version), the block schematic with its detail panel, and the full results matrix. */
+:root {
+  --bg: #f3f5f6;          /* cool paper */
+  --surface: #ffffff;
+  --sunk: #eaeef0;
+  --ink: #12181c;
+  --ink-2: #56626a;
+  --ink-3: #87939a;
+  --rule: #d5dde1;
+  --wire: #9aa7ae;
+  --accent: #0b6e8a;      /* deep cryostat teal: the selected / main line */
+  --accent-ink: #ffffff;
+  --accent-soft: #dcedf2;
+  --loss: #9a5b00;        /* training-time losses */
+  --loss-soft: #f8ecd6;
+  --good: #2f7d4f;
+  --bad: #b2443a;
+  --planned: #6b5bb5;
+  --planned-soft: #ebe8f7;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1214; --surface: #151c1f; --sunk: #1b2427; --ink: #e7eef1; --ink-2: #a3b0b6; --ink-3: #6f7d84;
+    --rule: #2a3539; --wire: #5f6e75; --accent: #4fb3d1; --accent-ink: #06222b; --accent-soft: #143440;
+    --loss: #e3aa52; --loss-soft: #362812; --good: #6cc48f; --bad: #e57d71; --planned: #a99cf0; --planned-soft: #262142;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1214; --surface: #151c1f; --sunk: #1b2427; --ink: #e7eef1; --ink-2: #a3b0b6; --ink-3: #6f7d84;
+  --rule: #2a3539; --wire: #5f6e75; --accent: #4fb3d1; --accent-ink: #06222b; --accent-soft: #143440;
+  --loss: #e3aa52; --loss-soft: #362812; --good: #6cc48f; --bad: #e57d71; --planned: #a99cf0; --planned-soft: #262142;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15.5px; line-height: 1.5; }
+.wrap { max-width: 1260px; margin: 0 auto; padding-inline: 20px; padding-block: 32px 56px; display: grid; gap: 28px; }
+h1, h2, .display { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.015em; text-wrap: balance; }
+h1 { font-size: clamp(1.7rem, 3.2vw, 2.4rem); margin: 0; line-height: 1.1; }
+.kicker { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); }
+.sub { color: var(--ink-2); margin: 8px 0 0; max-width: 64ch; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* masthead */
+.mast { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px 32px; align-items: end; }
+@media (max-width: 860px) { .mast { grid-template-columns: minmax(0, 1fr); } }
+.best { display: grid; grid-template-columns: repeat(5, minmax(84px, auto)); border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+@media (max-width: 560px) { .best { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.best .cell { padding: 10px 14px; border-left: 1px solid var(--rule); display: grid; gap: 2px; }
+.best .cell:first-child { border-left: 0; }
+.best .lab { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); white-space: nowrap; }
+.best .val { font-family: var(--font-display); font-size: 1.45rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.best .was { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-3); white-space: nowrap; }
+.best .was b { color: var(--good); font-weight: 500; }
+.best .was b.neg { color: var(--bad); }
+.bestcap { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-2); margin-top: 6px; text-align: right; }
+@media (max-width: 860px) { .bestcap { text-align: left; } }
+
+/* section frames */
+section.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 20px; min-width: 0; }
+.sechead { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.sechead h2 { font-size: 1.15rem; margin: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.82rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; display: inline-block; }
+
+/* lineage */
+.lineage { overflow-x: auto; }
+.lineage svg { display: block; min-width: 940px; width: 100%; height: auto; }
+.ln-edge { fill: none; stroke: var(--wire); stroke-width: 1.4; }
+.ln-edge.main { stroke: var(--accent); stroke-width: 2; }
+.ln-edge.plan { stroke: var(--planned); stroke-dasharray: 4 4; }
+.ln-node { cursor: pointer; }
+.ln-node circle { fill: var(--surface); stroke: var(--wire); stroke-width: 2; transition: r 0.15s; }
+.ln-node.s-main circle, .ln-node.s-line circle { stroke: var(--accent); }
+.ln-node.s-main circle { fill: var(--accent); }
+.ln-node.s-drop circle { stroke: var(--bad); stroke-dasharray: 3 2; }
+.ln-node.s-diag circle { stroke: var(--ink-3); }
+.ln-node.s-plan circle { stroke: var(--planned); fill: var(--planned-soft); stroke-dasharray: 3 2; }
+.ln-node text { font-family: var(--font-mono); font-size: 12px; fill: var(--ink-2); pointer-events: none; }
+.ln-node.sel text { fill: var(--ink); font-weight: 600; }
+.ln-node.sel circle { stroke-width: 3; }
+.ln-node .halo { fill: none; stroke: var(--accent); stroke-width: 1.5; opacity: 0; }
+.ln-node.sel .halo { opacity: 1; }
+.ln-node:focus-visible { outline: none; }
+.ln-node:focus-visible .halo { opacity: 1; stroke-dasharray: 2 2; }
+.ln-node:hover circle { stroke-width: 3; }
+
+/* schematic + panel */
+.main { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 940px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.schematic { overflow-x: auto; }
+.schematic svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; }
+button { font: inherit; font-size: 0.88rem; border: 1px solid var(--rule); background: var(--surface); color: var(--ink);
+  padding: 6px 13px; border-radius: 7px; cursor: pointer; }
+button:hover { border-color: var(--wire); }
+button:focus-visible, .blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.chip-substrate { fill: var(--sunk); }
+.chip-trace { fill: none; stroke: var(--rule); stroke-width: 1; }
+.blk { cursor: pointer; }
+.blk rect.frame { fill: var(--surface); stroke: var(--wire); stroke-width: 1.25; transition: stroke 0.2s, fill 0.2s; }
+.blk:hover rect.frame { stroke: var(--ink-2); }
+.blk.on rect.frame { stroke: var(--accent); stroke-width: 2; fill: var(--accent-soft); }
+.blk.pulse rect.frame { stroke: var(--accent); stroke-width: 2.5; }
+.blk.changed rect.frame { stroke: var(--loss); stroke-width: 2; stroke-dasharray: 5 3; }
+.blk.on.changed rect.frame { stroke: var(--accent); stroke-dasharray: none; }
+.blk text { fill: var(--ink); font-family: var(--font-body); pointer-events: none; }
+.blk text.t { font-family: var(--font-display); font-size: 15px; font-weight: 700; }
+.blk text.s { font-size: 12px; fill: var(--ink-2); }
+.blk text.dim { font-family: var(--font-mono); font-size: 11px; fill: var(--accent); }
+.tag-loss { fill: var(--loss-soft); stroke: var(--loss); stroke-width: 1; }
+.tag-loss-t { font-family: var(--font-mono); font-size: 10.5px; fill: var(--loss) !important; }
+.wire { fill: none; stroke: var(--wire); stroke-width: 1.4; }
+.wire.lit { stroke: var(--accent); stroke-width: 2.2; }
+.wire-label { font-family: var(--font-mono); font-size: 10.5px; fill: var(--ink-2); }
+.dot { fill: var(--accent); }
+.hint { color: var(--ink-2); font-size: 0.82rem; margin: 10px 2px 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.legend-changed { display: inline-block; width: 18px; height: 10px; border: 2px dashed var(--loss); border-radius: 3px; vertical-align: middle; margin-right: 4px; }
+
+.panel { display: grid; gap: 16px; min-width: 0; }
+.vcard { border-radius: 10px; padding: 14px 16px; display: grid; gap: 8px; background: var(--sunk); }
+.vtop { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.vname { font-family: var(--font-display); font-size: 1.35rem; font-weight: 700; }
+.status { font-size: 0.74rem; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink-2); background: var(--surface); }
+.status.s-main { border-color: var(--accent); color: var(--accent); }
+.status.s-drop { border-color: var(--bad); color: var(--bad); }
+.status.s-plan { border-color: var(--planned); color: var(--planned); }
+.vcard p { margin: 0; max-width: 62ch; }
+.vcard .why { color: var(--ink-2); }
+.res { width: 100%; border-collapse: collapse; font-size: 0.84rem; font-variant-numeric: tabular-nums; }
+.res th, .res td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+.res th:first-child, .res td:first-child { text-align: left; }
+.res th { font-weight: 500; color: var(--ink-2); font-size: 0.74rem; }
+.res .cur td { font-weight: 600; }
+.d-up { color: var(--good); font-size: 0.74rem; }
+.d-dn { color: var(--bad); font-size: 0.74rem; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); }
+.panel h3.ttl { margin: 2px 0 0; font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; }
+.panel p { margin: 0; max-width: 62ch; }
+.panel h4 { margin: 0 0 8px; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.feat { display: grid; gap: 6px; }
+.feat .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 7px 10px; border: 1px solid var(--rule); border-radius: 7px; }
+.feat .bar { height: 4px; border-radius: 2px; background: var(--accent); margin-top: 5px; opacity: 0.75; }
+.feat .n { font-family: var(--font-mono); font-size: 0.84rem; font-variant-numeric: tabular-nums; color: var(--accent); }
+.feat .d { color: var(--ink-2); font-size: 0.82rem; }
+.stack { display: grid; }
+.layer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 12px; border: 1px solid var(--rule); border-radius: 7px; background: var(--bg); }
+.layer .ln { font-weight: 600; }
+.layer .ld { color: var(--ink-2); font-size: 0.82rem; }
+.layer .shape { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.arrow { text-align: center; color: var(--wire); font-size: 0.8rem; line-height: 1.1; padding-block: 2px; }
+.formula { font-family: var(--font-mono); font-size: 0.85rem; background: var(--bg); border: 1px solid var(--rule); border-radius: 7px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
+.loss { border: 1px solid var(--loss); background: var(--loss-soft); border-radius: 7px; padding: 10px 12px; }
+.loss b { color: var(--loss); font-weight: 600; }
+.facts { display: flex; flex-wrap: wrap; gap: 6px; }
+.fact { font-size: 0.82rem; border: 1px solid var(--rule); border-radius: 999px; padding: 2px 10px; color: var(--ink-2); background: var(--surface); }
+.fact b { color: var(--ink); font-weight: 600; }
+.src { font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-3); }
+.fade { animation: fade 0.25s ease-out; }
+@keyframes fade { from { opacity: 0.4; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* results matrix */
+.matrix-wrap { overflow-x: auto; }
+table.matrix { width: 100%; min-width: 760px; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.86rem; }
+.matrix th { text-align: left; font-weight: 500; color: var(--ink-2); font-size: 0.74rem; padding: 6px 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+.matrix td { padding: 5px 8px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+.matrix tr { cursor: pointer; }
+.matrix tr:hover td { background: var(--sunk); }
+.matrix tr.sel td { background: var(--accent-soft); }
+.matrix td.k { font-family: var(--font-mono); font-weight: 500; white-space: nowrap; }
+.matrix td.st { font-size: 0.78rem; color: var(--ink-2); white-space: nowrap; }
+.mcell { display: grid; grid-template-columns: 3.2em minmax(40px, 1fr); gap: 8px; align-items: center; min-width: 110px; }
+.mcell .v { text-align: right; font-family: var(--font-mono); font-size: 0.8rem; }
+.mcell .track { height: 6px; background: var(--sunk); border-radius: 3px; position: relative; overflow: hidden; }
+.mcell .fill { position: absolute; inset: 0 auto 0 0; background: var(--wire); border-radius: 3px; }
+.mcell .fill.best { background: var(--accent); }
+.mcell .na { color: var(--ink-3); font-family: var(--font-mono); font-size: 0.8rem; }
+.note { color: var(--ink-2); font-size: 0.82rem; margin: 10px 0 0; max-width: 90ch; }
+@media (prefers-reduced-motion: reduce) { .fade { animation: none; } .blk rect.frame, .wire, .ln-node circle { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <div>
+      <div class="kicker">Generalization study · expected-fidelity predictor · 3 IQM-style devices</div>
+      <h1>Fidelity Predictor Explorer</h1>
+      <p class="sub">How a graph network turns one quantum circuit and three calibrated chips into a fidelity per chip, and how each version changed it. Pick a version in the lineage, then open any block of the model.</p>
+    </div>
+    <div>
+      <div class="best" id="best" aria-label="Current main model against v1 and v8a"></div>
+      <div class="bestcap" id="bestcap"></div>
+    </div>
+  </header>
+
+  <section class="card" aria-labelledby="h-lineage">
+    <div class="sechead">
+      <h2 id="h-lineage">Lineage</h2>
+      <div class="legend">
+        <span style="color:var(--accent)"><i class="sw" style="background:var(--accent)"></i>main model</span>
+        <span style="color:var(--accent)"><i class="sw"></i>main line</span>
+        <span style="color:var(--ink-3)"><i class="sw"></i>diagnostic / test</span>
+        <span style="color:var(--bad)"><i class="sw" style="border-style:dashed"></i>discarded</span>
+        <span style="color:var(--planned)"><i class="sw" style="border-style:dashed"></i>in progress</span>
+      </div>
+    </div>
+    <div class="lineage"><svg id="lineage" role="group" aria-label="Model versions, oldest on the left"></svg></div>
+  </section>
+
+  <div class="main">
+    <section class="card" aria-labelledby="h-arch">
+      <div class="sechead">
+        <h2 id="h-arch">Architecture</h2>
+        <div class="controls">
+          <button id="play" class="primary" type="button">Play forward pass</button>
+          <button id="train" type="button">Training setup</button>
+        </div>
+      </div>
+      <div class="schematic">
+      <svg id="dia" viewBox="0 0 900 470" role="img" aria-label="Block diagram of the selected version">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0 0L10 5L0 10z" fill="var(--wire)"/>
+          </marker>
+        </defs>
+        <rect class="chip-substrate" x="4" y="4" width="892" height="462" rx="14"/>
+        <path class="chip-trace" d="M14 20H886M14 450H886M20 14V456M880 14V456"/>
+        <path id="w-ab" class="wire" d="M210 75H248" marker-end="url(#ah)"/>
+        <path id="w-cd" class="wire" d="M210 205H248" marker-end="url(#ah)"/>
+        <path id="w-be" class="wire" d="M450 75H470V130H488" marker-end="url(#ah)"/>
+        <path id="w-de" class="wire" d="M450 205H470V170H488" marker-end="url(#ah)"/>
+        <path id="w-bf" class="wire" d="M350 110V318" marker-end="url(#ah)"/>
+        <path id="w-ef" class="wire" d="M590 205V280H380V318" marker-end="url(#ah)"/>
+        <path id="w-fg" class="wire" d="M460 380H488" marker-end="url(#ah)"/>
+        <path id="w-gh" class="wire" d="M680 380H698" marker-end="url(#ah)"/>
+        <path id="w-dh" class="wire" d="M450 225H462V256H790V318" marker-end="url(#ah)"/>
+        <text class="wire-label" x="356" y="300">gate embeddings</text>
+        <text class="wire-label" x="600" y="272">placement A</text>
+        <text class="wire-label" x="700" y="250">calibrated errors ε</text>
+
+        <g class="blk" id="b-cin" data-k="cin" tabindex="0" role="button" aria-label="Circuit input">
+          <rect class="frame" x="20" y="40" width="190" height="70" rx="8"/>
+          <text class="t" x="36" y="68">Circuit graph</text>
+          <text class="s" x="36" y="88">one node per gate</text>
+          <text class="dim" x="36" y="103">40 features / node</text>
+        </g>
+        <g class="blk" id="b-cenc" data-k="cenc" tabindex="0" role="button" aria-label="Circuit encoder">
+          <rect class="frame" x="250" y="40" width="200" height="70" rx="8"/>
+          <text class="t" x="266" y="68">Circuit encoder</text>
+          <text class="s" x="266" y="88">SAGE ×4 + qubit GINE ×2</text>
+          <text class="dim" x="266" y="103">→ 128 per gate, per qubit</text>
+        </g>
+        <g class="blk" id="b-din" data-k="din" tabindex="0" role="button" aria-label="Device input">
+          <rect class="frame" x="20" y="170" width="190" height="70" rx="8"/>
+          <text class="t" x="36" y="198">Device graphs ×3</text>
+          <text class="s" id="s-din" x="36" y="218">qubits, couplers</text>
+          <text class="dim" x="36" y="233">13 features / qubit</text>
+        </g>
+        <g class="blk" id="b-denc" data-k="denc" tabindex="0" role="button" aria-label="Device encoder">
+          <rect class="frame" x="250" y="170" width="200" height="70" rx="8"/>
+          <text class="t" x="266" y="198">Device encoder</text>
+          <text class="s" x="266" y="218">GINE ×3 on couplers</text>
+          <text class="dim" x="266" y="233">→ 128 per physical qubit</text>
+        </g>
+        <g class="blk" id="b-place" data-k="place" tabindex="0" role="button" aria-label="Placement">
+          <rect class="frame" x="490" y="95" width="200" height="110" rx="8"/>
+          <text class="t" id="t-place" x="506" y="123">Sinkhorn placement</text>
+          <text class="s" id="s1-place" x="506" y="143">logical × physical,</text>
+          <text class="s" id="s2-place" x="506" y="159">one to one, per device</text>
+          <text class="dim" id="d-place" x="506" y="177">τ = 0.3 · 20 iterations</text>
+          <g id="loss-place"><rect class="tag-loss" x="506" y="184" width="132" height="16" rx="3"/>
+          <text class="tag-loss-t" id="lt-place" x="512" y="196">loss v7 · λ 0.1</text></g>
+        </g>
+        <g class="blk" id="b-gate" data-k="gate" tabindex="0" role="button" aria-label="Per-gate features">
+          <rect class="frame" x="250" y="320" width="210" height="120" rx="8"/>
+          <text class="t" x="266" y="348">Per-gate features</text>
+          <text class="s" x="266" y="368">for each gate and device</text>
+          <text class="s" x="266" y="384">context · errors · distance</text>
+          <text class="dim" id="d-gate" x="266" y="404">642 values</text>
+          <text class="s" id="s-gate" x="266" y="424"></text>
+        </g>
+        <g class="blk" id="b-mlp" data-k="mlp" tabindex="0" role="button" aria-label="Count MLP">
+          <rect class="frame" x="490" y="320" width="190" height="120" rx="8"/>
+          <text class="t" x="506" y="348">Count MLP</text>
+          <text class="s" x="506" y="368">native ops per gate</text>
+          <text class="dim" id="d-mlp" x="506" y="388">642 → 512 → 256 → 128 → 3</text>
+          <text class="s" x="506" y="406">n_1q · n_meas · n_2q</text>
+          <g id="loss-mlp"><rect class="tag-loss" x="506" y="414" width="150" height="16" rx="3"/>
+          <text class="tag-loss-t" id="lt-mlp" x="512" y="426">count loss · λ 0.01</text></g>
+        </g>
+        <g class="blk" id="b-head" data-k="head" tabindex="0" role="button" aria-label="Physics head">
+          <rect class="frame" x="700" y="320" width="180" height="120" rx="8"/>
+          <text class="t" x="716" y="348">Physics head</text>
+          <text class="s" id="s-head" x="716" y="368">log F = −Σ s·n·ε</text>
+          <text class="dim" x="716" y="388">3 learned scales</text>
+          <text class="s" x="716" y="406">F per device → pick</text>
+          <rect class="tag-loss" x="716" y="414" width="150" height="16" rx="3" id="lr-head"/>
+          <text class="tag-loss-t" id="lt-head" x="722" y="426">fidelity loss</text>
+        </g>
+        <circle id="dot" class="dot" r="5" cx="-20" cy="-20"/>
+      </svg>
+      </div>
+      <p class="hint"><span><span class="legend-changed"></span>changed in this version vs its parent</span><span>amber tags = training losses</span><span>teal numbers = tensor sizes</span></p>
+    </section>
+
+    <section class="card panel" id="panel" aria-live="polite"></section>
+  </div>
+
+  <section class="card" aria-labelledby="h-res">
+    <div class="sechead">
+      <h2 id="h-res">All results</h2>
+      <span class="kicker">test R² · tracking = corr. of predicted vs true Δlog F, local calibration changes</span>
+    </div>
+    <div class="matrix-wrap"><table class="matrix" id="matrix"></table></div>
+    <p class="note">Mean over the seeds listed (5, 6, 7). LOFO = one circuit family held out, LOGO = a group of families held out, control = random split. The best value of each column is in teal. Label noise caps local tracking near 0.85; the oracle study puts the ceiling of the current head near 0.6.</p>
+  </section>
+</div>
+
+<script>
+const BLOCKS = {
+  cin: {
+    eyebrow: "Input · circuit", title: "Circuit graph",
+    lead: "The circuit is rewritten in the OpenQASM 3 standard gate set and turned into a graph: each gate is a node, and an edge joins two gates that act one after the other on the same qubit or classical bit.",
+    sections: [
+      { kind: "features", title: "Node features (40 per gate)", total: 40, rows: [
+        ["Gate type, one-hot", "27 OpenQASM 3 gates incl. if_else, + measure", 28],
+        ["Parameters", "sin and cos of up to 3 angles", 6],
+        ["Arity", "number of qubits the gate acts on", 1],
+        ["Controls", "number of control qubits", 1],
+        ["Parameter count", "how many angles the gate has", 1],
+        ["Critical path", "1 if the gate lies on a longest path", 1],
+        ["Fan-in", "distinct gates feeding this one", 1],
+        ["Fan-out", "distinct gates it feeds", 1]
+      ]},
+      { kind: "facts", items: [["operands kept", "up to 3 qubits per gate"], ["encode time", "2.2 ms median"], ["no compilation", "device-independent"]] }
+    ],
+    src: "evaluations/generalization_v3/gsv3/fast_encoding.py · src/model/encoding.py"
+  },
+  cenc: {
+    eyebrow: "Encoder · circuit", title: "Circuit encoder",
+    lead: "A graph network gives every gate a vector that summarises its neighbourhood in the circuit. Those vectors are then pooled per logical qubit and refined on the graph of which qubits interact.",
+    sections: [
+      { kind: "stack", title: "Gate embeddings", layers: [
+        ["SAGEConv", "bidirectional: forward and reversed edges, averaged", "40 → 142"],
+        ["SAGEConv ×2", "GraphNorm + LeakyReLU after each", "142 → 142"],
+        ["SAGEConv, residual", "x + conv(x)", "142 → 142"],
+        ["Linear projection", "into the shared width d", "142 → 128"]
+      ]},
+      { kind: "stack", title: "Logical-qubit embeddings", layers: [
+        ["Pool the qubit's gates", "mean and max of the gate vectors acting on it", "2 × 128"],
+        ["Linear + LeakyReLU", "", "256 → 128"],
+        ["GINE ×2, residual", "edges = operand pairs of multi-qubit gates; edge feature = that gate's vector", "128 → 128"]
+      ]}
+    ],
+    src: "gsv3/model.py · NodeSage, QubitCrossAttentionPredictor._qubits"
+  },
+  din: {
+    eyebrow: "Input · devices", title: "Device graphs",
+    lead: "Each of the three devices is a graph of its physical qubits, with couplers as edges. The calibration enters here: every error the compiler's fidelity formula uses is a feature.",
+    sections: [
+      { kind: "features", title: "Qubit features (13 per qubit)", total: 13, rows: [
+        ["1-qubit gate error", "−log(1 − e) of the r gate", 1],
+        ["Readout error", "−log(1 − e) of measure", 1],
+        ["T1, T2", "log10 of the coherence times", 2],
+        ["Degree", "number of couplers", 1],
+        ["Position on the chip", "8 Laplacian eigenvectors of the coupling map", 8]
+      ]},
+      { kind: "features", title: "Coupler feature (1 per edge)", total: 13, rows: [
+        ["CZ error", "−log(1 − e), worse direction if both calibrated", 1]
+      ]},
+      { kind: "facts", items: [["EQE1_Top", "26 qubits · 39 couplers"], ["EQE1_Bottom", "27 qubits · 38 couplers"], ["QExa20", "20 qubits · 30 couplers"], ["standardised", "with the 3 devices' statistics"]] }
+    ],
+    src: "generalization_v2/gsv2/devices.py · gsv3/devices.py"
+  },
+  denc: {
+    eyebrow: "Encoder · devices", title: "Device encoder",
+    lead: "A message-passing network over the couplers gives each physical qubit a vector that knows its own calibration and that of its neighbourhood.",
+    sections: [
+      { kind: "stack", title: "Layers", layers: [
+        ["Linear + LeakyReLU", "qubit features in", "13 → 128"],
+        ["GINE ×3, residual", "edge feature = CZ error of the coupler", "128 → 128"],
+        ["Device summary", "mean over the device's qubits", "128"]
+      ]},
+      { kind: "formula", title: "Errors kept apart for the physics head (not standardised)",
+        text: "ε_qubit = [ ε_1q , ε_readout , mean of the incident ε_CZ ]     ε = −log(1 − e)" }
+    ],
+    src: "gsv3/model.py · _devices · gsv3/devices.py · _physical_errors"
+  },
+  place: {
+    eyebrow: "Placement", title: "Sinkhorn placement",
+    lead: "For every device, the model decides where each logical qubit goes. Sinkhorn normalisation turns the score matrix into a soft one-to-one assignment: each logical qubit spreads a total weight of 1 over the physical qubits, and no physical qubit takes more than 1.",
+    sections: [
+      { kind: "stack", title: "Steps", layers: [
+        ["Scores", "(W_q h_q) · (W_p h_p) / √128 for every logical q and physical p", "Q × P"],
+        ["Dummy rows", "one learned score, for the physical qubits left unused", "P × P"],
+        ["Sinkhorn, log domain", "row and column normalisation, 20 iterations, temperature τ = 0.3", "A: Q × P"]
+      ]},
+      { kind: "formula", title: "What A is used for",
+        text: "context(q)   = Σ_p A[q,p] · h_p\nerrors(q)    = Σ_p A[q,p] · ε_p\ndistance(a,b) = A_aᵀ · H · A_b      H = hop distances on the coupling map" },
+      { kind: "loss", name: "Layout loss (v7), weight 0.1",
+        text: "Binary cross-entropy between the column sums of A and the physical qubits the compiler used, plus MSE on log(1 + distance) between interacting qubits vs the compiler's layout. Only family-independent properties of the layout: the exact qubit is not supervised (v6 did that and did not generalise)." }
+    ],
+    src: "gsv3/model.py · SinkhornPlacementPredictor · gsv3/training.py · region_distance_loss"
+  },
+  gate: {
+    eyebrow: "Features", title: "Per-gate features",
+    lead: "For each gate of the circuit and each device, the model assembles what it needs to guess how many native operations that gate becomes there.",
+    sections: [
+      { kind: "features", title: "Input of the count MLP (642 per gate and device)", total: 642, rows: [
+        ["Gate vector", "from the circuit encoder", 128],
+        ["Operands' context, mean", "placement-weighted device vectors of its qubits", 128],
+        ["Operands' context, range", "max − min over its qubits (0 for 1-qubit gates)", 128],
+        ["Device summary", "mean device vector", 128],
+        ["Gate × context", "element-wise product", 128],
+        ["Expected chip distance", "between its operands, and its log1p", 2]
+      ]},
+      { kind: "facts", items: [["v8r", "+1: routing-free flag (VF2 subgraph test)"], ["errors", "averaged over the gate's operands → ε̄"]] }
+    ],
+    src: "gsv3/model.py · SinkhornPlacementPredictor.forward"
+  },
+  mlp: {
+    eyebrow: "Counts", title: "Count MLP",
+    lead: "A small network predicts, for each gate and device, how many native operations of each kind it turns into after compilation: single-qubit r gates, measurements and CZ gates, routing SWAPs included.",
+    sections: [
+      { kind: "stack", title: "Layers", layers: [
+        ["Linear + LeakyReLU", "", "642 → 512"],
+        ["Linear + LeakyReLU", "", "512 → 256"],
+        ["Linear + LeakyReLU", "", "256 → 128"],
+        ["Linear + softplus", "counts are never negative", "128 → 3"]
+      ]},
+      { kind: "loss", name: "Count loss (v8a), weight 0.01",
+        text: "MSE on log(1 + count) between the summed predicted counts of the circuit and the true r / measure / cz counts of the compiled circuit, per device. It fixed the qnn drop of v7: the 1-qubit cost was 2× the truth." }
+    ],
+    src: "gsv3/model.py · self.cost · gsv3/training.py · count_loss"
+  },
+  head: {
+    eyebrow: "Output", title: "Physics head",
+    lead: "The fidelity is not predicted directly. The head multiplies the predicted counts by the calibrated errors of the qubits the gate is placed on, as the expected-fidelity formula does on a compiled circuit.",
+    sections: [
+      { kind: "formula", title: "Fidelity of circuit c on device d",
+        text: "cost(g, d) = Σ_k  s_k · n_k(g, d) · ε̄_k(g, d)        k ∈ {1q, readout, 2q}\nlog F(c, d) = − Σ_g cost(g, d)   ≤ 0\nF(c, d)     = exp(min(log F, 0))\nrecommended = argmax_d F(c, d)" },
+      { kind: "facts", items: [["s_k", "3 learned scales, ≈ 1 after training"], ["output", "3 fidelities per circuit"]] },
+      { kind: "loss", name: "Fidelity loss",
+        text: "MSE on F + 0.1 × MSE on log(max(F, 10⁻³)). The linear term is what R² measures; the log term keeps low-fidelity circuits informative." }
+    ],
+    src: "gsv3/model.py · PhysicsHeadPredictor · gsv3/training.py"
+  },
+  train: {
+    eyebrow: "Training", title: "Training setup",
+    lead: "All v8a runs use the same protocol; only the held-out split and the seed change.",
+    sections: [
+      { kind: "facts", items: [["optimiser", "Adam, lr 3·10⁻⁴"], ["gradient clip", "1.0"], ["batch", "32 circuits"], ["epochs", "≤ 1000, early stop patience 30"],
+        ["model selection", "validation MSE, 20% random"], ["parameters", "979,423"], ["speed", "≈ 95 s/epoch on 8 CPU cores, ≈ 9 s on an A100"]] },
+      { kind: "formula", title: "Total loss",
+        text: "L = MSE(F) + 0.1·MSE(log F)          fidelity\n  + 0.1  · (BCE_region + MSE_distance)  layout (v7)\n  + 0.01 · MSE_counts                  counts (v8a)" },
+      { kind: "facts", items: [["labels", "expected fidelity of the Qiskit level-2 compilation"], ["targets of the aux. losses", "recompilation with fixed seed, verified equivalent"]] }
+    ],
+    src: "gsv3/training.py · scripts/run_experiment.py"
+  }
+};
+const PLACE_ATTN = {
+  eyebrow: "Placement (v4)", title: "Cross-attention placement",
+  lead: "Each logical qubit attends to the physical qubits of a device on its own: nothing stops two logical qubits from landing on the same physical qubit, and there is no chip distance.",
+  sections: [
+    { kind: "stack", title: "Steps", layers: [
+      ["Multi-head attention", "query = logical qubit, keys/values = physical qubits; 4 heads", "Q × P"],
+      ["Context", "attention-weighted device vectors", "Q × 128"],
+      ["Errors", "attention-weighted ε of the physical qubits", "Q × 3"]
+    ]},
+    { kind: "facts", items: [["measured", "degenerate: 0.50 of the weight on one physical qubit, every seed"], ["effect", "reads the errors of 1–3 reference qubits"]] }
+  ],
+  src: "gsv3/model.py · PhysicsHeadPredictor.forward"
+};
+const PLACE_NONE = {
+  eyebrow: "Placement (phys_uniform)", title: "No placement",
+  lead: "Diagnostic model: every logical qubit attends uniformly to all physical qubits, so the errors are the device mean. Used to separate the effect of placement from the calibration of the head.",
+  sections: [{ kind: "facts", items: [["attention", "uniform, fixed"], ["errors", "device average"], ["outcome", "good on qnn (0.897), weak on qaoa and variational"]] }],
+  src: "gsv3/model.py · PhysicsHeadPredictor(uniform_attention=True)"
+};
+const GATE_640 = {
+  eyebrow: "Features", title: "Per-gate features",
+  lead: "Same as later versions minus the chip distance, which needs a one-to-one placement.",
+  sections: [{ kind: "features", title: "Input of the count MLP (640 per gate and device)", total: 640, rows: [
+    ["Gate vector", "from the circuit encoder", 128], ["Operands' context, mean", "attention-weighted device vectors", 128],
+    ["Operands' context, range", "max − min over its qubits", 128], ["Device summary", "mean device vector", 128], ["Gate × context", "element-wise product", 128]]}],
+  src: "gsv3/model.py · PhysicsHeadPredictor.forward"
+};
+const MLP_640 = { eyebrow: "Counts", title: "Count MLP", lead: "Same network, 640 inputs, trained only through the fidelity loss: the counts are free to be anything that makes F right.",
+  sections: [{ kind: "stack", title: "Layers", layers: [["Linear + LeakyReLU", "", "640 → 512"], ["Linear + LeakyReLU", "", "512 → 256"], ["Linear + LeakyReLU", "", "256 → 128"], ["Linear + softplus", "", "128 → 3"]]},
+    { kind: "facts", items: [["no count loss", "1q cost can be 2× the truth (seen on qnn)"]] }], src: "gsv3/model.py · self.cost" };
+const MLP_642_FREE = { eyebrow: "Counts", title: "Count MLP", lead: "642 inputs (with the chip distance), no count loss yet.",
+  sections: [{ kind: "stack", title: "Layers", layers: [["Linear + LeakyReLU", "", "642 → 512"], ["Linear + LeakyReLU", "", "512 → 256"], ["Linear + LeakyReLU", "", "256 → 128"], ["Linear + softplus", "", "128 → 3"]]}],
+  src: "gsv3/model.py · self.cost" };
+const PLACE_SINK_FREE = { eyebrow: "Placement (v5)", title: "Sinkhorn placement",
+  lead: "Soft one-to-one assignment learned only through the fidelity loss: nothing tells it where the compiler puts the qubits.",
+  sections: [
+    { kind: "stack", title: "Steps", layers: [["Scores", "(W_q h_q) · (W_p h_p) / √128", "Q × P"], ["Dummy rows", "learned score for unused physical qubits", "P × P"], ["Sinkhorn, log domain", "20 iterations, τ = 0.3", "A: Q × P"]]},
+    { kind: "facts", items: [["measured", "near-uniform: max row probability 0.175"], ["effect", "reads the device-average error"]] }],
+  src: "gsv3/model.py · SinkhornPlacementPredictor" };
+const PLACE_V6 = { eyebrow: "Placement (v6)", title: "Sinkhorn placement + exact layout",
+  lead: "The placement is trained to put each logical qubit on the exact physical qubit the compiler chose.",
+  sections: [
+    { kind: "loss", name: "Layout loss (v6), weight 0.1", text: "Cross-entropy between A and the compiler's initial layout, qubit by qubit." },
+    { kind: "facts", items: [["right qubit, same families", "86%"], ["right qubit, new families", "7–8% (random 5%)"], ["verdict", "learns family-specific layouts: discarded"]] }],
+  src: "gsv3/training.py · layout_loss" };
+const DIN_V8B = { eyebrow: "Input · devices (v8b)", title: "Device graphs + variants",
+  lead: "Each training batch uses the original calibration with probability 0.25, otherwise one of 8 calibration variants per device, with labels, layouts and counts compiled on that variant.",
+  sections: [{ kind: "facts", items: [["variants", "3 jitter (σ 0.25) · 2 shuffle · 3 bad qubits"], ["labels", "best of 3 compilations"], ["outcome", "tracking unchanged (0.45), worse on new families"]] }],
+  src: "compile_check/v8b_variants.py · gsv3/training.py" };
+const HEAD_V8C = { eyebrow: "Output (v8c)", title: "Physics head + change loss",
+  lead: "v8a fine-tuned for 20 epochs (lr 10⁻⁴): every batch goes through the original devices and one calibration variant, and the difference of log F is fitted directly.",
+  sections: [
+    { kind: "loss", name: "Change loss, weight 1", text: "MSE between (log F̂_variant − log F̂_original) and (log F_variant − log F_original), both best-of-3 labels, circuits with F > 0.01." },
+    { kind: "facts", items: [["tracking", "0.49 → 0.56"], ["on training", "explains ~90% of the change"], ["open question", "too few calibrations seen (24)?"]] }],
+  src: "gsv3/training.py · delta_lambda" };
+const GATE_V8R = { eyebrow: "Features (v8r)", title: "Per-gate features + routing flag",
+  lead: "One more input per circuit and device: 1 if the circuit's interaction graph fits in the coupling map with no SWAP (VF2 subgraph test, what Qiskit's VF2Layout looks for).",
+  sections: [{ kind: "facts", items: [["inputs", "643"], ["test accuracy", "94% (100% on vqe and qnn)"], ["cost", "0.009 ms median per topology"], ["target", "qnn: CZ predicted +40% in v8a"]] }],
+  src: "gsv3/model.py · routing_free" };
+const MLP_CZ = { eyebrow: "Counts (v8r_cz)", title: "Count MLP + cz-weighted count loss",
+  lead: "Same network; the count loss is 10× stronger and almost all of it is on the CZ count, the only count that carries routing.",
+  sections: [
+    { kind: "loss", name: "Count loss, weight 0.1 · kinds r 0.1 / measure 0.1 / cz 1", text: "MSE on log(1 + count) per device, as in v8a, with per-kind weights." },
+    { kind: "facts", items: [["target", "qaoa: CZ predicted at 0.43× the truth in v8a"], ["cost", "none at inference"]] }],
+  src: "gsv3/training.py · count_loss(kind_weights)" };
+const GATE_V8S = { eyebrow: "Features (v8s)", title: "Per-gate features + routing estimate",
+  lead: "One more input per circuit and device: a greedy placement of the interaction graph on the coupling map, then the number of extra hops the two-qubit gates would need.",
+  sections: [
+    { kind: "formula", title: "Estimate", text: "log(1 + Σ_pairs count · max(hops − 1, 0) / #multi-qubit gates)" },
+    { kind: "facts", items: [["inputs", "644"], ["Spearman vs true routing", "0.81 (qaoa 0.94)"], ["cost", "0.49 ms median per circuit, 3 devices"], ["loss", "as v8r_cz"]] }],
+  src: "gsv3/model.py · routing_estimate" };
+const DIN_V9 = { eyebrow: "Input · devices (v9)", title: "Device graphs + relative features",
+  lead: "Each qubit also gets its own errors as z-scores within its device, so the placement sees which qubits are good on this chip, not only on average across chips.",
+  sections: [{ kind: "facts", items: [["qubit features", "13 + 5 relative (1q, readout, T1, T2, degree)"], ["coupler features", "CZ error + its z-score in the device"], ["target", "placement under-reacts to calibration (slope 0.49)"]] }],
+  src: "gsv3/model.py · relative_device_features" };
+const AUTO_V9F = { eyebrow: "Final v9 (v9f)", title: "Add-ons chosen automatically",
+  lead: "A SLURM job waits for v8r_cz, v8s, v9 and their calibration tests, keeps each add-on that helps on seed 5, and trains the combination on 3 seeds.",
+  sections: [
+    { kind: "stack", title: "Tests", layers: [["cz loss", "v8r_cz vs v8r", ""], ["routing estimate", "v8s vs v8r_cz", ""], ["relative features", "v9 vs v8r", ""]] },
+    { kind: "facts", items: [["keep if", "mean ΔR² unseen ≥ +0.005"], ["and", "no split < −0.03, control ≥ −0.003, tracking ≥ −0.03"], ["output", "generalization_v9/DECISION.md, in RESULTS.md"]] }],
+  src: "generalization_v9/decide_v9f.py · v9f_supervisor.sh" };
+
+const MLP_CZC = { eyebrow: "Counts (v8k)", title: "Count MLP + constrained CZ count",
+  lead: "r and measure stay free; the CZ count of a multi-qubit gate is its decomposition count times a routing factor that is exactly 1 when the circuit needs no SWAP.",
+  sections: [
+    { kind: "formula", title: "CZ per gate", text: "cz = base(gate type, parameters) · (1 + κ · extra hops per 2q gate · (1 − routing-free))" },
+    { kind: "facts", items: [["base", "linear on the gate alone: no circuit or device context"], ["κ ≥ 0", "from the count MLP"], ["var: qnn", "0.08 (v8r_cz) → 0.955"], ["qaoa", "0.987, regret 0.0100"]] }],
+  src: "gsv3/model.py · cz_constrained" };
+const DIN_V8D = { eyebrow: "Input · devices (v8d)", title: "Device graphs + 100 calibrations",
+  lead: "100 calibration variants per device, every dataset circuit compiled exactly on each one (best of 3 compiler seeds): 18,473 circuits × 300 variants.",
+  sections: [{ kind: "facts", items: [["variants", "jitter σ 0.15–0.4 · shuffle · 1–3 bad qubits · per-gate scale · mixes"], ["labels", "exact, no approximation"], ["cost", "≈ 380 CPU-hours, one night"], ["test calibrations", "disjoint seeds"]] }],
+  src: "compile_check/v8b_variants.py --n-aug 100" };
+const HEAD_V8KD = { eyebrow: "Output (v8kd)", title: "Change loss on 100 calibrations",
+  lead: "20 epochs from v8k: each batch is run on the original devices and on one of the 300 variants, and the change of log F is fitted to the compiler's.",
+  sections: [{ kind: "facts", items: [["local tracking", "0.38 → 0.54"], ["with 8 calibrations", "0.38 → 0.46"], ["moderate / large", "0.98 / 0.95"], ["control R²", "unchanged, 0.996"]] }],
+  src: "gsv3/training.py · delta_lambda" };
+const HEAD_V8KD8 = { eyebrow: "Output (v8kd8)", title: "Change loss on 8 calibrations",
+  lead: "Same fine-tuning restricted to the 8 v8b calibrations: it fits them better in training (change MSE 0.008 vs 0.016) but tracks new calibrations worse.",
+  sections: [{ kind: "facts", items: [["local tracking", "0.38 → 0.46"], ["reading", "memorises few calibrations"]] }],
+  src: "gsv3/training.py · aug_variants" };
+
+
+const HEAD_V11 = { eyebrow: "Output (v11, planned)", title: "Usage-map physics head",
+  lead: "Instead of counts per logical gate times the mean error of its qubits, the model predicts where the compiled circuit spends its operations: r and measurements per physical qubit through the placement, CZ per coupler along the shortest paths between the placed qubits, lower-error paths preferred with a learned temperature. The expected fidelity is then the exact product over those elements.",
+  sections: [
+    { kind: "formula", title: "Fidelity from usage maps",
+      text: "log F(c, d) = − Σ_(p,p′) U_cz(p,p′) · ε_cz(p,p′)\n             − Σ_p [ U_r(p) · ε_r(p) + U_m(p) · ε_m(p) ]" },
+    { kind: "loss", name: "Usage loss (planned)", text: "MSE on log(1 + U) against the per-coupler and per-qubit counts of the best compilation, on the original devices and on 300 calibration variants." },
+    { kind: "facts", items: [["why", "oracle ceiling of the current head ≈ 0.6 local tracking"], ["with true maps", "exact by construction"], ["maps vs labels", "exact to 10⁻⁷ (static circuits)"], ["pilot", "2,040 circuits with maps, 300 calibrations"], ["now", "training seed 5; fine-tuning and calibration test chained"], ["risk", "maps may transfer worse to new families"]] }],
+  src: "compile_check/v8b_variants.py --usage · planned in gsv3/model.py" };
+const TRAIN_K = { eyebrow: "Training (v8k → v8kd40)", title: "Training setup",
+  lead: "Two stages. v8k is trained from scratch on each split; v8kd40 starts from it and adds the change loss on 100 exactly compiled calibrations per device.",
+  sections: [
+    { kind: "formula", title: "Stage 1 · v8k, from scratch",
+      text: "L = MSE(F) + 0.1·MSE(log F)                      fidelity\n  + 0.1 · (BCE_region + MSE_distance)             layout (v7)\n  + 0.1 · MSE_counts, weights r 0.1 / meas 0.1 / cz 1   counts" },
+    { kind: "formula", title: "Stage 2 · v8kd40, fine-tuning, 40 epochs, lr 10⁻⁴",
+      text: "L_stage1 + 1 · MSE( ΔlogF̂ , ΔlogF )     Δ = variant − original\n                                         one of 300 variants per batch" },
+    { kind: "facts", items: [["optimiser", "Adam, lr 3·10⁻⁴, clip 1.0"], ["batch", "32 circuits"], ["early stop", "patience 30 (stage 1)"], ["parameters", "980,485"], ["stage 2 cost", "≈ 1.7 min/epoch on 8 cores"]] }],
+  src: "gsv3/training.py · scripts/run_experiment.py" };
+
+const V1_DIN = { eyebrow: "Input · devices (v1)", title: "No device input",
+  lead: "The first model never sees a device. It reads the circuit alone and has one output per device, so each of the three chips is a fixed column of the network, calibration included.",
+  sections: [{ kind: "facts", items: [["calibration change", "cannot change the prediction"], ["new device", "needs a new output and retraining"], ["routing, layout", "not modelled"]] }],
+  src: "src/model (original pred-distr-tool predictor)" };
+const V1_HEAD = { eyebrow: "Output (v1)", title: "Direct regression",
+  lead: "Graph convolutions over the gates, a pooled circuit vector, then a small MLP straight to three fidelities. No counts, no errors, no placement.",
+  sections: [
+    { kind: "stack", title: "Layers", layers: [["SAGE graph convolutions", "over the circuit's gate graph", "→ 142 per gate"], ["Pooling", "mean, max and sum over gates", "circuit vector"], ["MLP", "", "→ 256 → 128"], ["Linear", "one output per device", "128 → 3"]] },
+    { kind: "facts", items: [["LOGO variational regret", "0.054 (v8kd40: 0.013)"], ["qnn held out", "R² 0.18 ± 0.51 over 3 seeds"]] }],
+  src: "evaluations/generalization (v1 study)" };
+
+const P7 = ["Sinkhorn placement", "logical × physical,", "one to one, per device", "τ = 0.3 · 20 iterations", "loss v7 · λ 0.1"];
+const G_RF = ["643 values", "+ routing-free flag"], G_RE = ["644 values", "+ flag + routing estimate"];
+const M_CZC = ["cz = base · (1 + κ · hops)", "count loss · cz-weighted"];
+
+/* s: main | line | drop | diag | plan   ·   path: on the main line of the lineage
+   r: [LOFO qaoa, LOFO qnn, LOGO variational, control, local tracking]; n = seeds */
+const VERSIONS = [
+  { k: "v1", parent: null, path: true, s: "line", label: "first model", what: "The original predictor: a circuit-only graph network with one fidelity output per device.",
+    why: "Starting point of the study. It never sees the calibration or the chip, so it cannot follow a calibration change or score a new device.",
+    changed: ["din", "place", "gate", "mlp", "head"], o: { din: V1_DIN, place: V1_DIN, gate: V1_HEAD, mlp: V1_HEAD, head: V1_HEAD },
+    diag: { din: "not an input", place: ["No placement", "the device is not", "an input", "–", null], gate: ["–", "pooled circuit vector"], mlp: ["pooled → 256 → 128 → 3", null], head: "fidelity loss", headText: "F = MLP(circuit)" },
+    r: [0.913, 0.177, 0.588, 0.994, null], n: 3 },
+  { k: "v4", parent: "v1", path: true, s: "line", label: "baseline", what: "Physics head: counts × calibrated errors, per-qubit attention placement.",
+    why: "Replaces the circuit-only regressor with the structure of the expected-fidelity formula, reading each device's calibration (v2 and v3 had added device graphs and attention without the formula).",
+    changed: ["place", "gate", "mlp", "head"], o: { place: PLACE_ATTN, gate: GATE_640, mlp: MLP_640 },
+    diag: { place: ["Cross-attention", "each logical qubit", "attends on its own", "4 heads", null], gate: ["640 values", ""], mlp: ["640 → 512 → 256 → 128 → 3", null], head: "fidelity loss" },
+    r: [0.882, 0.670, 0.896, 0.995, 0.01], n: 3 },
+  { k: "phys_uniform", parent: "v4", s: "diag", label: "diagnostic", what: "v4 with uniform attention: no placement at all.",
+    why: "Tests whether placement or the head's calibration drives v4's behaviour.",
+    changed: ["place"], o: { place: PLACE_NONE, gate: GATE_640, mlp: MLP_640 },
+    diag: { place: ["No placement", "uniform over", "all physical qubits", "device-average ε", null], gate: ["640 values", ""], mlp: ["640 → 512 → 256 → 128 → 3", null], head: "fidelity loss" },
+    r: [0.739, 0.897, 0.755, 0.994, -0.14], n: 1 },
+  { k: "v5", parent: "v4", path: true, s: "line", label: "baseline", what: "One-to-one Sinkhorn placement and the expected chip distance between operands.",
+    why: "v4 could put two logical qubits on one physical qubit and had no notion of distance (routing).",
+    changed: ["place", "gate"], o: { place: PLACE_SINK_FREE, mlp: MLP_642_FREE },
+    diag: { place: ["Sinkhorn placement", "logical × physical,", "one to one, per device", "τ = 0.3 · 20 iterations", null], gate: ["642 values", ""], mlp: ["642 → 512 → 256 → 128 → 3", null], head: "fidelity loss" },
+    r: [0.709, 0.922, 0.798, 0.996, 0.05], n: 3 },
+  { k: "v5b", parent: "v5", s: "drop", label: "discarded", what: "Same model; fixed 150-epoch budget, cosine LR, weight averaging (SWA), τ annealed 1.0 → 0.3.",
+    why: "Tried to reduce v5's seed instability on variational.",
+    changed: ["head"], o: { place: PLACE_SINK_FREE, mlp: MLP_642_FREE },
+    diag: { place: ["Sinkhorn placement", "logical × physical,", "one to one, per device", "τ 1.0 → 0.3 (annealed)", null], gate: ["642 values", ""], mlp: ["642 → 512 → 256 → 128 → 3", null], head: "fidelity · SWA" },
+    r: [0.609, 0.906, 0.800, 0.996, -0.03], n: 3 },
+  { k: "v6", parent: "v5", path: true, s: "drop", label: "discarded", what: "Placement trained on the compiler's exact layout.",
+    why: "v5's placement was near-uniform: give it a real target.",
+    changed: ["place"], o: { place: PLACE_V6, mlp: MLP_642_FREE },
+    diag: { place: ["Sinkhorn placement", "trained on the", "compiler's exact layout", "τ = 0.3 · 20 iterations", "loss v6 · λ 0.1"], gate: ["642 values", ""], mlp: ["642 → 512 → 256 → 128 → 3", null], head: "fidelity loss" },
+    r: [0.822, 0.720, 0.774, 0.995, 0.34], n: 1 },
+  { k: "v7", parent: "v6", path: true, s: "line", label: "superseded", what: "Layout loss on family-independent properties only: which qubits are used and how far apart interacting qubits are.",
+    why: "v6's exact-qubit target did not transfer to new families.",
+    changed: ["place"], o: { mlp: MLP_642_FREE },
+    diag: { place: P7, gate: ["642 values", ""], mlp: ["642 → 512 → 256 → 128 → 3", null], head: "fidelity loss" },
+    r: [0.934, 0.615, 0.830, 0.996, 0.43], n: 1 },
+  { k: "v8a", parent: "v7", path: true, s: "line", label: "previous main", what: "Loss on the true native-gate counts of the compiled circuits.",
+    why: "v7's head put 2× the true cost on 1-qubit gates, which broke qnn.",
+    changed: ["mlp"], o: {},
+    diag: { place: P7, gate: ["642 values", ""], mlp: ["642 → 512 → 256 → 128 → 3", "count loss · λ 0.01"], head: "fidelity loss" },
+    r: [0.892, 0.843, 0.880, 0.996, 0.46], n: 3 },
+  { k: "v8b", parent: "v8a", s: "drop", label: "discarded", what: "Training on 8 calibration variants per device.",
+    why: "No model followed local calibration changes: show it calibrations that change.",
+    changed: ["din"], o: { din: DIN_V8B },
+    diag: { din: "+ 8 variants each", place: P7, gate: ["642 values", ""], mlp: ["642 → 512 → 256 → 128 → 3", "count loss · λ 0.01"], head: "fidelity loss" },
+    r: [0.844, 0.754, 0.801, 0.997, 0.45], n: 1 },
+  { k: "v8c", parent: "v8a", s: "diag", label: "pilot", what: "v8a fine-tuned with a loss on the change of log F between calibrations.",
+    why: "In the absolute loss the change is only 3% of the variance of F.",
+    changed: ["head"], o: { head: HEAD_V8C },
+    diag: { place: P7, gate: ["642 values", ""], mlp: ["642 → 512 → 256 → 128 → 3", "count loss · λ 0.01"], head: "fidelity + change loss" },
+    r: [null, null, null, 0.996, 0.56], n: 1 },
+  { k: "v8r", parent: "v8a", path: true, s: "line", label: "superseded", what: "Routing-free flag as an extra input.",
+    why: "v8a predicted 40% too many CZ on qnn: it could not tell that qnn needs no SWAP.",
+    changed: ["gate"], o: { gate: GATE_V8R },
+    diag: { place: P7, gate: G_RF, mlp: ["643 → 512 → 256 → 128 → 3", "count loss · λ 0.01"], head: "fidelity loss" },
+    r: [0.861, 0.898, 0.914, 0.996, 0.47], n: 3 },
+  { k: "v9", parent: "v8r", s: "drop", label: "discarded", what: "Per-device relative qubit and coupler features.",
+    why: "The placement barely reacts to calibration changes (slope 0.49).",
+    changed: ["din"], o: { din: DIN_V9, gate: GATE_V8R },
+    diag: { din: "+ relative z-scores", place: P7, gate: G_RF, mlp: ["643 → 512 → 256 → 128 → 3", "count loss · λ 0.01"], head: "fidelity loss" },
+    r: [0.823, 0.954, 0.945, 0.997, 0.41], n: 1 },
+  { k: "v8r_cz", parent: "v8r", path: true, s: "drop", label: "discarded", what: "Count loss 10× stronger and weighted on the CZ count.",
+    why: "qaoa routing was under-predicted: CZ at 0.43× the truth.",
+    changed: ["mlp"], o: { gate: GATE_V8R, mlp: MLP_CZ },
+    diag: { place: P7, gate: G_RF, mlp: ["643 → 512 → 256 → 128 → 3", "count loss · cz-weighted"], head: "fidelity loss" },
+    r: [0.918, 0.974, 0.878, 0.996, 0.43], n: 1 },
+  { k: "v8s", parent: "v8r_cz", path: true, s: "line", label: "superseded", what: "Greedy routing-cost estimate as an extra input.",
+    why: "The flag says whether SWAPs are needed, not how many.",
+    changed: ["gate"], o: { gate: GATE_V8S, mlp: MLP_CZ },
+    diag: { place: P7, gate: G_RE, mlp: ["644 → 512 → 256 → 128 → 3", "count loss · cz-weighted"], head: "fidelity loss" },
+    r: [0.939, 0.958, 0.841, 0.996, 0.43], n: 1 },
+  { k: "v9c", parent: "v8s", s: "drop", label: "discarded", what: "All three add-ons: relative features, routing estimate, cz-weighted loss.",
+    why: "An automatic seed-5 test kept none of the add-ons alone; this checked whether they complement each other.",
+    changed: ["din"], o: { din: DIN_V9, gate: GATE_V8S, mlp: MLP_CZ },
+    diag: { din: "+ relative z-scores", place: P7, gate: G_RE, mlp: ["644 → 512 → 256 → 128 → 3", "count loss · cz-weighted"], head: "fidelity loss" },
+    r: [0.941, 0.974, 0.937, 0.996, 0.37], n: 1 },
+  { k: "v8k", parent: "v8s", path: true, s: "line", label: "stage 1 of main", what: "Constrained CZ count: exactly the decomposition count when no routing is needed.",
+    why: "The cz-weighted loss made the free count MLP invent SWAPs for qnn (3.3× the true CZ).",
+    changed: ["mlp"], o: { gate: GATE_V8S, mlp: MLP_CZC },
+    diag: { place: P7, gate: G_RE, mlp: M_CZC, head: "fidelity loss" },
+    r: [0.955, 0.867, 0.930, 0.996, 0.43], n: 3 },
+  { k: "v9k", parent: "v8k", s: "drop", label: "discarded", what: "v8k + relative device features.",
+    why: "Check whether relative features add to the constrained count.",
+    changed: ["din"], o: { din: DIN_V9, gate: GATE_V8S, mlp: MLP_CZC },
+    diag: { din: "+ relative z-scores", place: P7, gate: G_RE, mlp: M_CZC, head: "fidelity loss" },
+    r: [0.946, 0.740, 0.927, 0.996, 0.34], n: 1 },
+  { k: "v8kd8", parent: "v8k", s: "diag", label: "control", what: "v8k fine-tuned with the change loss on the 8 v8b calibrations.",
+    why: "Same fine-tuning as v8kd with few calibrations: isolates the effect of their number.",
+    changed: ["head"], o: { head: HEAD_V8KD8, gate: GATE_V8S, mlp: MLP_CZC },
+    diag: { din: "+ 8 variants each", place: P7, gate: G_RE, mlp: M_CZC, head: "fidelity + change loss" },
+    r: [null, null, null, 0.996, 0.46], n: 1 },
+  { k: "v8kd", parent: "v8k", path: true, s: "diag", label: "pilot, 20 epochs", what: "v8k fine-tuned with the change loss on 100 exactly compiled calibrations per device (control split only).",
+    why: "Tracking is limited by how few calibrations the model sees in training.",
+    changed: ["din", "head"], o: { din: DIN_V8D, head: HEAD_V8KD, gate: GATE_V8S, mlp: MLP_CZC },
+    diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: M_CZC, head: "fidelity + change loss" },
+    r: [null, null, null, 0.996, 0.54], n: 1 },
+  { k: "v8kd40", parent: "v8kd", path: true, s: "main", label: "main model", what: "The v8kd fine-tuning for 40 epochs, on every split.",
+    why: "Check that the change loss does not cost generalization, and give it more epochs (its training loss was still falling at 20).",
+    changed: ["din", "head"], o: { din: DIN_V8D, head: HEAD_V8KD, gate: GATE_V8S, mlp: MLP_CZC, train: TRAIN_K },
+    diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: M_CZC, head: "fidelity + change loss" },
+    r: [0.965, 0.855, 0.918, 0.996, 0.60], n: 3 },
+  { k: "v11", parent: "v8kd40", path: true, s: "plan", label: "training", what: "Usage-map head: CZ per coupler, r and measure per physical qubit.",
+    why: "With layout, counts and coupler errors all given exactly, the current head still stops near 0.6 local tracking: the routed circuit is not described.",
+    changed: ["mlp", "head"], o: { head: HEAD_V11, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D },
+    diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: ["→ U_cz(p,p′), U_r(p), U_m(p)", "usage loss"], head: "fidelity + change + usage", headText: "log F = −Σ U·ε (exact)" },
+    r: [null, null, null, null, null], n: 0 }
+];
+const MAIN = "v8kd40", BASE = "v8a", FIRST = "v1";
+const METRICS = ["LOFO qaoa", "LOFO qnn", "LOGO variational", "control", "local tracking"];
+const SHORT = ["qaoa", "qnn", "variational", "control", "tracking"];
+
+let cur = MAIN, curBlock = "head";
+const panel = document.getElementById("panel");
+const V = () => VERSIONS.find(v => v.k === cur);
+const byK = k => VERSIONS.find(v => v.k === k);
+const f2 = x => x == null ? "–" : x.toFixed(2);
+const f3 = x => x == null ? "–" : x.toFixed(3);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* masthead: main model vs v8a */
+(function best() {
+  const m = byK(MAIN), b = byK(BASE), a = byK(FIRST);
+  document.getElementById("best").innerHTML = METRICS.map((name, i) => {
+    const d = m.r[i] != null && b.r[i] != null ? m.r[i] - b.r[i] : null;
+    const dd = d == null ? "" : `<b class="${d < 0 ? "neg" : ""}">${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(i === 3 ? 3 : 2)}</b>`;
+    const d1 = m.r[i] != null && a.r[i] != null ? m.r[i] - a.r[i] : null;
+    const dd1 = d1 == null ? "" : `<b class="${d1 < 0 ? "neg" : ""}">${d1 >= 0 ? "+" : "−"}${Math.abs(d1).toFixed(i === 3 ? 3 : 2)}</b>`;
+    const first = a.r[i] == null ? `v1 n/a` : `v1 ${i === 3 ? f3(a.r[i]) : f2(a.r[i])} ${dd1}`;
+    return `<div class="cell"><span class="lab">${esc(name)}</span><span class="val">${i === 3 ? f3(m.r[i]) : f2(m.r[i])}</span><span class="was">${first}</span><span class="was">v8a ${i === 3 ? f3(b.r[i]) : f2(b.r[i])} ${dd}</span></div>`;
+  }).join("");
+  document.getElementById("bestcap").textContent = `main model ${MAIN} (${m.n} seed${m.n === 1 ? "" : "s"}) vs the first model v1 and the previous main v8a · v1 has no calibration input, so no tracking`;
+})();
+
+/* lineage: main line left to right, branches hang under their parent */
+(function lineage() {
+  const svg = document.getElementById("lineage");
+  const pathNodes = VERSIONS.filter(v => v.path);
+  const step = 78, x0 = 46, yMain = 44, yStep = 46;
+  const pos = {};
+  pathNodes.forEach((v, i) => { pos[v.k] = { x: x0 + i * step, y: yMain, main: true }; });
+  const lanes = {};
+  VERSIONS.filter(v => !v.path).forEach(v => {
+    const p = pos[v.parent]; lanes[v.parent] = (lanes[v.parent] || 0) + 1;
+    pos[v.k] = { x: p.x + 22, y: yMain + lanes[v.parent] * yStep, main: false };
+  });
+  const H = Math.max(...Object.values(pos).map(p => p.y)) + 34, W = x0 + (pathNodes.length - 1) * step + 70;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  let edges = "", nodes = "";
+  VERSIONS.forEach(v => {
+    if (!v.parent) return;
+    const a = pos[v.parent], b = pos[v.k];
+    const cls = v.s === "plan" ? "plan" : (v.path ? "main" : "");
+    const d = b.main ? `M${a.x} ${a.y}H${b.x}` : `M${a.x} ${a.y + 9}V${b.y}H${b.x - 9}`;
+    edges += `<path class="ln-edge ${cls}" d="${d}"/>`;
+  });
+  VERSIONS.forEach(v => {
+    const p = pos[v.k];
+    const lbl = p.main ? `<text x="${p.x}" y="${p.y - 16}" text-anchor="middle">${esc(v.k)}</text>`
+                       : `<text x="${p.x + 14}" y="${p.y + 4}">${esc(v.k)}</text>`;
+    nodes += `<g class="ln-node s-${v.s}" data-v="${v.k}" tabindex="0" role="button" aria-label="${esc(v.k)}, ${esc(v.label)}">` +
+      `<circle class="halo" cx="${p.x}" cy="${p.y}" r="13"/><circle cx="${p.x}" cy="${p.y}" r="${p.main ? 8 : 6.5}"><title>${esc(v.k)}: ${esc(v.what)}</title></circle>${lbl}</g>`;
+  });
+  svg.innerHTML = edges + nodes;
+  svg.querySelectorAll(".ln-node").forEach(g => {
+    g.addEventListener("click", () => { stopPlay(); applyVersion(g.dataset.v); });
+    g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); stopPlay(); applyVersion(g.dataset.v); } });
+  });
+})();
+
+/* results matrix */
+(function matrix() {
+  const t = document.getElementById("matrix");
+  const bestOf = i => Math.max(...VERSIONS.filter(v => v.r[i] != null).map(v => v.r[i]));
+  const bests = METRICS.map((_, i) => bestOf(i));
+  const lo = [0.5, 0.5, 0.5, 0.99, 0], hi = [1, 1, 1, 1, 0.85];
+  const cell = (v, i) => {
+    const x = v.r[i];
+    if (x == null) return `<td><span class="na">–</span></td>`;
+    const w = Math.max(2, Math.min(100, (x - lo[i]) / (hi[i] - lo[i]) * 100));
+    return `<td><div class="mcell"><span class="v">${i === 3 ? f3(x) : f2(x)}</span><span class="track"><span class="fill ${x === bests[i] ? "best" : ""}" style="width:${w}%"></span></span></div></td>`;
+  };
+  t.innerHTML = `<thead><tr><th>version</th><th>status</th>${METRICS.map(m => `<th>${esc(m)}</th>`).join("")}<th>seeds</th></tr></thead><tbody>` +
+    VERSIONS.filter(v => v.s !== "plan").map(v => `<tr data-v="${v.k}"><td class="k">${esc(v.k)}</td><td class="st">${esc(v.label)}</td>${METRICS.map((_, i) => cell(v, i)).join("")}<td class="num">${v.n}</td></tr>`).join("") + `</tbody>`;
+  t.querySelectorAll("tbody tr").forEach(tr => tr.addEventListener("click", () => { stopPlay(); applyVersion(tr.dataset.v); document.getElementById("h-lineage").scrollIntoView({ behavior: "smooth", block: "start" }); }));
+})();
+
+function versionCard() {
+  const v = V(), par = v.parent ? byK(v.parent) : null;
+  const delta = (i) => {
+    if (!par || v.r[i] == null || par.r[i] == null) return "";
+    const d = v.r[i] - par.r[i]; if (Math.abs(d) < 0.0005) return "";
+    return ` <span class="${d > 0 ? "d-up" : "d-dn"}">${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(i === 3 ? 3 : 2)}</span>`;
+  };
+  const row = (x, cls, withDelta) => `<tr class="${cls}"><td>${esc(x.k)}</td>` + x.r.map((c, i) => `<td>${i === 3 ? f3(c) : f2(c)}${withDelta ? delta(i) : ""}</td>`).join("") + `<td>${x.n || "–"}</td></tr>`;
+  return `<div class="vcard"><div class="vtop"><span class="vname">${esc(v.k)}</span><span class="status s-${v.s}">${esc(v.label)}</span>${par ? `<span class="src">builds on ${esc(par.k)}</span>` : ""}</div>` +
+    `<p><b>Changes:</b> ${esc(v.what)}</p><p class="why"><b>Why:</b> ${esc(v.why)}</p>` +
+    (v.s === "plan" ? "" : `<div style="overflow-x:auto"><table class="res"><thead><tr><th>model</th>` + SHORT.map(c => `<th>${c}</th>`).join("") +
+    `<th>seeds</th></tr></thead><tbody>${row(v, "cur", true)}${par ? row(par, "", false) : ""}</tbody></table></div>`) + `</div>`;
+}
+function render(key) {
+  curBlock = key;
+  const b = (V().o && V().o[key]) || BLOCKS[key];
+  let h = versionCard() + `<div class="fade"><div class="eyebrow">${esc(b.eyebrow)}</div><h3 class="ttl">${esc(b.title)}</h3></div><p>${esc(b.lead)}</p>`;
+  for (const s of b.sections) {
+    if (s.kind === "features") {
+      const max = Math.max(...s.rows.map(r => r[2]));
+      h += `<div><h4>${esc(s.title)}</h4><div class="feat">` + s.rows.map(r =>
+        `<div class="row"><div><div>${esc(r[0])}</div><div class="d">${esc(r[1])}</div>` +
+        `<div class="bar" style="width:${Math.max(4, r[2] / max * 100)}%"></div></div><div class="n">${r[2]}</div></div>`).join("") + `</div></div>`;
+    } else if (s.kind === "stack") {
+      h += `<div><h4>${esc(s.title)}</h4><div class="stack">` + s.layers.map((l, i) =>
+        (i ? `<div class="arrow" aria-hidden="true">↓</div>` : "") +
+        `<div class="layer"><div><div class="ln">${esc(l[0])}</div>${l[1] ? `<div class="ld">${esc(l[1])}</div>` : ""}</div><div class="shape">${esc(l[2])}</div></div>`).join("") + `</div></div>`;
+    } else if (s.kind === "formula") {
+      h += `<div><h4>${esc(s.title)}</h4><div class="formula">${esc(s.text)}</div></div>`;
+    } else if (s.kind === "loss") {
+      h += `<div class="loss"><b>${esc(s.name)}</b><p style="margin-top:4px">${esc(s.text)}</p></div>`;
+    } else if (s.kind === "facts") {
+      h += `<div class="facts">` + s.items.map(f => `<span class="fact">${esc(f[0])}: <b>${esc(f[1])}</b></span>`).join("") + `</div>`;
+    }
+  }
+  h += `<div class="src">Code: ${esc(b.src)}</div>`;
+  panel.innerHTML = h;
+  document.querySelectorAll(".blk").forEach(g => g.classList.toggle("on", g.dataset.k === key));
+}
+function setText(id, t) { const e = document.getElementById(id); if (e) e.textContent = t; }
+function applyVersion(k) {
+  cur = k; const v = V(), d = v.diag;
+  document.querySelectorAll(".ln-node").forEach(g => g.classList.toggle("sel", g.dataset.v === k));
+  document.querySelectorAll(".matrix tbody tr").forEach(tr => tr.classList.toggle("sel", tr.dataset.v === k));
+  document.querySelectorAll(".blk").forEach(g => g.classList.toggle("changed", v.changed.includes(g.dataset.k)));
+  setText("t-place", d.place[0]); setText("s1-place", d.place[1]); setText("s2-place", d.place[2]); setText("d-place", d.place[3]);
+  document.getElementById("loss-place").style.display = d.place[4] ? "" : "none";
+  if (d.place[4]) setText("lt-place", d.place[4]);
+  setText("d-gate", d.gate[0]); setText("s-gate", d.gate[1]);
+  setText("d-mlp", d.mlp[0]); document.getElementById("loss-mlp").style.display = d.mlp[1] ? "" : "none";
+  if (d.mlp[1]) setText("lt-mlp", d.mlp[1]);
+  setText("lt-head", d.head); setText("s-din", d.din || "qubits, couplers"); setText("s-head", d.headText || "log F = −Σ s·n·ε");
+  render(v.changed[0] || curBlock);
+}
+
+document.querySelectorAll(".blk").forEach(g => {
+  g.addEventListener("click", () => { stopPlay(); render(g.dataset.k); });
+  g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); stopPlay(); render(g.dataset.k); } });
+});
+document.getElementById("train").addEventListener("click", () => { stopPlay(); render("train"); });
+
+/* forward-pass animation: wires light up in order and a dot travels along each */
+const SEQ = [["w-ab", "cenc"], ["w-cd", "denc"], ["w-be", "place"], ["w-de", "place"], ["w-bf", "gate"], ["w-ef", "gate"],
+             ["w-fg", "mlp"], ["w-dh", "head"], ["w-gh", "head"]];
+const dot = document.getElementById("dot");
+const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let timer = null, raf = null, playing = false;
+const playBtn = document.getElementById("play");
+function stopPlay() {
+  playing = false; clearTimeout(timer); cancelAnimationFrame(raf);
+  dot.setAttribute("cx", -20); dot.setAttribute("cy", -20);
+  document.querySelectorAll(".wire").forEach(w => w.classList.remove("lit"));
+  document.querySelectorAll(".blk").forEach(g => g.classList.remove("pulse"));
+  playBtn.textContent = "Play forward pass";
+}
+function travel(path, ms, done) {
+  if (reduce) { done(); return; }
+  const len = path.getTotalLength(), t0 = performance.now();
+  const stepf = now => {
+    if (!playing) return;
+    const f = Math.min(1, (now - t0) / ms), p = path.getPointAtLength(f * len);
+    dot.setAttribute("cx", p.x); dot.setAttribute("cy", p.y);
+    if (f < 1) raf = requestAnimationFrame(stepf); else done();
+  };
+  raf = requestAnimationFrame(stepf);
+}
+function play() {
+  stopPlay(); playing = true; playBtn.textContent = "Stop";
+  render("cin");
+  let i = 0;
+  const next = () => {
+    if (!playing) return;
+    if (i >= SEQ.length) { timer = setTimeout(stopPlay, 900); return; }
+    const [wid, key] = SEQ[i++];
+    const w = document.getElementById(wid); w.classList.add("lit");
+    travel(w, 700, () => {
+      document.querySelectorAll(".blk").forEach(g => g.classList.toggle("pulse", g.dataset.k === key));
+      render(key);
+      timer = setTimeout(next, reduce ? 1400 : 1100);
+    });
+  };
+  timer = setTimeout(next, 600);
+}
+playBtn.addEventListener("click", () => (playing ? stopPlay() : play()));
+
+applyVersion(MAIN);
+</script>

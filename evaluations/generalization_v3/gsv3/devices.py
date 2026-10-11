@@ -57,6 +57,24 @@ def _physical_errors(raw: dict) -> torch.Tensor:
     return torch.stack([nodes[:, 0], nodes[:, 1], cz_mean], dim=1)
 
 
+# Gate durations of the devices in µs (createDevice.py: uniform per device, from mqt.bench's IQM targets):
+# r (1-qubit), measure, cz — the order of the count head's kinds.
+GATE_US = (0.042, 15.0, 0.130)
+
+
+# QExa20's T1/T2 in createDevice.py are 10x too small (DCDB ns read as 1e-4 µs units; see
+# compile_check/esp_labels.py T_FIX); the ESP path corrects them, the standardised input features are left as trained.
+T_FIX = {"QExa20": 10.0}
+
+
+def _coherence(raw: dict, g, name: str = "") -> None:
+    """v13 (ESP): ``g.coh`` = 1 / min(T1, T2) of every qubit in 1/µs, from the raw node features
+    (columns 2, 3 = log10 of T1, T2 in seconds), as MQT's estimated success probability uses them."""
+    nodes = torch.tensor(raw["nodes"], dtype=torch.float64)
+    fix = T_FIX.get(name.split("/")[0], 1.0)
+    g.coh = (10.0 ** (-torch.minimum(nodes[:, 2], nodes[:, 3])) * 1e-6 / fix).float()
+
+
 def _coupler_errors(raw: dict, g) -> None:
     """v11 usage-map head: the couplers of the device in ``raw["edges"]`` order, as local node
     pairs (``coupler_pairs``, E x 2), their unstandardised ``-log(1-e)`` CZ error
@@ -80,6 +98,7 @@ def load_devices(path: Path, device_names: tuple[str, ...], lap_pe: int = 0,
             g.phys = _physical_errors(raw[name])
             assert g.phys.size(0) == g.num_nodes, name
             _coupler_errors(raw[name], g)
+            _coherence(raw[name], g, name)
     logger.info("Device graphs: node features %d (Laplacian PE %d), physical errors %s",
                 graphs[0].x.size(1), lap_pe, physical_errors)
     return Batch.from_data_list(graphs)
@@ -114,5 +133,6 @@ def variant_batch(raw_variants: dict, keys: list[str], lap_pe: int, path: Path |
         g.phys = _physical_errors({"nodes": r["nodes"], "edges": [tuple(e) for e in r["edges"]],
                                    "edge_feats": r["edge_feats"]})
         _coupler_errors(r, g)
+        _coherence(r, g, k)
         graphs.append(g)
     return Batch.from_data_list(graphs)

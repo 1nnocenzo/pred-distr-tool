@@ -72,6 +72,21 @@ def count_loss(model, batch, kind_weights=None) -> tuple[torch.Tensor, float]:
     return loss, rel2.item()
 
 
+def esp_loss(model, batch, weights=None) -> tuple[torch.Tensor, list[float]]:
+    """v13: predicted (ESP decay, log duration, log depth) vs the stored compilation's (``batch.esp``,
+    NaN = unknown).  The decay (≤ 0) is compared as log1p(−decay); MSE per target, weighted; also
+    returns the three MSEs."""
+    pred = torch.stack(model.last_esp, -1)                       # (B, D, 3)
+    true = batch.esp.view_as(pred)
+    known = torch.isfinite(true)
+    p = torch.cat([torch.log1p(-pred[..., :1].clamp(max=0)), pred[..., 1:]], -1)
+    t = torch.cat([torch.log1p(-true[..., :1].clamp(max=0)), true[..., 1:]], -1)
+    err = torch.where(known, (p - torch.nan_to_num(t)) ** 2, torch.zeros_like(p))
+    mse = err.sum((0, 1)) / known.sum((0, 1)).clamp(min=1)       # (3,)
+    w = mse.new_tensor(weights if weights is not None else (1.0, 1.0, 1.0))
+    return (w * mse).sum(), mse.tolist()
+
+
 def usage_loss(model, batch, true_maps=None) -> tuple[torch.Tensor, float]:
     """v11: predicted usage maps vs the compiled circuit's (``batch.usage_r/m/cz``, -1 = no maps),
     or vs ``true_maps`` = (r, m, cz) given explicitly (calibration variants).
@@ -304,6 +319,9 @@ def train_model(
     layout_kind = protocol.get("layout_loss", "assign")
     # v8 (opt-in): weight of the count loss; needs ``counts`` on the graphs.
     count_lambda = float(protocol.get("count_lambda", 0) or 0)
+    # v13 (opt-in): ESP decay / duration / depth of the stored compilation; needs ``esp`` on the graphs
+    esp_lambda = float(protocol.get("esp_lambda", 0) or 0)
+    esp_w = [float(x) for x in str(protocol.get("esp_weights") or "1,1,1").split(",")]
     usage_lambda = float(protocol.get("usage_lambda", 0) or 0)
     # usage maps on the calibration variants (change-loss pass), indexed by ``batch.usage_id``
     usage_aug_lambda = float(protocol.get("usage_aug_lambda", 0) or 0)
@@ -390,6 +408,7 @@ def train_model(
         lay_ce, lay_acc, lay_n = 0.0, 0.0, 0
         v7_stats: dict[str, float] = {}
         cnt_loss, cnt_rel2, cnt_n = 0.0, 0.0, 0
+        esp_acc, esp_n = [0.0, 0.0, 0.0], 0
         dl_sum, dl_n = 0.0, 0
         dc_sum, dc_n = 0.0, 0
         us_loss, us_corr, us_n = 0.0, 0.0, 0
@@ -429,6 +448,11 @@ def train_model(
                 closs, rel2 = count_loss(model, batch, count_w)
                 loss = loss + count_lambda * closs
                 cnt_loss, cnt_rel2, cnt_n = cnt_loss + closs.item(), cnt_rel2 + rel2, cnt_n + 1
+            if esp_lambda and batch_devices is devices:     # labels of the original calibration
+                eloss, emse = esp_loss(model, batch, esp_w)
+                loss = loss + esp_lambda * eloss
+                esp_acc = [a + b for a, b in zip(esp_acc, emse)]
+                esp_n += 1
             if usage_lambda and batch_devices is devices:   # maps exist for the original devices
                 uloss, ucorr = usage_loss(model, batch)
                 loss = loss + usage_lambda * uloss
@@ -533,6 +557,11 @@ def train_model(
             history[-1]["train_usage_aug_cz_corr"] = ua_corr / max(1, ua_n)
             logger.info("[%s] epoch %04d  usage_aug_mse=%.4f  usage_aug_cz_corr=%.3f", tag, epoch,
                         history[-1]["train_usage_aug_mse"], history[-1]["train_usage_aug_cz_corr"])
+        if esp_lambda:
+            for k, v in zip(("train_esp_decay_mse", "train_log_duration_mse", "train_log_depth_mse"), esp_acc):
+                history[-1][k] = v / max(1, esp_n)
+            logger.info("[%s] epoch %04d  esp_decay_mse=%.4f  log_duration_mse=%.4f  log_depth_mse=%.4f", tag, epoch,
+                        *(history[-1][k] for k in ("train_esp_decay_mse", "train_log_duration_mse", "train_log_depth_mse")))
         if count_lambda:
             history[-1]["train_count_mse"] = cnt_loss / max(1, cnt_n)
             history[-1]["train_count_rel_err_2q"] = cnt_rel2 / max(1, cnt_n)

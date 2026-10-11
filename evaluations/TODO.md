@@ -138,6 +138,13 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
       calibration), so the placement learns to follow local changes., with seed ensembles (`generalization_v4/scripts/ensemble_seeds.py`).
 
 ## Next
+- [ ] **Hybrid rule: compile what is cheap, predict the rest** (from the pipeline anatomy, 2026-10-11,
+      `compile_check/results/pipeline_anatomy_stage/report.md`): routing-free circuits compile in 2.3 ms
+      (median, ≈ the VF2 step alone) and their calibration response is exactly the compiler's VF2Layout
+      choice → compile them, predict only the routed ones (40 ms median compile). First check that the
+      model's routing-free flag matches the compiler's VF2Layout decision; then score with the standard
+      evaluation (tracking, regret, decision policies) — no retraining. Later: predict the routed structure
+      (calibration-invariant) and compute the placement with the VF2 score.
 - [ ] **Target ESP instead of plain expected fidelity**: include T1/T2 and gate
       durations (already in the `createDevice.py` targets). Extend the physics head with
       a learned per-gate duration/idle time × the device's real 1/T1, 1/T2.
@@ -187,6 +194,24 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
 - [ ] Validation closer to hardware (noisy simulation or real runs) — likely asked by
       reviewers, since the ground truth is a calibration-based estimate.
 - [ ] Release code + data for the paper.
+- [ ] **Future work (after the paper): reinforcement-learning placement and routing**, idea of
+      2026-10-11. Why: local calibration tracking is limited by the placement, a soft Sinkhorn average,
+      while the compiler makes a hard, noise-scored choice among many near-equivalent layouts (worst on
+      the larger EQE1 chips and on small circuits). An agent that places qubits and inserts SWAPs step
+      by step fits that discrete choice, and adapts to calibration changes by construction.
+      - Reward: the exact expected fidelity from usage maps, `log F = −Σ U·ε` (verified to 1e-7,
+        `compile_check/merge_usage.py`), so no compiler labels are needed per calibration; train on
+        many calibrations generated on the fly.
+      - Plan: (1) imitation of the compiler's layouts and usage maps (v8d layouts, v8u maps on 300
+        calibrations); (2) RL fine-tuning with the fidelity reward; (3) the agent becomes the placement
+        module, the usage-map head (v11) computes F; one rollout per device for device choice.
+      - Caveats: it predicts the fidelity *its own* compilation reaches, not Qiskit's (needs imitation
+        to stay aligned, or a reframed goal: a noise-aware learned compiler); several steps per circuit
+        reduce the 5–13× speed-up; RL on combinatorial problems is unstable. Prior art to check:
+        MQT Predictor (RL over compilation flows), IBM's RL-based transpiler passes (routing).
+      - Intermediate step inside the current predictor (paper scope): a noise score of each candidate
+        placement as prior (readout + CZ errors of the used qubits and couplers, as VF2Layout) and a
+        near-argmax placement in training (annealed τ or straight-through).
 
 ## Notes for the paper
 - Comparison with MQT Predictor: already in the QSW paper (our model is better at

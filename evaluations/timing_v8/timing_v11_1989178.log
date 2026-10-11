@@ -1,0 +1,20 @@
+v8kd40  N= 3: forward     9.9 ms (batch 64:   7.8 ms/circuit) | compile     66.7 ms | speed-up   5.6x
+Traceback (most recent call last):
+  File "/home/atudisco/pred-distr-tool/evaluations/timing_v8/timing_v11.py", line 100, in <module>
+    main()
+  File "/home/atudisco/pred-distr-tool/evaluations/timing_v8/timing_v11.py", line 59, in main
+    model(next(iter(DataLoader(graphs[:2], batch_size=2))), dev_n[n])   # warm caches
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/atudisco/miniforge3/envs/pred-distr/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1779, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/atudisco/miniforge3/envs/pred-distr/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1790, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/atudisco/pred-distr-tool/evaluations/generalization_v3/gsv3/model.py", line 445, in forward
+    a_h = torch.einsum("bdqp,dpr->bdqr", assign, self.hops[:, :p_max, :p_max])
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/atudisco/miniforge3/envs/pred-distr/lib/python3.11/site-packages/torch/functional.py", line 373, in einsum
+    return _VF.einsum(equation, operands)  # type: ignore[attr-defined]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: einsum(): subscript d has size 3 for operand 1 which does not broadcast with previously seen size 6

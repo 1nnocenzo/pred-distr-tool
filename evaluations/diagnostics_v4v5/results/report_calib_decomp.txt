@@ -1,0 +1,40 @@
+model v8a_c001 seed 5: 6870 (circuit, device, variant) with F > 0.01
+
+1) What the true change is made of
+   std true 0.239 | fixed-layout part std 1.004, corr with true 0.48 | relayout part std 0.914, mean +0.341 (compiler gains by re-compiling)
+
+2) Model change vs truth (corr / slope pred-on-true / mean pred vs mean true)
+   errors only (placement, counts frozen)   corr true +0.45  corr fixed +0.69  corr relayout -0.64  slope +1.24  mean -0.387 vs -0.096  std 0.656
+   + counts see the variant                 corr true +0.44  corr fixed +0.55  corr relayout -0.49  slope +0.95  mean -0.336 vs -0.096  std 0.510
+   + placement recomputed                   corr true +0.38  corr fixed +0.24  corr relayout -0.16  slope +0.49  mean -0.145 vs -0.096  std 0.306
+   placement contribution alone: std 0.409, corr relayout +0.49
+
+3) Sign (|true dlogF| > 0.05, n=3008): true worse in 85%, model predicts worse in 84%, same sign 83%
+
+4) Does the placement move when the compiler's layout moves?
+   compiler: share of logical qubits moved 0.57 | model argmax moved 0.42 | model total-variation shift 0.331 | corr(model shift, compiler moved) +0.21
+
+5) By variant type: corr(model, true) / corr(fixed, true) / compiler moved / model moved
+   jitter      +0.58 / +0.68 / 0.53 / 0.13
+   shuffle     +0.36 / +0.47 / 0.91 / 0.67
+   bad qubits  +0.34 / +0.45 / 0.39 / 0.55
+model v8c_d1 seed 5: 6870 (circuit, device, variant) with F > 0.01
+
+1) What the true change is made of
+   std true 0.239 | fixed-layout part std 1.004, corr with true 0.48 | relayout part std 0.914, mean +0.341 (compiler gains by re-compiling)
+
+2) Model change vs truth (corr / slope pred-on-true / mean pred vs mean true)
+   errors only (placement, counts frozen)   corr true +0.45  corr fixed +0.70  corr relayout -0.65  slope +1.24  mean -0.380 vs -0.096  std 0.651
+   + counts see the variant                 corr true +0.59  corr fixed +0.61  corr relayout -0.52  slope +1.06  mean -0.269 vs -0.096  std 0.431
+   + placement recomputed                   corr true +0.89  corr fixed +0.49  corr relayout -0.31  slope +0.82  mean -0.095 vs -0.096  std 0.221
+   placement contribution alone: std 0.335, corr relayout +0.47
+
+3) Sign (|true dlogF| > 0.05, n=3008): true worse in 85%, model predicts worse in 86%, same sign 91%
+
+4) Does the placement move when the compiler's layout moves?
+   compiler: share of logical qubits moved 0.57 | model argmax moved 0.43 | model total-variation shift 0.342 | corr(model shift, compiler moved) +0.28
+
+5) By variant type: corr(model, true) / corr(fixed, true) / compiler moved / model moved
+   jitter      +0.73 / +0.68 / 0.53 / 0.15
+   shuffle     +0.88 / +0.47 / 0.91 / 0.74
+   bad qubits  +0.90 / +0.45 / 0.39 / 0.52

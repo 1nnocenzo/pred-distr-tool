@@ -1,0 +1,217 @@
+{
+  "experiment": "group_holdout",
+  "split": "vqe",
+  "description": "Leave-one-group-out: test = all 9168 circuits of group 'vqe' (vqe_real_amp, vqe_su2, vqe_two_local), train = 7888 circuits from the other 32 families.",
+  "n_train": 5581,
+  "n_val": 2307,
+  "n_test": 9168,
+  "validation": {
+    "mode": "family",
+    "val_families": [
+      "bmw_quark_cardinality",
+      "bmw_quark_copula",
+      "bv",
+      "draper_qft_adder",
+      "dynamic_qft",
+      "ghz",
+      "graphstate",
+      "grover",
+      "iqpe",
+      "modular_adder",
+      "qft",
+      "qftentangled",
+      "qpeinexact",
+      "qwalk",
+      "rg_qft_multiplier",
+      "shors_nine_qubit_code",
+      "wstate"
+    ]
+  },
+  "training": {
+    "best_epoch": 16,
+    "epochs_run": 46,
+    "best_val_score": 0.009228129871189594,
+    "select_metric": "mse",
+    "resumed": false
+  },
+  "test": {
+    "n_circuits": 9168,
+    "mae": 0.09170773981695039,
+    "rmse": 0.11831693667425243,
+    "r2": 0.8309177262175765,
+    "target_std": 0.2891499673420044,
+    "device_choice_accuracy": 0.7924301919720768,
+    "fidelity_regret_mean": 0.006943501152412662,
+    "mean_true_best_fidelity": 0.43627799644837817,
+    "best_fixed_device": "EQE1_Bottom",
+    "regret_best_fixed_device": 0.008811848747636115,
+    "regret_random_device": 0.038755735270702925,
+    "per_device": {
+      "EQE1_Top": {
+        "mae": 0.08774597710515594,
+        "rmse": 0.11297140068397767,
+        "r2": 0.8481287417829891,
+        "target_std": 0.2898883203620043
+      },
+      "EQE1_Bottom": {
+        "mae": 0.095350953026328,
+        "rmse": 0.12483812604250268,
+        "r2": 0.8216032403795254,
+        "target_std": 0.2955655139529855
+      },
+      "QExa20": {
+        "mae": 0.0920262893193672,
+        "rmse": 0.1168314915835348,
+        "r2": 0.8230211964902037,
+        "target_std": 0.2777149721390102
+      }
+    },
+    "log_mse": 1.7047817082669305
+  },
+  "provenance": {
+    "model": "gsv3:xattn",
+    "hyperparameters": {
+      "device_hidden": 64,
+      "device_layers": 3,
+      "fusion_dim": 128,
+      "qubit_layers": 2,
+      "attn_heads": 4,
+      "lap_pe": 8,
+      "cost_bias_init": -6.0,
+      "hidden_dim": 142,
+      "num_conv_wo_resnet": 3,
+      "num_resnet_layers": 1,
+      "dropout": 0.0,
+      "bidirectional": true,
+      "mlp": [
+        512,
+        256,
+        128
+      ],
+      "lr": 0.001,
+      "readout": "meanmaxsum"
+    },
+    "train_protocol": {
+      "optimizer": "adam",
+      "loss": "mse_log_fidelity",
+      "log_eps": 0.001,
+      "batch_size": 32,
+      "num_epochs": 1000,
+      "patience": 30,
+      "val_fraction": 0.2,
+      "balance_alpha": 0.0,
+      "seed": 5,
+      "lr": 0.0003,
+      "grad_clip": 1.0,
+      "model": "xattn",
+      "select_metric": "mse",
+      "loss_kind": "log",
+      "mix_lambda": 0.1
+    },
+    "torch_version": "2.11.0+cu128",
+    "cuda_device": null,
+    "python": "3.11.15",
+    "host": "compute-5-8.cluster.lan"
+  },
+  "test_by_family": {
+    "vqe_real_amp": {
+      "n_circuits": 2861,
+      "mae": 0.07011157570712442,
+      "rmse": 0.09273832670122155,
+      "r2": 0.8961468929857869,
+      "target_std": 0.28831017965434397,
+      "device_choice_accuracy": 0.8014680181754631,
+      "fidelity_regret_mean": 0.005901815617776705,
+      "mean_true_best_fidelity": 0.4382716002204294,
+      "best_fixed_device": "EQE1_Bottom",
+      "regret_best_fixed_device": 0.008319218111066642,
+      "regret_random_device": 0.03737062661797581,
+      "per_device": {
+        "EQE1_Top": {
+          "mae": 0.0720240286037784,
+          "rmse": 0.09288654146778458,
+          "r2": 0.8968325619437983,
+          "target_std": 0.2891888003920484
+        },
+        "EQE1_Bottom": {
+          "mae": 0.07352528364129671,
+          "rmse": 0.10097918233063503,
+          "r2": 0.8828731361664095,
+          "target_std": 0.295055416940536
+        },
+        "QExa20": {
+          "mae": 0.06478541487629817,
+          "rmse": 0.08352536661408559,
+          "r2": 0.9087349808471501,
+          "target_std": 0.27648158843608367
+        }
+      }
+    },
+    "vqe_su2": {
+      "n_circuits": 2858,
+      "mae": 0.11725621360551644,
+      "rmse": 0.1436919772561609,
+      "r2": 0.746574605078124,
+      "target_std": 0.2885055959135667,
+      "device_choice_accuracy": 0.8589923023093072,
+      "fidelity_regret_mean": 0.004985736997105547,
+      "mean_true_best_fidelity": 0.42312667182988933,
+      "best_fixed_device": "EQE1_Bottom",
+      "regret_best_fixed_device": 0.006577896269875514,
+      "regret_random_device": 0.04586173898645275,
+      "per_device": {
+        "EQE1_Top": {
+          "mae": 0.10814865032863293,
+          "rmse": 0.13333249384337453,
+          "r2": 0.7856502419513672,
+          "target_std": 0.2879880740121853
+        },
+        "EQE1_Bottom": {
+          "mae": 0.1211551999129869,
+          "rmse": 0.1480496181089006,
+          "r2": 0.7479573108394174,
+          "target_std": 0.29489692168547077
+        },
+        "QExa20": {
+          "mae": 0.12246479057492946,
+          "rmse": 0.14915062737605359,
+          "r2": 0.7061162624435773,
+          "target_std": 0.2751295939709854
+        }
+      }
+    },
+    "vqe_two_local": {
+      "n_circuits": 3449,
+      "mae": 0.08845145899076605,
+      "rmse": 0.11387623487967773,
+      "r2": 0.8445711611573691,
+      "target_std": 0.28943628928718623,
+      "device_choice_accuracy": 0.7297767468831545,
+      "fidelity_regret_mean": 0.009429889169362852,
+      "mean_true_best_fidelity": 0.4455220629510753,
+      "best_fixed_device": "EQE1_Bottom",
+      "regret_best_fixed_device": 0.011071649394973045,
+      "regret_random_device": 0.034016343341401474,
+      "per_device": {
+        "EQE1_Top": {
+          "mae": 0.0838809885837712,
+          "rmse": 0.10971145399028576,
+          "r2": 0.858256802378009,
+          "target_std": 0.29140758904515524
+        },
+        "EQE1_Bottom": {
+          "mae": 0.0920731051018581,
+          "rmse": 0.12167595899367506,
+          "r2": 0.8313456921858369,
+          "target_std": 0.2962825395990762
+        },
+        "QExa20": {
+          "mae": 0.0894002832866689,
+          "rmse": 0.10982599181169045,
+          "r2": 0.8441109889082535,
+          "target_std": 0.27816173269511246
+        }
+      }
+    }
+  }
+}

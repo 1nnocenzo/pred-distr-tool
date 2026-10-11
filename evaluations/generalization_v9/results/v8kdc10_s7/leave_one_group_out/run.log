@@ -1,0 +1,263 @@
+2026-10-11 20:30:22,367  genstudy.io               INFO     Logging to evaluations/generalization_v9/results/v8kdc10_s7/leave_one_group_out/run.log
+2026-10-11 20:30:22,367  run_experiment            INFO     Command line: evaluations/generalization_v3/scripts/run_experiment.py logo --model sinkhorn_rf_route_czc --balance-alpha 0 --lr 3e-4 --grad-clip 1.0 --seed 7 --families variational --groups variational --loss mixed --val-mode random --layout-lambda 0.1 --layout-loss region_dist --layouts-path evaluations/compile_check/results/compiler_layouts_v6pilot.pt --count-lambda 0.1 --count-weights 0.1,0.1,1 --counts-path evaluations/compile_check/results/compiler_counts_v8.pt --calib-aug evaluations/compile_check/results/v8d --orig-best evaluations/compile_check/results/v8b_orig/v8b_orig_labels.pt --delta-lambda 1 --keep-last --epochs 40 --patience 100 --lr 1e-4 --aug-aux --delta-corr-lambda 0.1 --init-from evaluations/generalization_v9/results/v8k_s7/leave_one_group_out/variational/model.pth --results-dir evaluations/generalization_v9/results/v8kdc10_s7
+2026-10-11 20:30:22,705  gsv2.gpu                  INFO     GPU: NVIDIA H200
+2026-10-11 20:30:22,706  gsv3.model                INFO     Hyper-parameters (/home/atudisco/pred-distr-tool/src/model/best_params.json + v3 defaults): {'device_hidden': 64, 'device_layers': 3, 'fusion_dim': 128, 'qubit_layers': 2, 'attn_heads': 4, 'lap_pe': 8, 'cost_bias_init': -6.0, 'hidden_dim': 142, 'num_conv_wo_resnet': 3, 'num_resnet_layers': 1, 'dropout': 0.0, 'bidirectional': True, 'mlp': [512, 256, 128], 'lr': 0.001, 'readout': 'meanmaxsum'}
+2026-10-11 20:30:22,720  gsv3.devices              INFO     Device graphs: node features 13 (Laplacian PE 8), physical errors True
+2026-10-11 20:30:22,721  genstudy.data             INFO     Loading graph dataset: /home/atudisco/pred-distr-tool/evaluations/generalization_v3/data/graph_dataset_expected_fidelity.pt
+2026-10-11 20:30:26,113  genstudy.data             INFO     Loaded 17056 graphs
+2026-10-11 20:30:26,654  run_experiment            INFO     Compiler layouts (evaluations/compile_check/results/compiler_layouts_v6pilot.pt): 16994/17056 circuits
+2026-10-11 20:30:29,310  run_experiment            INFO     Calibration variants (evaluations/compile_check/results/v8d): 100 variant sets, 16994/17056 circuits
+2026-10-11 20:30:31,152  run_experiment            INFO     Original-calibration best-of-K labels (evaluations/compile_check/results/v8b_orig/v8b_orig_labels.pt): 16994/17056 circuits
+2026-10-11 20:30:31,655  run_experiment            INFO     Compiler counts (evaluations/compile_check/results/compiler_counts_v8.pt): 16994/17056 circuits
+2026-10-11 20:30:31,660  genstudy.io               INFO     Wrote evaluations/generalization_v9/results/v8kdc10_s7/leave_one_group_out/dataset_summary.json
+2026-10-11 20:30:31,663  run_experiment            INFO     [1/1] variational
+2026-10-11 20:30:31,666  gsv3.experiment           INFO     === group_holdout / variational ===
+2026-10-11 20:30:31,666  gsv3.experiment           INFO     Leave-one-group-out: test = all 9928 circuits of group 'variational' (qnn, vqe_real_amp, vqe_su2, vqe_two_local), train = 7128 circuits from the other 31 families.
+2026-10-11 20:30:31,666  gsv3.experiment           INFO     train=5702  val=1426 ({'mode': 'random'})  test=9928
+2026-10-11 20:30:31,750  gsv3.training             INFO     [group_holdout:variational] initialised from evaluations/generalization_v9/results/v8k_s7/leave_one_group_out/variational/model.pth
+2026-10-11 20:30:32,673  gsv3.training             INFO     [group_holdout:variational] model=sinkhorn_rf_route_czc (980485 params) train=5702 val=1426 lr=0.0001 clip=1.0 alpha=0.00
+2026-10-11 20:30:54,338  gsv3.training             INFO     [group_holdout:variational] epoch 0001  delta_mse=0.0457
+2026-10-11 20:30:54,339  gsv3.training             INFO     [group_holdout:variational] epoch 0001  delta_corr=0.463
+2026-10-11 20:30:54,339  gsv3.training             INFO     [group_holdout:variational] epoch 0001  aug_layout=0.5850  aug_region_overlap=0.742  aug_count_mse=0.0539  aug_count_rel_err_2q=0.263
+2026-10-11 20:30:54,339  gsv3.training             INFO     [group_holdout:variational] epoch 0001  count_mse=0.0515  count_rel_err_2q=0.259
+2026-10-11 20:30:54,339  gsv3.training             INFO     [group_holdout:variational] epoch 0001  region_bce=0.1963  dist_mse=0.1077  region_overlap=0.827
+2026-10-11 20:30:54,343  gsv3.training             INFO     [group_holdout:variational] epoch 0001  train_log_mse=0.00778  val_log_mse=0.12099  val_mse=0.000820  max_grad=177.90  patience=0/100
+2026-10-11 20:31:09,555  gsv3.training             INFO     [group_holdout:variational] epoch 0002  delta_mse=0.0370
+2026-10-11 20:31:09,555  gsv3.training             INFO     [group_holdout:variational] epoch 0002  delta_corr=0.497
+2026-10-11 20:31:09,555  gsv3.training             INFO     [group_holdout:variational] epoch 0002  aug_layout=0.5005  aug_region_overlap=0.746  aug_count_mse=0.0544  aug_count_rel_err_2q=0.269
+2026-10-11 20:31:09,555  gsv3.training             INFO     [group_holdout:variational] epoch 0002  count_mse=0.0523  count_rel_err_2q=0.266
+2026-10-11 20:31:09,555  gsv3.training             INFO     [group_holdout:variational] epoch 0002  region_bce=0.2122  dist_mse=0.1097  region_overlap=0.812
+2026-10-11 20:31:09,558  gsv3.training             INFO     [group_holdout:variational] epoch 0002  train_log_mse=0.00725  val_log_mse=0.10431  val_mse=0.000718  max_grad=6.83  patience=0/100
+2026-10-11 20:31:25,442  gsv3.training             INFO     [group_holdout:variational] epoch 0003  delta_mse=0.0348
+2026-10-11 20:31:25,442  gsv3.training             INFO     [group_holdout:variational] epoch 0003  delta_corr=0.531
+2026-10-11 20:31:25,442  gsv3.training             INFO     [group_holdout:variational] epoch 0003  aug_layout=0.4943  aug_region_overlap=0.745  aug_count_mse=0.0541  aug_count_rel_err_2q=0.266
+2026-10-11 20:31:25,442  gsv3.training             INFO     [group_holdout:variational] epoch 0003  count_mse=0.0517  count_rel_err_2q=0.265
+2026-10-11 20:31:25,442  gsv3.training             INFO     [group_holdout:variational] epoch 0003  region_bce=0.2091  dist_mse=0.1087  region_overlap=0.814
+2026-10-11 20:31:25,442  gsv3.training             INFO     [group_holdout:variational] epoch 0003  train_log_mse=0.00730  val_log_mse=0.09667  val_mse=0.000786  max_grad=39.14  patience=1/100
+2026-10-11 20:31:39,384  gsv3.training             INFO     [group_holdout:variational] epoch 0004  delta_mse=0.0255
+2026-10-11 20:31:39,384  gsv3.training             INFO     [group_holdout:variational] epoch 0004  delta_corr=0.526
+2026-10-11 20:31:39,384  gsv3.training             INFO     [group_holdout:variational] epoch 0004  aug_layout=0.4749  aug_region_overlap=0.752  aug_count_mse=0.0544  aug_count_rel_err_2q=0.267
+2026-10-11 20:31:39,384  gsv3.training             INFO     [group_holdout:variational] epoch 0004  count_mse=0.0511  count_rel_err_2q=0.265
+2026-10-11 20:31:39,384  gsv3.training             INFO     [group_holdout:variational] epoch 0004  region_bce=0.2075  dist_mse=0.1087  region_overlap=0.814
+2026-10-11 20:31:39,384  gsv3.training             INFO     [group_holdout:variational] epoch 0004  train_log_mse=0.00716  val_log_mse=0.11795  val_mse=0.000763  max_grad=4.82  patience=2/100
+2026-10-11 20:31:56,719  gsv3.training             INFO     [group_holdout:variational] epoch 0005  delta_mse=0.0281
+2026-10-11 20:31:56,719  gsv3.training             INFO     [group_holdout:variational] epoch 0005  delta_corr=0.556
+2026-10-11 20:31:56,719  gsv3.training             INFO     [group_holdout:variational] epoch 0005  aug_layout=0.4666  aug_region_overlap=0.752  aug_count_mse=0.0532  aug_count_rel_err_2q=0.271
+2026-10-11 20:31:56,719  gsv3.training             INFO     [group_holdout:variational] epoch 0005  count_mse=0.0508  count_rel_err_2q=0.269
+2026-10-11 20:31:56,719  gsv3.training             INFO     [group_holdout:variational] epoch 0005  region_bce=0.2073  dist_mse=0.1083  region_overlap=0.814
+2026-10-11 20:31:56,722  gsv3.training             INFO     [group_holdout:variational] epoch 0005  train_log_mse=0.00712  val_log_mse=0.10295  val_mse=0.000704  max_grad=4.84  patience=0/100
+2026-10-11 20:32:17,274  gsv3.training             INFO     [group_holdout:variational] epoch 0006  delta_mse=0.0341
+2026-10-11 20:32:17,275  gsv3.training             INFO     [group_holdout:variational] epoch 0006  delta_corr=0.592
+2026-10-11 20:32:17,275  gsv3.training             INFO     [group_holdout:variational] epoch 0006  aug_layout=0.4806  aug_region_overlap=0.744  aug_count_mse=0.0530  aug_count_rel_err_2q=0.271
+2026-10-11 20:32:17,275  gsv3.training             INFO     [group_holdout:variational] epoch 0006  count_mse=0.0506  count_rel_err_2q=0.273
+2026-10-11 20:32:17,275  gsv3.training             INFO     [group_holdout:variational] epoch 0006  region_bce=0.2107  dist_mse=0.1083  region_overlap=0.813
+2026-10-11 20:32:17,275  gsv3.training             INFO     [group_holdout:variational] epoch 0006  train_log_mse=0.00692  val_log_mse=0.10662  val_mse=0.000852  max_grad=27.77  patience=1/100
+2026-10-11 20:32:37,079  gsv3.training             INFO     [group_holdout:variational] epoch 0007  delta_mse=0.0264
+2026-10-11 20:32:37,079  gsv3.training             INFO     [group_holdout:variational] epoch 0007  delta_corr=0.589
+2026-10-11 20:32:37,079  gsv3.training             INFO     [group_holdout:variational] epoch 0007  aug_layout=0.4688  aug_region_overlap=0.749  aug_count_mse=0.0531  aug_count_rel_err_2q=0.269
+2026-10-11 20:32:37,079  gsv3.training             INFO     [group_holdout:variational] epoch 0007  count_mse=0.0507  count_rel_err_2q=0.272
+2026-10-11 20:32:37,079  gsv3.training             INFO     [group_holdout:variational] epoch 0007  region_bce=0.2088  dist_mse=0.1085  region_overlap=0.813
+2026-10-11 20:32:37,079  gsv3.training             INFO     [group_holdout:variational] epoch 0007  train_log_mse=0.00716  val_log_mse=0.10996  val_mse=0.000765  max_grad=6.65  patience=2/100
+2026-10-11 20:32:56,707  gsv3.training             INFO     [group_holdout:variational] epoch 0008  delta_mse=0.0307
+2026-10-11 20:32:56,707  gsv3.training             INFO     [group_holdout:variational] epoch 0008  delta_corr=0.622
+2026-10-11 20:32:56,707  gsv3.training             INFO     [group_holdout:variational] epoch 0008  aug_layout=0.4711  aug_region_overlap=0.745  aug_count_mse=0.0514  aug_count_rel_err_2q=0.265
+2026-10-11 20:32:56,707  gsv3.training             INFO     [group_holdout:variational] epoch 0008  count_mse=0.0499  count_rel_err_2q=0.268
+2026-10-11 20:32:56,707  gsv3.training             INFO     [group_holdout:variational] epoch 0008  region_bce=0.2140  dist_mse=0.1093  region_overlap=0.808
+2026-10-11 20:32:56,707  gsv3.training             INFO     [group_holdout:variational] epoch 0008  train_log_mse=0.00700  val_log_mse=0.10507  val_mse=0.000716  max_grad=63.23  patience=3/100
+2026-10-11 20:33:16,207  gsv3.training             INFO     [group_holdout:variational] epoch 0009  delta_mse=0.0239
+2026-10-11 20:33:16,207  gsv3.training             INFO     [group_holdout:variational] epoch 0009  delta_corr=0.599
+2026-10-11 20:33:16,207  gsv3.training             INFO     [group_holdout:variational] epoch 0009  aug_layout=0.4538  aug_region_overlap=0.758  aug_count_mse=0.0518  aug_count_rel_err_2q=0.266
+2026-10-11 20:33:16,207  gsv3.training             INFO     [group_holdout:variational] epoch 0009  count_mse=0.0502  count_rel_err_2q=0.267
+2026-10-11 20:33:16,207  gsv3.training             INFO     [group_holdout:variational] epoch 0009  region_bce=0.2073  dist_mse=0.1080  region_overlap=0.817
+2026-10-11 20:33:16,210  gsv3.training             INFO     [group_holdout:variational] epoch 0009  train_log_mse=0.00702  val_log_mse=0.10594  val_mse=0.000677  max_grad=21.85  patience=0/100
+2026-10-11 20:33:36,502  gsv3.training             INFO     [group_holdout:variational] epoch 0010  delta_mse=0.0253
+2026-10-11 20:33:36,502  gsv3.training             INFO     [group_holdout:variational] epoch 0010  delta_corr=0.612
+2026-10-11 20:33:36,502  gsv3.training             INFO     [group_holdout:variational] epoch 0010  aug_layout=0.4549  aug_region_overlap=0.757  aug_count_mse=0.0509  aug_count_rel_err_2q=0.267
+2026-10-11 20:33:36,502  gsv3.training             INFO     [group_holdout:variational] epoch 0010  count_mse=0.0499  count_rel_err_2q=0.271
+2026-10-11 20:33:36,502  gsv3.training             INFO     [group_holdout:variational] epoch 0010  region_bce=0.2086  dist_mse=0.1082  region_overlap=0.815
+2026-10-11 20:33:36,502  gsv3.training             INFO     [group_holdout:variational] epoch 0010  train_log_mse=0.00689  val_log_mse=0.11386  val_mse=0.000733  max_grad=6.18  patience=1/100
+2026-10-11 20:33:56,268  gsv3.training             INFO     [group_holdout:variational] epoch 0011  delta_mse=0.0283
+2026-10-11 20:33:56,268  gsv3.training             INFO     [group_holdout:variational] epoch 0011  delta_corr=0.617
+2026-10-11 20:33:56,268  gsv3.training             INFO     [group_holdout:variational] epoch 0011  aug_layout=0.4561  aug_region_overlap=0.756  aug_count_mse=0.0503  aug_count_rel_err_2q=0.266
+2026-10-11 20:33:56,268  gsv3.training             INFO     [group_holdout:variational] epoch 0011  count_mse=0.0487  count_rel_err_2q=0.267
+2026-10-11 20:33:56,268  gsv3.training             INFO     [group_holdout:variational] epoch 0011  region_bce=0.2071  dist_mse=0.1076  region_overlap=0.815
+2026-10-11 20:33:56,271  gsv3.training             INFO     [group_holdout:variational] epoch 0011  train_log_mse=0.00701  val_log_mse=0.15128  val_mse=0.000669  max_grad=5.91  patience=0/100
+2026-10-11 20:34:15,681  gsv3.training             INFO     [group_holdout:variational] epoch 0012  delta_mse=0.0284
+2026-10-11 20:34:15,681  gsv3.training             INFO     [group_holdout:variational] epoch 0012  delta_corr=0.618
+2026-10-11 20:34:15,681  gsv3.training             INFO     [group_holdout:variational] epoch 0012  aug_layout=0.4557  aug_region_overlap=0.754  aug_count_mse=0.0502  aug_count_rel_err_2q=0.266
+2026-10-11 20:34:15,681  gsv3.training             INFO     [group_holdout:variational] epoch 0012  count_mse=0.0488  count_rel_err_2q=0.268
+2026-10-11 20:34:15,681  gsv3.training             INFO     [group_holdout:variational] epoch 0012  region_bce=0.2068  dist_mse=0.1067  region_overlap=0.815
+2026-10-11 20:34:15,681  gsv3.training             INFO     [group_holdout:variational] epoch 0012  train_log_mse=0.00707  val_log_mse=0.10577  val_mse=0.000711  max_grad=9.20  patience=1/100
+2026-10-11 20:34:35,440  gsv3.training             INFO     [group_holdout:variational] epoch 0013  delta_mse=0.0267
+2026-10-11 20:34:35,441  gsv3.training             INFO     [group_holdout:variational] epoch 0013  delta_corr=0.613
+2026-10-11 20:34:35,441  gsv3.training             INFO     [group_holdout:variational] epoch 0013  aug_layout=0.4506  aug_region_overlap=0.755  aug_count_mse=0.0496  aug_count_rel_err_2q=0.264
+2026-10-11 20:34:35,441  gsv3.training             INFO     [group_holdout:variational] epoch 0013  count_mse=0.0485  count_rel_err_2q=0.266
+2026-10-11 20:34:35,441  gsv3.training             INFO     [group_holdout:variational] epoch 0013  region_bce=0.2057  dist_mse=0.1074  region_overlap=0.815
+2026-10-11 20:34:35,441  gsv3.training             INFO     [group_holdout:variational] epoch 0013  train_log_mse=0.00674  val_log_mse=0.11434  val_mse=0.000729  max_grad=8.67  patience=2/100
+2026-10-11 20:34:54,435  gsv3.training             INFO     [group_holdout:variational] epoch 0014  delta_mse=0.0218
+2026-10-11 20:34:54,436  gsv3.training             INFO     [group_holdout:variational] epoch 0014  delta_corr=0.661
+2026-10-11 20:34:54,436  gsv3.training             INFO     [group_holdout:variational] epoch 0014  aug_layout=0.4417  aug_region_overlap=0.760  aug_count_mse=0.0495  aug_count_rel_err_2q=0.266
+2026-10-11 20:34:54,436  gsv3.training             INFO     [group_holdout:variational] epoch 0014  count_mse=0.0484  count_rel_err_2q=0.269
+2026-10-11 20:34:54,436  gsv3.training             INFO     [group_holdout:variational] epoch 0014  region_bce=0.2033  dist_mse=0.1064  region_overlap=0.817
+2026-10-11 20:34:54,436  gsv3.training             INFO     [group_holdout:variational] epoch 0014  train_log_mse=0.00664  val_log_mse=0.10462  val_mse=0.000762  max_grad=4.34  patience=3/100
+2026-10-11 20:35:13,752  gsv3.training             INFO     [group_holdout:variational] epoch 0015  delta_mse=0.0268
+2026-10-11 20:35:13,752  gsv3.training             INFO     [group_holdout:variational] epoch 0015  delta_corr=0.617
+2026-10-11 20:35:13,752  gsv3.training             INFO     [group_holdout:variational] epoch 0015  aug_layout=0.4557  aug_region_overlap=0.755  aug_count_mse=0.0490  aug_count_rel_err_2q=0.269
+2026-10-11 20:35:13,752  gsv3.training             INFO     [group_holdout:variational] epoch 0015  count_mse=0.0481  count_rel_err_2q=0.274
+2026-10-11 20:35:13,752  gsv3.training             INFO     [group_holdout:variational] epoch 0015  region_bce=0.2035  dist_mse=0.1068  region_overlap=0.819
+2026-10-11 20:35:13,752  gsv3.training             INFO     [group_holdout:variational] epoch 0015  train_log_mse=0.00680  val_log_mse=0.10096  val_mse=0.000676  max_grad=9.48  patience=4/100
+2026-10-11 20:35:32,035  gsv3.training             INFO     [group_holdout:variational] epoch 0016  delta_mse=0.0249
+2026-10-11 20:35:32,035  gsv3.training             INFO     [group_holdout:variational] epoch 0016  delta_corr=0.622
+2026-10-11 20:35:32,035  gsv3.training             INFO     [group_holdout:variational] epoch 0016  aug_layout=0.4465  aug_region_overlap=0.758  aug_count_mse=0.0493  aug_count_rel_err_2q=0.267
+2026-10-11 20:35:32,035  gsv3.training             INFO     [group_holdout:variational] epoch 0016  count_mse=0.0476  count_rel_err_2q=0.270
+2026-10-11 20:35:32,035  gsv3.training             INFO     [group_holdout:variational] epoch 0016  region_bce=0.2045  dist_mse=0.1068  region_overlap=0.817
+2026-10-11 20:35:32,038  gsv3.training             INFO     [group_holdout:variational] epoch 0016  train_log_mse=0.00692  val_log_mse=0.10533  val_mse=0.000655  max_grad=5.61  patience=0/100
+2026-10-11 20:35:51,597  gsv3.training             INFO     [group_holdout:variational] epoch 0017  delta_mse=0.0240
+2026-10-11 20:35:51,597  gsv3.training             INFO     [group_holdout:variational] epoch 0017  delta_corr=0.674
+2026-10-11 20:35:51,597  gsv3.training             INFO     [group_holdout:variational] epoch 0017  aug_layout=0.4451  aug_region_overlap=0.763  aug_count_mse=0.0487  aug_count_rel_err_2q=0.270
+2026-10-11 20:35:51,597  gsv3.training             INFO     [group_holdout:variational] epoch 0017  count_mse=0.0476  count_rel_err_2q=0.273
+2026-10-11 20:35:51,597  gsv3.training             INFO     [group_holdout:variational] epoch 0017  region_bce=0.2022  dist_mse=0.1057  region_overlap=0.821
+2026-10-11 20:35:51,597  gsv3.training             INFO     [group_holdout:variational] epoch 0017  train_log_mse=0.00629  val_log_mse=0.11769  val_mse=0.000685  max_grad=3.57  patience=1/100
+2026-10-11 20:36:11,162  gsv3.training             INFO     [group_holdout:variational] epoch 0018  delta_mse=0.0210
+2026-10-11 20:36:11,162  gsv3.training             INFO     [group_holdout:variational] epoch 0018  delta_corr=0.657
+2026-10-11 20:36:11,162  gsv3.training             INFO     [group_holdout:variational] epoch 0018  aug_layout=0.4360  aug_region_overlap=0.762  aug_count_mse=0.0480  aug_count_rel_err_2q=0.264
+2026-10-11 20:36:11,162  gsv3.training             INFO     [group_holdout:variational] epoch 0018  count_mse=0.0472  count_rel_err_2q=0.268
+2026-10-11 20:36:11,162  gsv3.training             INFO     [group_holdout:variational] epoch 0018  region_bce=0.2030  dist_mse=0.1065  region_overlap=0.818
+2026-10-11 20:36:11,165  gsv3.training             INFO     [group_holdout:variational] epoch 0018  train_log_mse=0.00632  val_log_mse=0.09321  val_mse=0.000649  max_grad=4.23  patience=0/100
+2026-10-11 20:36:31,903  gsv3.training             INFO     [group_holdout:variational] epoch 0019  delta_mse=0.0261
+2026-10-11 20:36:31,903  gsv3.training             INFO     [group_holdout:variational] epoch 0019  delta_corr=0.634
+2026-10-11 20:36:31,903  gsv3.training             INFO     [group_holdout:variational] epoch 0019  aug_layout=0.4379  aug_region_overlap=0.764  aug_count_mse=0.0481  aug_count_rel_err_2q=0.270
+2026-10-11 20:36:31,903  gsv3.training             INFO     [group_holdout:variational] epoch 0019  count_mse=0.0471  count_rel_err_2q=0.273
+2026-10-11 20:36:31,903  gsv3.training             INFO     [group_holdout:variational] epoch 0019  region_bce=0.1984  dist_mse=0.1054  region_overlap=0.823
+2026-10-11 20:36:31,903  gsv3.training             INFO     [group_holdout:variational] epoch 0019  train_log_mse=0.00649  val_log_mse=0.09604  val_mse=0.000732  max_grad=4.05  patience=1/100
+2026-10-11 20:36:50,834  gsv3.training             INFO     [group_holdout:variational] epoch 0020  delta_mse=0.0205
+2026-10-11 20:36:50,835  gsv3.training             INFO     [group_holdout:variational] epoch 0020  delta_corr=0.659
+2026-10-11 20:36:50,835  gsv3.training             INFO     [group_holdout:variational] epoch 0020  aug_layout=0.4394  aug_region_overlap=0.762  aug_count_mse=0.0478  aug_count_rel_err_2q=0.269
+2026-10-11 20:36:50,835  gsv3.training             INFO     [group_holdout:variational] epoch 0020  count_mse=0.0467  count_rel_err_2q=0.274
+2026-10-11 20:36:50,835  gsv3.training             INFO     [group_holdout:variational] epoch 0020  region_bce=0.1992  dist_mse=0.1054  region_overlap=0.821
+2026-10-11 20:36:50,835  gsv3.training             INFO     [group_holdout:variational] epoch 0020  train_log_mse=0.00646  val_log_mse=0.10137  val_mse=0.000693  max_grad=4.57  patience=2/100
+2026-10-11 20:37:08,998  gsv3.training             INFO     [group_holdout:variational] epoch 0021  delta_mse=0.0218
+2026-10-11 20:37:08,998  gsv3.training             INFO     [group_holdout:variational] epoch 0021  delta_corr=0.636
+2026-10-11 20:37:08,998  gsv3.training             INFO     [group_holdout:variational] epoch 0021  aug_layout=0.4356  aug_region_overlap=0.763  aug_count_mse=0.0474  aug_count_rel_err_2q=0.267
+2026-10-11 20:37:08,998  gsv3.training             INFO     [group_holdout:variational] epoch 0021  count_mse=0.0464  count_rel_err_2q=0.271
+2026-10-11 20:37:08,998  gsv3.training             INFO     [group_holdout:variational] epoch 0021  region_bce=0.2004  dist_mse=0.1057  region_overlap=0.820
+2026-10-11 20:37:08,998  gsv3.training             INFO     [group_holdout:variational] epoch 0021  train_log_mse=0.00642  val_log_mse=0.11299  val_mse=0.000663  max_grad=11.64  patience=3/100
+2026-10-11 20:37:28,498  gsv3.training             INFO     [group_holdout:variational] epoch 0022  delta_mse=0.0203
+2026-10-11 20:37:28,499  gsv3.training             INFO     [group_holdout:variational] epoch 0022  delta_corr=0.676
+2026-10-11 20:37:28,499  gsv3.training             INFO     [group_holdout:variational] epoch 0022  aug_layout=0.4359  aug_region_overlap=0.764  aug_count_mse=0.0471  aug_count_rel_err_2q=0.265
+2026-10-11 20:37:28,499  gsv3.training             INFO     [group_holdout:variational] epoch 0022  count_mse=0.0464  count_rel_err_2q=0.271
+2026-10-11 20:37:28,499  gsv3.training             INFO     [group_holdout:variational] epoch 0022  region_bce=0.1993  dist_mse=0.1051  region_overlap=0.821
+2026-10-11 20:37:28,499  gsv3.training             INFO     [group_holdout:variational] epoch 0022  train_log_mse=0.00659  val_log_mse=0.09466  val_mse=0.000682  max_grad=8.00  patience=4/100
+2026-10-11 20:37:46,684  gsv3.training             INFO     [group_holdout:variational] epoch 0023  delta_mse=0.0245
+2026-10-11 20:37:46,684  gsv3.training             INFO     [group_holdout:variational] epoch 0023  delta_corr=0.667
+2026-10-11 20:37:46,684  gsv3.training             INFO     [group_holdout:variational] epoch 0023  aug_layout=0.4299  aug_region_overlap=0.766  aug_count_mse=0.0468  aug_count_rel_err_2q=0.265
+2026-10-11 20:37:46,684  gsv3.training             INFO     [group_holdout:variational] epoch 0023  count_mse=0.0460  count_rel_err_2q=0.270
+2026-10-11 20:37:46,684  gsv3.training             INFO     [group_holdout:variational] epoch 0023  region_bce=0.1978  dist_mse=0.1048  region_overlap=0.823
+2026-10-11 20:37:46,684  gsv3.training             INFO     [group_holdout:variational] epoch 0023  train_log_mse=0.00654  val_log_mse=0.09648  val_mse=0.000724  max_grad=6.89  patience=5/100
+2026-10-11 20:38:05,935  gsv3.training             INFO     [group_holdout:variational] epoch 0024  delta_mse=0.0193
+2026-10-11 20:38:05,935  gsv3.training             INFO     [group_holdout:variational] epoch 0024  delta_corr=0.685
+2026-10-11 20:38:05,936  gsv3.training             INFO     [group_holdout:variational] epoch 0024  aug_layout=0.4276  aug_region_overlap=0.769  aug_count_mse=0.0465  aug_count_rel_err_2q=0.268
+2026-10-11 20:38:05,936  gsv3.training             INFO     [group_holdout:variational] epoch 0024  count_mse=0.0458  count_rel_err_2q=0.273
+2026-10-11 20:38:05,936  gsv3.training             INFO     [group_holdout:variational] epoch 0024  region_bce=0.1965  dist_mse=0.1049  region_overlap=0.824
+2026-10-11 20:38:05,936  gsv3.training             INFO     [group_holdout:variational] epoch 0024  train_log_mse=0.00633  val_log_mse=0.10476  val_mse=0.000695  max_grad=7.12  patience=6/100
+2026-10-11 20:38:24,235  gsv3.training             INFO     [group_holdout:variational] epoch 0025  delta_mse=0.0205
+2026-10-11 20:38:24,236  gsv3.training             INFO     [group_holdout:variational] epoch 0025  delta_corr=0.661
+2026-10-11 20:38:24,236  gsv3.training             INFO     [group_holdout:variational] epoch 0025  aug_layout=0.4412  aug_region_overlap=0.761  aug_count_mse=0.0461  aug_count_rel_err_2q=0.262
+2026-10-11 20:38:24,236  gsv3.training             INFO     [group_holdout:variational] epoch 0025  count_mse=0.0458  count_rel_err_2q=0.270
+2026-10-11 20:38:24,236  gsv3.training             INFO     [group_holdout:variational] epoch 0025  region_bce=0.1940  dist_mse=0.1048  region_overlap=0.825
+2026-10-11 20:38:24,236  gsv3.training             INFO     [group_holdout:variational] epoch 0025  train_log_mse=0.00642  val_log_mse=0.10294  val_mse=0.000680  max_grad=6.09  patience=7/100
+2026-10-11 20:38:43,707  gsv3.training             INFO     [group_holdout:variational] epoch 0026  delta_mse=0.0217
+2026-10-11 20:38:43,707  gsv3.training             INFO     [group_holdout:variational] epoch 0026  delta_corr=0.629
+2026-10-11 20:38:43,708  gsv3.training             INFO     [group_holdout:variational] epoch 0026  aug_layout=0.4341  aug_region_overlap=0.764  aug_count_mse=0.0463  aug_count_rel_err_2q=0.266
+2026-10-11 20:38:43,708  gsv3.training             INFO     [group_holdout:variational] epoch 0026  count_mse=0.0454  count_rel_err_2q=0.271
+2026-10-11 20:38:43,708  gsv3.training             INFO     [group_holdout:variational] epoch 0026  region_bce=0.1969  dist_mse=0.1051  region_overlap=0.823
+2026-10-11 20:38:43,708  gsv3.training             INFO     [group_holdout:variational] epoch 0026  train_log_mse=0.00674  val_log_mse=0.10340  val_mse=0.000690  max_grad=5.89  patience=8/100
+2026-10-11 20:39:02,214  gsv3.training             INFO     [group_holdout:variational] epoch 0027  delta_mse=0.0205
+2026-10-11 20:39:02,214  gsv3.training             INFO     [group_holdout:variational] epoch 0027  delta_corr=0.696
+2026-10-11 20:39:02,214  gsv3.training             INFO     [group_holdout:variational] epoch 0027  aug_layout=0.4320  aug_region_overlap=0.766  aug_count_mse=0.0455  aug_count_rel_err_2q=0.262
+2026-10-11 20:39:02,214  gsv3.training             INFO     [group_holdout:variational] epoch 0027  count_mse=0.0453  count_rel_err_2q=0.268
+2026-10-11 20:39:02,214  gsv3.training             INFO     [group_holdout:variational] epoch 0027  region_bce=0.1949  dist_mse=0.1048  region_overlap=0.824
+2026-10-11 20:39:02,214  gsv3.training             INFO     [group_holdout:variational] epoch 0027  train_log_mse=0.00650  val_log_mse=0.13005  val_mse=0.000749  max_grad=3.24  patience=9/100
+2026-10-11 20:39:22,458  gsv3.training             INFO     [group_holdout:variational] epoch 0028  delta_mse=0.0194
+2026-10-11 20:39:22,458  gsv3.training             INFO     [group_holdout:variational] epoch 0028  delta_corr=0.676
+2026-10-11 20:39:22,459  gsv3.training             INFO     [group_holdout:variational] epoch 0028  aug_layout=0.4332  aug_region_overlap=0.766  aug_count_mse=0.0445  aug_count_rel_err_2q=0.263
+2026-10-11 20:39:22,459  gsv3.training             INFO     [group_holdout:variational] epoch 0028  count_mse=0.0450  count_rel_err_2q=0.269
+2026-10-11 20:39:22,459  gsv3.training             INFO     [group_holdout:variational] epoch 0028  region_bce=0.1951  dist_mse=0.1044  region_overlap=0.825
+2026-10-11 20:39:22,462  gsv3.training             INFO     [group_holdout:variational] epoch 0028  train_log_mse=0.00656  val_log_mse=0.09669  val_mse=0.000602  max_grad=2.89  patience=0/100
+2026-10-11 20:39:41,929  gsv3.training             INFO     [group_holdout:variational] epoch 0029  delta_mse=0.0228
+2026-10-11 20:39:41,929  gsv3.training             INFO     [group_holdout:variational] epoch 0029  delta_corr=0.693
+2026-10-11 20:39:41,929  gsv3.training             INFO     [group_holdout:variational] epoch 0029  aug_layout=0.4407  aug_region_overlap=0.761  aug_count_mse=0.0448  aug_count_rel_err_2q=0.266
+2026-10-11 20:39:41,929  gsv3.training             INFO     [group_holdout:variational] epoch 0029  count_mse=0.0456  count_rel_err_2q=0.274
+2026-10-11 20:39:41,929  gsv3.training             INFO     [group_holdout:variational] epoch 0029  region_bce=0.1964  dist_mse=0.1045  region_overlap=0.823
+2026-10-11 20:39:41,929  gsv3.training             INFO     [group_holdout:variational] epoch 0029  train_log_mse=0.00652  val_log_mse=0.11228  val_mse=0.000631  max_grad=11.46  patience=1/100
+2026-10-11 20:40:00,361  gsv3.training             INFO     [group_holdout:variational] epoch 0030  delta_mse=0.0240
+2026-10-11 20:40:00,361  gsv3.training             INFO     [group_holdout:variational] epoch 0030  delta_corr=0.656
+2026-10-11 20:40:00,361  gsv3.training             INFO     [group_holdout:variational] epoch 0030  aug_layout=0.4349  aug_region_overlap=0.763  aug_count_mse=0.0451  aug_count_rel_err_2q=0.265
+2026-10-11 20:40:00,361  gsv3.training             INFO     [group_holdout:variational] epoch 0030  count_mse=0.0452  count_rel_err_2q=0.271
+2026-10-11 20:40:00,361  gsv3.training             INFO     [group_holdout:variational] epoch 0030  region_bce=0.1935  dist_mse=0.1047  region_overlap=0.825
+2026-10-11 20:40:00,361  gsv3.training             INFO     [group_holdout:variational] epoch 0030  train_log_mse=0.00649  val_log_mse=0.12210  val_mse=0.000645  max_grad=6.81  patience=2/100
+2026-10-11 20:40:19,825  gsv3.training             INFO     [group_holdout:variational] epoch 0031  delta_mse=0.0197
+2026-10-11 20:40:19,825  gsv3.training             INFO     [group_holdout:variational] epoch 0031  delta_corr=0.649
+2026-10-11 20:40:19,825  gsv3.training             INFO     [group_holdout:variational] epoch 0031  aug_layout=0.4304  aug_region_overlap=0.766  aug_count_mse=0.0442  aug_count_rel_err_2q=0.265
+2026-10-11 20:40:19,825  gsv3.training             INFO     [group_holdout:variational] epoch 0031  count_mse=0.0452  count_rel_err_2q=0.274
+2026-10-11 20:40:19,825  gsv3.training             INFO     [group_holdout:variational] epoch 0031  region_bce=0.1928  dist_mse=0.1042  region_overlap=0.826
+2026-10-11 20:40:19,825  gsv3.training             INFO     [group_holdout:variational] epoch 0031  train_log_mse=0.00645  val_log_mse=0.09935  val_mse=0.000661  max_grad=3.41  patience=3/100
+2026-10-11 20:40:39,073  gsv3.training             INFO     [group_holdout:variational] epoch 0032  delta_mse=0.0219
+2026-10-11 20:40:39,074  gsv3.training             INFO     [group_holdout:variational] epoch 0032  delta_corr=0.682
+2026-10-11 20:40:39,074  gsv3.training             INFO     [group_holdout:variational] epoch 0032  aug_layout=0.4281  aug_region_overlap=0.766  aug_count_mse=0.0443  aug_count_rel_err_2q=0.262
+2026-10-11 20:40:39,074  gsv3.training             INFO     [group_holdout:variational] epoch 0032  count_mse=0.0448  count_rel_err_2q=0.269
+2026-10-11 20:40:39,074  gsv3.training             INFO     [group_holdout:variational] epoch 0032  region_bce=0.1949  dist_mse=0.1038  region_overlap=0.825
+2026-10-11 20:40:39,074  gsv3.training             INFO     [group_holdout:variational] epoch 0032  train_log_mse=0.00642  val_log_mse=0.10433  val_mse=0.000729  max_grad=5.41  patience=4/100
+2026-10-11 20:40:58,667  gsv3.training             INFO     [group_holdout:variational] epoch 0033  delta_mse=0.0219
+2026-10-11 20:40:58,668  gsv3.training             INFO     [group_holdout:variational] epoch 0033  delta_corr=0.695
+2026-10-11 20:40:58,668  gsv3.training             INFO     [group_holdout:variational] epoch 0033  aug_layout=0.4342  aug_region_overlap=0.765  aug_count_mse=0.0441  aug_count_rel_err_2q=0.263
+2026-10-11 20:40:58,668  gsv3.training             INFO     [group_holdout:variational] epoch 0033  count_mse=0.0448  count_rel_err_2q=0.272
+2026-10-11 20:40:58,668  gsv3.training             INFO     [group_holdout:variational] epoch 0033  region_bce=0.1935  dist_mse=0.1042  region_overlap=0.825
+2026-10-11 20:40:58,668  gsv3.training             INFO     [group_holdout:variational] epoch 0033  train_log_mse=0.00634  val_log_mse=0.09566  val_mse=0.000666  max_grad=3.97  patience=5/100
+2026-10-11 20:41:18,176  gsv3.training             INFO     [group_holdout:variational] epoch 0034  delta_mse=0.0199
+2026-10-11 20:41:18,177  gsv3.training             INFO     [group_holdout:variational] epoch 0034  delta_corr=0.686
+2026-10-11 20:41:18,177  gsv3.training             INFO     [group_holdout:variational] epoch 0034  aug_layout=0.4270  aug_region_overlap=0.768  aug_count_mse=0.0443  aug_count_rel_err_2q=0.266
+2026-10-11 20:41:18,177  gsv3.training             INFO     [group_holdout:variational] epoch 0034  count_mse=0.0449  count_rel_err_2q=0.274
+2026-10-11 20:41:18,177  gsv3.training             INFO     [group_holdout:variational] epoch 0034  region_bce=0.1923  dist_mse=0.1038  region_overlap=0.827
+2026-10-11 20:41:18,177  gsv3.training             INFO     [group_holdout:variational] epoch 0034  train_log_mse=0.00629  val_log_mse=0.09618  val_mse=0.000726  max_grad=5.11  patience=6/100
+2026-10-11 20:41:37,952  gsv3.training             INFO     [group_holdout:variational] epoch 0035  delta_mse=0.0227
+2026-10-11 20:41:37,953  gsv3.training             INFO     [group_holdout:variational] epoch 0035  delta_corr=0.677
+2026-10-11 20:41:37,953  gsv3.training             INFO     [group_holdout:variational] epoch 0035  aug_layout=0.4243  aug_region_overlap=0.770  aug_count_mse=0.0441  aug_count_rel_err_2q=0.268
+2026-10-11 20:41:37,953  gsv3.training             INFO     [group_holdout:variational] epoch 0035  count_mse=0.0449  count_rel_err_2q=0.279
+2026-10-11 20:41:37,953  gsv3.training             INFO     [group_holdout:variational] epoch 0035  region_bce=0.1929  dist_mse=0.1033  region_overlap=0.827
+2026-10-11 20:41:37,953  gsv3.training             INFO     [group_holdout:variational] epoch 0035  train_log_mse=0.00616  val_log_mse=0.09477  val_mse=0.000697  max_grad=6.38  patience=7/100
+2026-10-11 20:41:57,387  gsv3.training             INFO     [group_holdout:variational] epoch 0036  delta_mse=0.0205
+2026-10-11 20:41:57,387  gsv3.training             INFO     [group_holdout:variational] epoch 0036  delta_corr=0.683
+2026-10-11 20:41:57,387  gsv3.training             INFO     [group_holdout:variational] epoch 0036  aug_layout=0.4265  aug_region_overlap=0.768  aug_count_mse=0.0432  aug_count_rel_err_2q=0.267
+2026-10-11 20:41:57,388  gsv3.training             INFO     [group_holdout:variational] epoch 0036  count_mse=0.0444  count_rel_err_2q=0.277
+2026-10-11 20:41:57,388  gsv3.training             INFO     [group_holdout:variational] epoch 0036  region_bce=0.1900  dist_mse=0.1038  region_overlap=0.828
+2026-10-11 20:41:57,388  gsv3.training             INFO     [group_holdout:variational] epoch 0036  train_log_mse=0.00631  val_log_mse=0.10796  val_mse=0.000799  max_grad=4.89  patience=8/100
+2026-10-11 20:42:16,846  gsv3.training             INFO     [group_holdout:variational] epoch 0037  delta_mse=0.0189
+2026-10-11 20:42:16,846  gsv3.training             INFO     [group_holdout:variational] epoch 0037  delta_corr=0.680
+2026-10-11 20:42:16,846  gsv3.training             INFO     [group_holdout:variational] epoch 0037  aug_layout=0.4287  aug_region_overlap=0.768  aug_count_mse=0.0428  aug_count_rel_err_2q=0.264
+2026-10-11 20:42:16,846  gsv3.training             INFO     [group_holdout:variational] epoch 0037  count_mse=0.0445  count_rel_err_2q=0.275
+2026-10-11 20:42:16,847  gsv3.training             INFO     [group_holdout:variational] epoch 0037  region_bce=0.1903  dist_mse=0.1034  region_overlap=0.829
+2026-10-11 20:42:16,847  gsv3.training             INFO     [group_holdout:variational] epoch 0037  train_log_mse=0.00650  val_log_mse=0.10849  val_mse=0.000661  max_grad=3.23  patience=9/100
+2026-10-11 20:42:37,390  gsv3.training             INFO     [group_holdout:variational] epoch 0038  delta_mse=0.0187
+2026-10-11 20:42:37,390  gsv3.training             INFO     [group_holdout:variational] epoch 0038  delta_corr=0.710
+2026-10-11 20:42:37,390  gsv3.training             INFO     [group_holdout:variational] epoch 0038  aug_layout=0.4283  aug_region_overlap=0.767  aug_count_mse=0.0431  aug_count_rel_err_2q=0.262
+2026-10-11 20:42:37,390  gsv3.training             INFO     [group_holdout:variational] epoch 0038  count_mse=0.0445  count_rel_err_2q=0.273
+2026-10-11 20:42:37,390  gsv3.training             INFO     [group_holdout:variational] epoch 0038  region_bce=0.1881  dist_mse=0.1037  region_overlap=0.829
+2026-10-11 20:42:37,390  gsv3.training             INFO     [group_holdout:variational] epoch 0038  train_log_mse=0.00628  val_log_mse=0.10254  val_mse=0.000675  max_grad=10.10  patience=10/100
+2026-10-11 20:42:56,403  gsv3.training             INFO     [group_holdout:variational] epoch 0039  delta_mse=0.0195
+2026-10-11 20:42:56,403  gsv3.training             INFO     [group_holdout:variational] epoch 0039  delta_corr=0.682
+2026-10-11 20:42:56,403  gsv3.training             INFO     [group_holdout:variational] epoch 0039  aug_layout=0.4157  aug_region_overlap=0.773  aug_count_mse=0.0431  aug_count_rel_err_2q=0.261
+2026-10-11 20:42:56,403  gsv3.training             INFO     [group_holdout:variational] epoch 0039  count_mse=0.0442  count_rel_err_2q=0.270
+2026-10-11 20:42:56,404  gsv3.training             INFO     [group_holdout:variational] epoch 0039  region_bce=0.1909  dist_mse=0.1036  region_overlap=0.828
+2026-10-11 20:42:56,404  gsv3.training             INFO     [group_holdout:variational] epoch 0039  train_log_mse=0.00630  val_log_mse=0.11059  val_mse=0.000765  max_grad=5.85  patience=11/100
+2026-10-11 20:43:16,415  gsv3.training             INFO     [group_holdout:variational] epoch 0040  delta_mse=0.0179
+2026-10-11 20:43:16,416  gsv3.training             INFO     [group_holdout:variational] epoch 0040  delta_corr=0.707
+2026-10-11 20:43:16,416  gsv3.training             INFO     [group_holdout:variational] epoch 0040  aug_layout=0.4275  aug_region_overlap=0.768  aug_count_mse=0.0425  aug_count_rel_err_2q=0.264
+2026-10-11 20:43:16,416  gsv3.training             INFO     [group_holdout:variational] epoch 0040  count_mse=0.0441  count_rel_err_2q=0.272
+2026-10-11 20:43:16,416  gsv3.training             INFO     [group_holdout:variational] epoch 0040  region_bce=0.1876  dist_mse=0.1035  region_overlap=0.830
+2026-10-11 20:43:16,416  gsv3.training             INFO     [group_holdout:variational] epoch 0040  train_log_mse=0.00657  val_log_mse=0.10168  val_mse=0.000665  max_grad=7.80  patience=12/100
+2026-10-11 20:43:46,162  gsv3.experiment           INFO     [variational] TEST  n=9928  MAE=0.0472  R2=0.9444  device-acc=0.525  regret=0.0147
+2026-10-11 20:43:46,165  genstudy.io               INFO     Wrote evaluations/generalization_v9/results/v8kdc10_s7/leave_one_group_out/variational/metrics.json
+2026-10-11 20:43:46,217  genstudy.io               INFO     Wrote evaluations/generalization_v9/results/v8kdc10_s7/leave_one_group_out/variational/predictions.json
+2026-10-11 20:43:46,244  genstudy.io               INFO     Wrote evaluations/generalization_v9/results/v8kdc10_s7/leave_one_group_out/variational/history.json
+2026-10-11 20:43:46,304  run_experiment            INFO     leave_one_group_out finished: 1 complete, 0 skipped

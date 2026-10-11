@@ -1,0 +1,526 @@
+2026-10-08 17:06:11,698  genstudy.io               INFO     Logging to evaluations/generalization_v6/results/v6_l01/leave_one_family_out/run.log
+2026-10-08 17:06:11,699  run_experiment            INFO     Command line: evaluations/generalization_v3/scripts/run_experiment.py lofo --model sinkhorn --balance-alpha 0 --lr 3e-4 --grad-clip 1.0 --seed 5 --families qnn --groups qnn --loss mixed --val-mode random --layout-lambda 0.1 --layouts-path evaluations/compile_check/results/compiler_layouts_v6pilot.pt --results-dir evaluations/generalization_v6/results/v6_l01
+2026-10-08 17:06:11,699  gsv2.gpu                  WARNING  No CUDA device available — running on the CPU.
+2026-10-08 17:06:11,699  gsv3.model                INFO     Hyper-parameters (/home/atudisco/pred-distr-tool/src/model/best_params.json + v3 defaults): {'device_hidden': 64, 'device_layers': 3, 'fusion_dim': 128, 'qubit_layers': 2, 'attn_heads': 4, 'lap_pe': 8, 'cost_bias_init': -6.0, 'hidden_dim': 142, 'num_conv_wo_resnet': 3, 'num_resnet_layers': 1, 'dropout': 0.0, 'bidirectional': True, 'mlp': [512, 256, 128], 'lr': 0.001, 'readout': 'meanmaxsum'}
+2026-10-08 17:06:11,712  gsv3.devices              INFO     Device graphs: node features 13 (Laplacian PE 8), physical errors True
+2026-10-08 17:06:11,713  genstudy.data             INFO     Loading graph dataset: /home/atudisco/pred-distr-tool/evaluations/generalization_v3/data/graph_dataset_expected_fidelity.pt
+2026-10-08 17:06:11,722  genstudy.io               INFO     Logging to evaluations/generalization_v6/results/v6_l01/leave_one_family_out/run.log
+2026-10-08 17:06:11,722  run_experiment            INFO     Command line: evaluations/generalization_v3/scripts/run_experiment.py lofo --model sinkhorn --balance-alpha 0 --lr 3e-4 --grad-clip 1.0 --seed 5 --families qaoa --groups qaoa --loss mixed --val-mode random --layout-lambda 0.1 --layouts-path evaluations/compile_check/results/compiler_layouts_v6pilot.pt --results-dir evaluations/generalization_v6/results/v6_l01
+2026-10-08 17:06:11,722  gsv2.gpu                  WARNING  No CUDA device available — running on the CPU.
+2026-10-08 17:06:11,723  gsv3.model                INFO     Hyper-parameters (/home/atudisco/pred-distr-tool/src/model/best_params.json + v3 defaults): {'device_hidden': 64, 'device_layers': 3, 'fusion_dim': 128, 'qubit_layers': 2, 'attn_heads': 4, 'lap_pe': 8, 'cost_bias_init': -6.0, 'hidden_dim': 142, 'num_conv_wo_resnet': 3, 'num_resnet_layers': 1, 'dropout': 0.0, 'bidirectional': True, 'mlp': [512, 256, 128], 'lr': 0.001, 'readout': 'meanmaxsum'}
+2026-10-08 17:06:11,736  gsv3.devices              INFO     Device graphs: node features 13 (Laplacian PE 8), physical errors True
+2026-10-08 17:06:11,737  genstudy.data             INFO     Loading graph dataset: /home/atudisco/pred-distr-tool/evaluations/generalization_v3/data/graph_dataset_expected_fidelity.pt
+2026-10-08 17:06:15,001  genstudy.data             INFO     Loaded 17056 graphs
+2026-10-08 17:06:15,044  genstudy.data             INFO     Loaded 17056 graphs
+2026-10-08 17:06:15,557  run_experiment            INFO     Compiler layouts (evaluations/compile_check/results/compiler_layouts_v6pilot.pt): 16994/17056 circuits
+2026-10-08 17:06:15,576  genstudy.io               INFO     Wrote evaluations/generalization_v6/results/v6_l01/leave_one_family_out/dataset_summary.json
+2026-10-08 17:06:15,577  genstudy.data             INFO     Holding out 1 families: qnn
+2026-10-08 17:06:15,579  run_experiment            INFO     [1/1] qnn
+2026-10-08 17:06:15,582  gsv3.experiment           INFO     === family_holdout / qnn ===
+2026-10-08 17:06:15,582  gsv3.experiment           INFO     Leave-one-family-out: test = all 760 'qnn' circuits, train = 16296 circuits from 34 other families.
+2026-10-08 17:06:15,583  gsv3.experiment           INFO     train=13037  val=3259 ({'mode': 'random'})  test=760
+2026-10-08 17:06:15,591  run_experiment            INFO     Compiler layouts (evaluations/compile_check/results/compiler_layouts_v6pilot.pt): 16994/17056 circuits
+2026-10-08 17:06:15,611  genstudy.io               INFO     Wrote evaluations/generalization_v6/results/v6_l01/leave_one_family_out/dataset_summary.json
+2026-10-08 17:06:15,612  genstudy.data             INFO     Holding out 1 families: qaoa
+2026-10-08 17:06:15,615  run_experiment            INFO     [1/1] qaoa
+2026-10-08 17:06:15,620  gsv3.experiment           INFO     === family_holdout / qaoa ===
+2026-10-08 17:06:15,620  gsv3.experiment           INFO     Leave-one-family-out: test = all 2706 'qaoa' circuits, train = 14350 circuits from 34 other families.
+2026-10-08 17:06:15,621  gsv3.experiment           INFO     train=11480  val=2870 ({'mode': 'random'})  test=2706
+2026-10-08 17:06:15,676  gsv3.training             INFO     [family_holdout:qnn] model=sinkhorn (979423 params) train=13037 val=3259 lr=0.0003 clip=1.0 alpha=0.00
+2026-10-08 17:06:15,711  gsv3.training             INFO     [family_holdout:qaoa] model=sinkhorn (979423 params) train=11480 val=2870 lr=0.0003 clip=1.0 alpha=0.00
+2026-10-08 17:07:37,345  gsv3.training             INFO     [family_holdout:qaoa] epoch 0001  layout_ce=3.2685  layout_acc=0.090
+2026-10-08 17:07:37,347  gsv3.training             INFO     [family_holdout:qaoa] epoch 0001  train_log_mse=0.62211  val_log_mse=0.30664  val_mse=0.001926  max_grad=546.67  patience=0/30
+2026-10-08 17:07:59,175  gsv3.training             INFO     [family_holdout:qnn] epoch 0001  layout_ce=3.1841  layout_acc=0.085
+2026-10-08 17:07:59,177  gsv3.training             INFO     [family_holdout:qnn] epoch 0001  train_log_mse=0.63245  val_log_mse=0.27564  val_mse=0.001955  max_grad=413.04  patience=0/30
+2026-10-08 17:08:58,902  gsv3.training             INFO     [family_holdout:qaoa] epoch 0002  layout_ce=2.7755  layout_acc=0.125
+2026-10-08 17:08:58,905  gsv3.training             INFO     [family_holdout:qaoa] epoch 0002  train_log_mse=0.30844  val_log_mse=0.20407  val_mse=0.001359  max_grad=7.03  patience=0/30
+2026-10-08 17:09:42,807  gsv3.training             INFO     [family_holdout:qnn] epoch 0002  layout_ce=2.8249  layout_acc=0.117
+2026-10-08 17:09:42,807  gsv3.training             INFO     [family_holdout:qnn] epoch 0002  train_log_mse=0.31673  val_log_mse=0.24242  val_mse=0.002031  max_grad=10.80  patience=1/30
+2026-10-08 17:10:20,962  gsv3.training             INFO     [family_holdout:qaoa] epoch 0003  layout_ce=2.6171  layout_acc=0.162
+2026-10-08 17:10:20,963  gsv3.training             INFO     [family_holdout:qaoa] epoch 0003  train_log_mse=0.28277  val_log_mse=0.22082  val_mse=0.002959  max_grad=5.64  patience=1/30
+2026-10-08 17:11:26,998  gsv3.training             INFO     [family_holdout:qnn] epoch 0003  layout_ce=2.6624  layout_acc=0.150
+2026-10-08 17:11:27,001  gsv3.training             INFO     [family_holdout:qnn] epoch 0003  train_log_mse=0.29037  val_log_mse=0.15742  val_mse=0.001519  max_grad=7.69  patience=0/30
+2026-10-08 17:11:42,543  gsv3.training             INFO     [family_holdout:qaoa] epoch 0004  layout_ce=2.4741  layout_acc=0.197
+2026-10-08 17:11:42,546  gsv3.training             INFO     [family_holdout:qaoa] epoch 0004  train_log_mse=0.26196  val_log_mse=0.15212  val_mse=0.001017  max_grad=6.92  patience=0/30
+2026-10-08 17:13:04,272  gsv3.training             INFO     [family_holdout:qaoa] epoch 0005  layout_ce=2.3750  layout_acc=0.224
+2026-10-08 17:13:04,275  gsv3.training             INFO     [family_holdout:qaoa] epoch 0005  train_log_mse=0.25172  val_log_mse=0.10323  val_mse=0.000942  max_grad=4.40  patience=0/30
+2026-10-08 17:13:11,442  gsv3.training             INFO     [family_holdout:qnn] epoch 0004  layout_ce=2.5380  layout_acc=0.182
+2026-10-08 17:13:11,445  gsv3.training             INFO     [family_holdout:qnn] epoch 0004  train_log_mse=0.27043  val_log_mse=0.11922  val_mse=0.001114  max_grad=3.36  patience=0/30
+2026-10-08 17:14:26,760  gsv3.training             INFO     [family_holdout:qaoa] epoch 0006  layout_ce=2.2860  layout_acc=0.247
+2026-10-08 17:14:26,761  gsv3.training             INFO     [family_holdout:qaoa] epoch 0006  train_log_mse=0.24028  val_log_mse=0.06859  val_mse=0.000984  max_grad=3.36  patience=1/30
+2026-10-08 17:14:55,479  gsv3.training             INFO     [family_holdout:qnn] epoch 0005  layout_ce=2.4449  layout_acc=0.206
+2026-10-08 17:14:55,481  gsv3.training             INFO     [family_holdout:qnn] epoch 0005  train_log_mse=0.25755  val_log_mse=0.32686  val_mse=0.001008  max_grad=4.09  patience=0/30
+2026-10-08 17:15:49,151  gsv3.training             INFO     [family_holdout:qaoa] epoch 0007  layout_ce=2.1971  layout_acc=0.275
+2026-10-08 17:15:49,152  gsv3.training             INFO     [family_holdout:qaoa] epoch 0007  train_log_mse=0.23012  val_log_mse=0.07205  val_mse=0.000962  max_grad=2.21  patience=2/30
+2026-10-08 17:16:37,951  gsv3.training             INFO     [family_holdout:qnn] epoch 0006  layout_ce=2.3724  layout_acc=0.224
+2026-10-08 17:16:37,953  gsv3.training             INFO     [family_holdout:qnn] epoch 0006  train_log_mse=0.25078  val_log_mse=0.16331  val_mse=0.000821  max_grad=4.47  patience=0/30
+2026-10-08 17:17:07,673  gsv3.training             INFO     [family_holdout:qaoa] epoch 0008  layout_ce=2.1139  layout_acc=0.304
+2026-10-08 17:17:07,675  gsv3.training             INFO     [family_holdout:qaoa] epoch 0008  train_log_mse=0.22042  val_log_mse=0.07062  val_mse=0.000867  max_grad=3.29  patience=0/30
+2026-10-08 17:18:14,710  gsv3.training             INFO     [family_holdout:qnn] epoch 0007  layout_ce=2.3011  layout_acc=0.247
+2026-10-08 17:18:14,713  gsv3.training             INFO     [family_holdout:qnn] epoch 0007  train_log_mse=0.24104  val_log_mse=0.08641  val_mse=0.000801  max_grad=2.49  patience=0/30
+2026-10-08 17:18:24,929  gsv3.training             INFO     [family_holdout:qaoa] epoch 0009  layout_ce=2.0415  layout_acc=0.330
+2026-10-08 17:18:24,929  gsv3.training             INFO     [family_holdout:qaoa] epoch 0009  train_log_mse=0.21424  val_log_mse=0.08957  val_mse=0.001011  max_grad=12.67  patience=1/30
+2026-10-08 17:19:41,921  gsv3.training             INFO     [family_holdout:qaoa] epoch 0010  layout_ce=1.9659  layout_acc=0.359
+2026-10-08 17:19:41,922  gsv3.training             INFO     [family_holdout:qaoa] epoch 0010  train_log_mse=0.20724  val_log_mse=0.12804  val_mse=0.000934  max_grad=7.50  patience=2/30
+2026-10-08 17:19:51,854  gsv3.training             INFO     [family_holdout:qnn] epoch 0008  layout_ce=2.2182  layout_acc=0.276
+2026-10-08 17:19:51,856  gsv3.training             INFO     [family_holdout:qnn] epoch 0008  train_log_mse=0.23126  val_log_mse=0.07405  val_mse=0.000796  max_grad=2.24  patience=0/30
+2026-10-08 17:20:59,009  gsv3.training             INFO     [family_holdout:qaoa] epoch 0011  layout_ce=1.8902  layout_acc=0.386
+2026-10-08 17:20:59,011  gsv3.training             INFO     [family_holdout:qaoa] epoch 0011  train_log_mse=0.19686  val_log_mse=0.07028  val_mse=0.000755  max_grad=2.61  patience=0/30
+2026-10-08 17:21:28,892  gsv3.training             INFO     [family_holdout:qnn] epoch 0009  layout_ce=2.1494  layout_acc=0.299
+2026-10-08 17:21:28,893  gsv3.training             INFO     [family_holdout:qnn] epoch 0009  train_log_mse=0.22537  val_log_mse=0.08128  val_mse=0.000797  max_grad=3.29  patience=1/30
+2026-10-08 17:22:15,752  gsv3.training             INFO     [family_holdout:qaoa] epoch 0012  layout_ce=1.8110  layout_acc=0.415
+2026-10-08 17:22:15,752  gsv3.training             INFO     [family_holdout:qaoa] epoch 0012  train_log_mse=0.18857  val_log_mse=0.06674  val_mse=0.000793  max_grad=2.90  patience=1/30
+2026-10-08 17:23:05,928  gsv3.training             INFO     [family_holdout:qnn] epoch 0010  layout_ce=2.0738  layout_acc=0.325
+2026-10-08 17:23:05,928  gsv3.training             INFO     [family_holdout:qnn] epoch 0010  train_log_mse=0.21661  val_log_mse=0.10445  val_mse=0.000819  max_grad=2.60  patience=2/30
+2026-10-08 17:23:32,757  gsv3.training             INFO     [family_holdout:qaoa] epoch 0013  layout_ce=1.7464  layout_acc=0.439
+2026-10-08 17:23:32,757  gsv3.training             INFO     [family_holdout:qaoa] epoch 0013  train_log_mse=0.18244  val_log_mse=0.06875  val_mse=0.000768  max_grad=2.86  patience=2/30
+2026-10-08 17:24:42,595  gsv3.training             INFO     [family_holdout:qnn] epoch 0011  layout_ce=1.9986  layout_acc=0.350
+2026-10-08 17:24:42,595  gsv3.training             INFO     [family_holdout:qnn] epoch 0011  train_log_mse=0.20881  val_log_mse=0.16530  val_mse=0.000871  max_grad=2.91  patience=3/30
+2026-10-08 17:24:49,553  gsv3.training             INFO     [family_holdout:qaoa] epoch 0014  layout_ce=1.6801  layout_acc=0.462
+2026-10-08 17:24:49,555  gsv3.training             INFO     [family_holdout:qaoa] epoch 0014  train_log_mse=0.17481  val_log_mse=0.08021  val_mse=0.000701  max_grad=2.13  patience=0/30
+2026-10-08 17:26:06,442  gsv3.training             INFO     [family_holdout:qaoa] epoch 0015  layout_ce=1.6210  layout_acc=0.482
+2026-10-08 17:26:06,444  gsv3.training             INFO     [family_holdout:qaoa] epoch 0015  train_log_mse=0.16993  val_log_mse=0.06262  val_mse=0.000687  max_grad=4.98  patience=0/30
+2026-10-08 17:26:19,679  gsv3.training             INFO     [family_holdout:qnn] epoch 0012  layout_ce=1.9212  layout_acc=0.378
+2026-10-08 17:26:19,681  gsv3.training             INFO     [family_holdout:qnn] epoch 0012  train_log_mse=0.20075  val_log_mse=0.07511  val_mse=0.000705  max_grad=2.80  patience=0/30
+2026-10-08 17:27:24,769  gsv3.training             INFO     [family_holdout:qaoa] epoch 0016  layout_ce=1.5477  layout_acc=0.507
+2026-10-08 17:27:24,769  gsv3.training             INFO     [family_holdout:qaoa] epoch 0016  train_log_mse=0.16149  val_log_mse=0.06848  val_mse=0.000697  max_grad=2.44  patience=1/30
+2026-10-08 17:27:59,147  gsv3.training             INFO     [family_holdout:qnn] epoch 0013  layout_ce=1.8451  layout_acc=0.404
+2026-10-08 17:27:59,149  gsv3.training             INFO     [family_holdout:qnn] epoch 0013  train_log_mse=0.19319  val_log_mse=0.06753  val_mse=0.000646  max_grad=3.43  patience=0/30
+2026-10-08 17:28:42,650  gsv3.training             INFO     [family_holdout:qaoa] epoch 0017  layout_ce=1.4943  layout_acc=0.524
+2026-10-08 17:28:42,652  gsv3.training             INFO     [family_holdout:qaoa] epoch 0017  train_log_mse=0.15580  val_log_mse=0.06231  val_mse=0.000686  max_grad=1.91  patience=0/30
+2026-10-08 17:30:01,852  gsv3.training             INFO     [family_holdout:qaoa] epoch 0018  layout_ce=1.4337  layout_acc=0.545
+2026-10-08 17:30:01,855  gsv3.training             INFO     [family_holdout:qaoa] epoch 0018  train_log_mse=0.15008  val_log_mse=0.06790  val_mse=0.000648  max_grad=2.32  patience=0/30
+2026-10-08 17:31:20,503  gsv3.training             INFO     [family_holdout:qaoa] epoch 0019  layout_ce=1.3724  layout_acc=0.565
+2026-10-08 17:31:20,504  gsv3.training             INFO     [family_holdout:qaoa] epoch 0019  train_log_mse=0.14376  val_log_mse=0.07199  val_mse=0.000684  max_grad=2.16  patience=1/30
+2026-10-08 17:31:42,742  gsv3.training             INFO     [family_holdout:qnn] epoch 0014  layout_ce=1.7672  layout_acc=0.433
+2026-10-08 17:31:42,742  gsv3.training             INFO     [family_holdout:qnn] epoch 0014  train_log_mse=0.18528  val_log_mse=0.07926  val_mse=0.000672  max_grad=5.70  patience=1/30
+2026-10-08 17:32:39,760  gsv3.training             INFO     [family_holdout:qaoa] epoch 0020  layout_ce=1.3168  layout_acc=0.584
+2026-10-08 17:32:39,760  gsv3.training             INFO     [family_holdout:qaoa] epoch 0020  train_log_mse=0.13776  val_log_mse=0.07071  val_mse=0.000727  max_grad=3.89  patience=2/30
+2026-10-08 17:33:21,194  gsv3.training             INFO     [family_holdout:qnn] epoch 0015  layout_ce=1.6754  layout_acc=0.464
+2026-10-08 17:33:21,196  gsv3.training             INFO     [family_holdout:qnn] epoch 0015  train_log_mse=0.17506  val_log_mse=0.07521  val_mse=0.000618  max_grad=1.79  patience=0/30
+2026-10-08 17:33:58,318  gsv3.training             INFO     [family_holdout:qaoa] epoch 0021  layout_ce=1.2608  layout_acc=0.603
+2026-10-08 17:33:58,318  gsv3.training             INFO     [family_holdout:qaoa] epoch 0021  train_log_mse=0.13238  val_log_mse=0.05516  val_mse=0.000693  max_grad=3.12  patience=3/30
+2026-10-08 17:35:00,350  gsv3.training             INFO     [family_holdout:qnn] epoch 0016  layout_ce=1.5908  layout_acc=0.494
+2026-10-08 17:35:00,351  gsv3.training             INFO     [family_holdout:qnn] epoch 0016  train_log_mse=0.16654  val_log_mse=0.06992  val_mse=0.000798  max_grad=1.99  patience=1/30
+2026-10-08 17:35:16,767  gsv3.training             INFO     [family_holdout:qaoa] epoch 0022  layout_ce=1.2098  layout_acc=0.621
+2026-10-08 17:35:16,769  gsv3.training             INFO     [family_holdout:qaoa] epoch 0022  train_log_mse=0.12686  val_log_mse=0.05687  val_mse=0.000602  max_grad=2.39  patience=0/30
+2026-10-08 17:36:35,454  gsv3.training             INFO     [family_holdout:qaoa] epoch 0023  layout_ce=1.1668  layout_acc=0.636
+2026-10-08 17:36:35,457  gsv3.training             INFO     [family_holdout:qaoa] epoch 0023  train_log_mse=0.12308  val_log_mse=0.05751  val_mse=0.000594  max_grad=2.26  patience=0/30
+2026-10-08 17:36:39,654  gsv3.training             INFO     [family_holdout:qnn] epoch 0017  layout_ce=1.5101  layout_acc=0.522
+2026-10-08 17:36:39,656  gsv3.training             INFO     [family_holdout:qnn] epoch 0017  train_log_mse=0.15869  val_log_mse=0.09171  val_mse=0.000581  max_grad=2.53  patience=0/30
+2026-10-08 17:37:55,272  gsv3.training             INFO     [family_holdout:qaoa] epoch 0024  layout_ce=1.1029  layout_acc=0.658
+2026-10-08 17:37:55,273  gsv3.training             INFO     [family_holdout:qaoa] epoch 0024  train_log_mse=0.11581  val_log_mse=0.06841  val_mse=0.000796  max_grad=2.14  patience=1/30
+2026-10-08 17:38:21,936  gsv3.training             INFO     [family_holdout:qnn] epoch 0018  layout_ce=1.4302  layout_acc=0.550
+2026-10-08 17:38:21,937  gsv3.training             INFO     [family_holdout:qnn] epoch 0018  train_log_mse=0.15008  val_log_mse=0.06001  val_mse=0.000583  max_grad=1.92  patience=1/30
+2026-10-08 17:39:13,845  gsv3.training             INFO     [family_holdout:qaoa] epoch 0025  layout_ce=1.0709  layout_acc=0.670
+2026-10-08 17:39:13,846  gsv3.training             INFO     [family_holdout:qaoa] epoch 0025  train_log_mse=0.11298  val_log_mse=0.07467  val_mse=0.000612  max_grad=2.47  patience=2/30
+2026-10-08 17:40:01,853  gsv3.training             INFO     [family_holdout:qnn] epoch 0019  layout_ce=1.3567  layout_acc=0.576
+2026-10-08 17:40:01,854  gsv3.training             INFO     [family_holdout:qnn] epoch 0019  train_log_mse=0.14269  val_log_mse=0.07712  val_mse=0.000604  max_grad=1.90  patience=2/30
+2026-10-08 17:40:32,501  gsv3.training             INFO     [family_holdout:qaoa] epoch 0026  layout_ce=1.0366  layout_acc=0.682
+2026-10-08 17:40:32,503  gsv3.training             INFO     [family_holdout:qaoa] epoch 0026  train_log_mse=0.10950  val_log_mse=0.05642  val_mse=0.000572  max_grad=2.96  patience=0/30
+2026-10-08 17:41:41,061  gsv3.training             INFO     [family_holdout:qnn] epoch 0020  layout_ce=1.2861  layout_acc=0.601
+2026-10-08 17:41:41,063  gsv3.training             INFO     [family_holdout:qnn] epoch 0020  train_log_mse=0.13526  val_log_mse=0.06790  val_mse=0.000579  max_grad=1.98  patience=0/30
+2026-10-08 17:41:51,256  gsv3.training             INFO     [family_holdout:qaoa] epoch 0027  layout_ce=0.9795  layout_acc=0.702
+2026-10-08 17:41:51,257  gsv3.training             INFO     [family_holdout:qaoa] epoch 0027  train_log_mse=0.10367  val_log_mse=0.06127  val_mse=0.000799  max_grad=12.10  patience=1/30
+2026-10-08 17:43:09,805  gsv3.training             INFO     [family_holdout:qaoa] epoch 0028  layout_ce=0.9451  layout_acc=0.715
+2026-10-08 17:43:09,806  gsv3.training             INFO     [family_holdout:qaoa] epoch 0028  train_log_mse=0.10021  val_log_mse=0.05443  val_mse=0.000662  max_grad=2.00  patience=2/30
+2026-10-08 17:43:20,487  gsv3.training             INFO     [family_holdout:qnn] epoch 0021  layout_ce=1.2323  layout_acc=0.619
+2026-10-08 17:43:20,488  gsv3.training             INFO     [family_holdout:qnn] epoch 0021  train_log_mse=0.12988  val_log_mse=0.11229  val_mse=0.000624  max_grad=2.00  patience=1/30
+2026-10-08 17:44:28,545  gsv3.training             INFO     [family_holdout:qaoa] epoch 0029  layout_ce=0.9167  layout_acc=0.725
+2026-10-08 17:44:28,545  gsv3.training             INFO     [family_holdout:qaoa] epoch 0029  train_log_mse=0.09725  val_log_mse=0.05265  val_mse=0.000599  max_grad=2.85  patience=3/30
+2026-10-08 17:45:00,233  gsv3.training             INFO     [family_holdout:qnn] epoch 0022  layout_ce=1.1784  layout_acc=0.638
+2026-10-08 17:45:00,234  gsv3.training             INFO     [family_holdout:qnn] epoch 0022  train_log_mse=0.12504  val_log_mse=0.06814  val_mse=0.000595  max_grad=2.47  patience=2/30
+2026-10-08 17:45:47,265  gsv3.training             INFO     [family_holdout:qaoa] epoch 0030  layout_ce=0.8703  layout_acc=0.743
+2026-10-08 17:45:47,266  gsv3.training             INFO     [family_holdout:qaoa] epoch 0030  train_log_mse=0.09229  val_log_mse=0.06683  val_mse=0.000575  max_grad=1.93  patience=4/30
+2026-10-08 17:46:43,395  gsv3.training             INFO     [family_holdout:qnn] epoch 0023  layout_ce=1.1253  layout_acc=0.655
+2026-10-08 17:46:43,395  gsv3.training             INFO     [family_holdout:qnn] epoch 0023  train_log_mse=0.11915  val_log_mse=0.07233  val_mse=0.000820  max_grad=2.15  patience=3/30
+2026-10-08 17:47:06,293  gsv3.training             INFO     [family_holdout:qaoa] epoch 0031  layout_ce=0.8423  layout_acc=0.751
+2026-10-08 17:47:06,294  gsv3.training             INFO     [family_holdout:qaoa] epoch 0031  train_log_mse=0.08948  val_log_mse=0.06198  val_mse=0.000575  max_grad=1.88  patience=5/30
+2026-10-08 17:48:24,895  gsv3.training             INFO     [family_holdout:qnn] epoch 0024  layout_ce=1.0793  layout_acc=0.671
+2026-10-08 17:48:24,897  gsv3.training             INFO     [family_holdout:qnn] epoch 0024  train_log_mse=0.11421  val_log_mse=0.08449  val_mse=0.000558  max_grad=2.47  patience=0/30
+2026-10-08 17:48:24,998  gsv3.training             INFO     [family_holdout:qaoa] epoch 0032  layout_ce=0.8169  layout_acc=0.761
+2026-10-08 17:48:25,003  gsv3.training             INFO     [family_holdout:qaoa] epoch 0032  train_log_mse=0.08695  val_log_mse=0.05629  val_mse=0.000522  max_grad=8.18  patience=0/30
+2026-10-08 17:49:43,894  gsv3.training             INFO     [family_holdout:qaoa] epoch 0033  layout_ce=0.7803  layout_acc=0.773
+2026-10-08 17:49:43,894  gsv3.training             INFO     [family_holdout:qaoa] epoch 0033  train_log_mse=0.08335  val_log_mse=0.05673  val_mse=0.000575  max_grad=3.16  patience=1/30
+2026-10-08 17:50:04,608  gsv3.training             INFO     [family_holdout:qnn] epoch 0025  layout_ce=1.0421  layout_acc=0.683
+2026-10-08 17:50:04,609  gsv3.training             INFO     [family_holdout:qnn] epoch 0025  train_log_mse=0.11073  val_log_mse=0.06769  val_mse=0.000595  max_grad=2.52  patience=1/30
+2026-10-08 17:51:02,609  gsv3.training             INFO     [family_holdout:qaoa] epoch 0034  layout_ce=0.7561  layout_acc=0.780
+2026-10-08 17:51:02,609  gsv3.training             INFO     [family_holdout:qaoa] epoch 0034  train_log_mse=0.08029  val_log_mse=0.06009  val_mse=0.000561  max_grad=2.87  patience=2/30
+2026-10-08 17:51:45,419  gsv3.training             INFO     [family_holdout:qnn] epoch 0026  layout_ce=0.9949  layout_acc=0.700
+2026-10-08 17:51:45,419  gsv3.training             INFO     [family_holdout:qnn] epoch 0026  train_log_mse=0.10556  val_log_mse=0.10940  val_mse=0.000778  max_grad=2.92  patience=2/30
+2026-10-08 17:52:21,391  gsv3.training             INFO     [family_holdout:qaoa] epoch 0035  layout_ce=0.7389  layout_acc=0.786
+2026-10-08 17:52:21,392  gsv3.training             INFO     [family_holdout:qaoa] epoch 0035  train_log_mse=0.07916  val_log_mse=0.06050  val_mse=0.000523  max_grad=2.27  patience=3/30
+2026-10-08 17:53:26,428  gsv3.training             INFO     [family_holdout:qnn] epoch 0027  layout_ce=0.9594  layout_acc=0.711
+2026-10-08 17:53:26,428  gsv3.training             INFO     [family_holdout:qnn] epoch 0027  train_log_mse=0.10221  val_log_mse=0.09725  val_mse=0.000578  max_grad=3.92  patience=3/30
+2026-10-08 17:53:40,223  gsv3.training             INFO     [family_holdout:qaoa] epoch 0036  layout_ce=0.7083  layout_acc=0.797
+2026-10-08 17:53:40,223  gsv3.training             INFO     [family_holdout:qaoa] epoch 0036  train_log_mse=0.07572  val_log_mse=0.05742  val_mse=0.000524  max_grad=2.20  patience=4/30
+2026-10-08 17:54:58,915  gsv3.training             INFO     [family_holdout:qaoa] epoch 0037  layout_ce=0.6884  layout_acc=0.804
+2026-10-08 17:54:58,921  gsv3.training             INFO     [family_holdout:qaoa] epoch 0037  train_log_mse=0.07347  val_log_mse=0.06590  val_mse=0.000560  max_grad=2.42  patience=5/30
+2026-10-08 17:55:07,577  gsv3.training             INFO     [family_holdout:qnn] epoch 0028  layout_ce=0.9319  layout_acc=0.721
+2026-10-08 17:55:07,579  gsv3.training             INFO     [family_holdout:qnn] epoch 0028  train_log_mse=0.10005  val_log_mse=0.06309  val_mse=0.000543  max_grad=3.52  patience=0/30
+2026-10-08 17:56:17,559  gsv3.training             INFO     [family_holdout:qaoa] epoch 0038  layout_ce=0.6712  layout_acc=0.809
+2026-10-08 17:56:17,560  gsv3.training             INFO     [family_holdout:qaoa] epoch 0038  train_log_mse=0.07206  val_log_mse=0.04889  val_mse=0.000563  max_grad=2.61  patience=6/30
+2026-10-08 17:56:49,996  gsv3.training             INFO     [family_holdout:qnn] epoch 0029  layout_ce=0.8905  layout_acc=0.735
+2026-10-08 17:56:49,998  gsv3.training             INFO     [family_holdout:qnn] epoch 0029  train_log_mse=0.09501  val_log_mse=0.07793  val_mse=0.000535  max_grad=2.04  patience=0/30
+2026-10-08 17:57:36,232  gsv3.training             INFO     [family_holdout:qaoa] epoch 0039  layout_ce=0.6486  layout_acc=0.817
+2026-10-08 17:57:36,232  gsv3.training             INFO     [family_holdout:qaoa] epoch 0039  train_log_mse=0.06991  val_log_mse=0.06125  val_mse=0.000560  max_grad=2.54  patience=7/30
+2026-10-08 17:58:30,564  gsv3.training             INFO     [family_holdout:qnn] epoch 0030  layout_ce=0.8575  layout_acc=0.746
+2026-10-08 17:58:30,565  gsv3.training             INFO     [family_holdout:qnn] epoch 0030  train_log_mse=0.09138  val_log_mse=0.07824  val_mse=0.000549  max_grad=2.49  patience=1/30
+2026-10-08 17:58:54,216  gsv3.training             INFO     [family_holdout:qaoa] epoch 0040  layout_ce=0.6284  layout_acc=0.823
+2026-10-08 17:58:54,218  gsv3.training             INFO     [family_holdout:qaoa] epoch 0040  train_log_mse=0.06746  val_log_mse=0.05897  val_mse=0.000497  max_grad=1.94  patience=0/30
+2026-10-08 18:00:07,954  gsv3.training             INFO     [family_holdout:qnn] epoch 0031  layout_ce=0.8280  layout_acc=0.755
+2026-10-08 18:00:07,956  gsv3.training             INFO     [family_holdout:qnn] epoch 0031  train_log_mse=0.08874  val_log_mse=0.07769  val_mse=0.000515  max_grad=3.20  patience=0/30
+2026-10-08 18:00:11,128  gsv3.training             INFO     [family_holdout:qaoa] epoch 0041  layout_ce=0.6051  layout_acc=0.831
+2026-10-08 18:00:11,128  gsv3.training             INFO     [family_holdout:qaoa] epoch 0041  train_log_mse=0.06505  val_log_mse=0.05318  val_mse=0.000530  max_grad=1.98  patience=1/30
+2026-10-08 18:01:28,491  gsv3.training             INFO     [family_holdout:qaoa] epoch 0042  layout_ce=0.5947  layout_acc=0.834
+2026-10-08 18:01:28,492  gsv3.training             INFO     [family_holdout:qaoa] epoch 0042  train_log_mse=0.06416  val_log_mse=0.06201  val_mse=0.000541  max_grad=2.09  patience=2/30
+2026-10-08 18:01:45,085  gsv3.training             INFO     [family_holdout:qnn] epoch 0032  layout_ce=0.8036  layout_acc=0.764
+2026-10-08 18:01:45,088  gsv3.training             INFO     [family_holdout:qnn] epoch 0032  train_log_mse=0.08597  val_log_mse=0.06191  val_mse=0.000504  max_grad=2.59  patience=0/30
+2026-10-08 18:02:45,547  gsv3.training             INFO     [family_holdout:qaoa] epoch 0043  layout_ce=0.5821  layout_acc=0.839
+2026-10-08 18:02:45,548  gsv3.training             INFO     [family_holdout:qaoa] epoch 0043  train_log_mse=0.06275  val_log_mse=0.05921  val_mse=0.000583  max_grad=2.65  patience=3/30
+2026-10-08 18:03:22,942  gsv3.training             INFO     [family_holdout:qnn] epoch 0033  layout_ce=0.7755  layout_acc=0.774
+2026-10-08 18:03:22,942  gsv3.training             INFO     [family_holdout:qnn] epoch 0033  train_log_mse=0.08309  val_log_mse=0.05505  val_mse=0.000513  max_grad=2.26  patience=1/30
+2026-10-08 18:04:02,546  gsv3.training             INFO     [family_holdout:qaoa] epoch 0044  layout_ce=0.5727  layout_acc=0.842
+2026-10-08 18:04:02,547  gsv3.training             INFO     [family_holdout:qaoa] epoch 0044  train_log_mse=0.06151  val_log_mse=0.05571  val_mse=0.000508  max_grad=3.45  patience=4/30
+2026-10-08 18:05:00,099  gsv3.training             INFO     [family_holdout:qnn] epoch 0034  layout_ce=0.7463  layout_acc=0.783
+2026-10-08 18:05:00,099  gsv3.training             INFO     [family_holdout:qnn] epoch 0034  train_log_mse=0.08049  val_log_mse=0.09220  val_mse=0.000682  max_grad=2.00  patience=2/30
+2026-10-08 18:05:19,767  gsv3.training             INFO     [family_holdout:qaoa] epoch 0045  layout_ce=0.5507  layout_acc=0.848
+2026-10-08 18:05:19,768  gsv3.training             INFO     [family_holdout:qaoa] epoch 0045  train_log_mse=0.05955  val_log_mse=0.06685  val_mse=0.000535  max_grad=2.11  patience=5/30
+2026-10-08 18:06:37,182  gsv3.training             INFO     [family_holdout:qaoa] epoch 0046  layout_ce=0.5350  layout_acc=0.854
+2026-10-08 18:06:37,183  gsv3.training             INFO     [family_holdout:qaoa] epoch 0046  train_log_mse=0.05788  val_log_mse=0.05999  val_mse=0.000566  max_grad=1.97  patience=6/30
+2026-10-08 18:06:38,460  gsv3.training             INFO     [family_holdout:qnn] epoch 0035  layout_ce=0.7233  layout_acc=0.791
+2026-10-08 18:06:38,460  gsv3.training             INFO     [family_holdout:qnn] epoch 0035  train_log_mse=0.07797  val_log_mse=0.07064  val_mse=0.000539  max_grad=2.06  patience=3/30
+2026-10-08 18:07:54,071  gsv3.training             INFO     [family_holdout:qaoa] epoch 0047  layout_ce=0.5285  layout_acc=0.856
+2026-10-08 18:07:54,071  gsv3.training             INFO     [family_holdout:qaoa] epoch 0047  train_log_mse=0.05736  val_log_mse=0.07281  val_mse=0.000520  max_grad=1.90  patience=7/30
+2026-10-08 18:08:16,061  gsv3.training             INFO     [family_holdout:qnn] epoch 0036  layout_ce=0.7072  layout_acc=0.796
+2026-10-08 18:08:16,062  gsv3.training             INFO     [family_holdout:qnn] epoch 0036  train_log_mse=0.07670  val_log_mse=0.05869  val_mse=0.000505  max_grad=3.06  patience=4/30
+2026-10-08 18:09:07,420  gsv3.training             INFO     [family_holdout:qaoa] epoch 0048  layout_ce=0.5112  layout_acc=0.861
+2026-10-08 18:09:07,420  gsv3.training             INFO     [family_holdout:qaoa] epoch 0048  train_log_mse=0.05566  val_log_mse=0.05965  val_mse=0.000604  max_grad=2.03  patience=8/30
+2026-10-08 18:09:47,133  gsv3.training             INFO     [family_holdout:qnn] epoch 0037  layout_ce=0.6776  layout_acc=0.806
+2026-10-08 18:09:47,136  gsv3.training             INFO     [family_holdout:qnn] epoch 0037  train_log_mse=0.07303  val_log_mse=0.05745  val_mse=0.000456  max_grad=2.23  patience=0/30
+2026-10-08 18:10:18,537  gsv3.training             INFO     [family_holdout:qaoa] epoch 0049  layout_ce=0.5032  layout_acc=0.864
+2026-10-08 18:10:18,539  gsv3.training             INFO     [family_holdout:qaoa] epoch 0049  train_log_mse=0.05433  val_log_mse=0.05714  val_mse=0.000488  max_grad=2.88  patience=0/30
+2026-10-08 18:11:18,118  gsv3.training             INFO     [family_holdout:qnn] epoch 0038  layout_ce=0.6621  layout_acc=0.812
+2026-10-08 18:11:18,119  gsv3.training             INFO     [family_holdout:qnn] epoch 0038  train_log_mse=0.07144  val_log_mse=0.07013  val_mse=0.000515  max_grad=1.98  patience=1/30
+2026-10-08 18:11:29,712  gsv3.training             INFO     [family_holdout:qaoa] epoch 0050  layout_ce=0.4829  layout_acc=0.870
+2026-10-08 18:11:29,712  gsv3.training             INFO     [family_holdout:qaoa] epoch 0050  train_log_mse=0.05275  val_log_mse=0.06123  val_mse=0.000512  max_grad=2.00  patience=1/30
+2026-10-08 18:12:40,916  gsv3.training             INFO     [family_holdout:qaoa] epoch 0051  layout_ce=0.4805  layout_acc=0.871
+2026-10-08 18:12:40,918  gsv3.training             INFO     [family_holdout:qaoa] epoch 0051  train_log_mse=0.05239  val_log_mse=0.05537  val_mse=0.000483  max_grad=1.87  patience=0/30
+2026-10-08 18:12:48,905  gsv3.training             INFO     [family_holdout:qnn] epoch 0039  layout_ce=0.6369  layout_acc=0.820
+2026-10-08 18:12:48,906  gsv3.training             INFO     [family_holdout:qnn] epoch 0039  train_log_mse=0.06918  val_log_mse=0.05746  val_mse=0.000476  max_grad=1.82  patience=2/30
+2026-10-08 18:13:52,045  gsv3.training             INFO     [family_holdout:qaoa] epoch 0052  layout_ce=0.4671  layout_acc=0.876
+2026-10-08 18:13:52,046  gsv3.training             INFO     [family_holdout:qaoa] epoch 0052  train_log_mse=0.05091  val_log_mse=0.05473  val_mse=0.000552  max_grad=2.00  patience=1/30
+2026-10-08 18:14:19,574  gsv3.training             INFO     [family_holdout:qnn] epoch 0040  layout_ce=0.6178  layout_acc=0.826
+2026-10-08 18:14:19,574  gsv3.training             INFO     [family_holdout:qnn] epoch 0040  train_log_mse=0.06683  val_log_mse=0.06170  val_mse=0.000527  max_grad=1.88  patience=3/30
+2026-10-08 18:15:03,322  gsv3.training             INFO     [family_holdout:qaoa] epoch 0053  layout_ce=0.4657  layout_acc=0.876
+2026-10-08 18:15:03,323  gsv3.training             INFO     [family_holdout:qaoa] epoch 0053  train_log_mse=0.05087  val_log_mse=0.05374  val_mse=0.000484  max_grad=2.37  patience=2/30
+2026-10-08 18:15:50,216  gsv3.training             INFO     [family_holdout:qnn] epoch 0041  layout_ce=0.6056  layout_acc=0.831
+2026-10-08 18:15:50,217  gsv3.training             INFO     [family_holdout:qnn] epoch 0041  train_log_mse=0.06627  val_log_mse=0.06411  val_mse=0.000516  max_grad=3.02  patience=4/30
+2026-10-08 18:16:14,830  gsv3.training             INFO     [family_holdout:qaoa] epoch 0054  layout_ce=0.4405  layout_acc=0.884
+2026-10-08 18:16:14,832  gsv3.training             INFO     [family_holdout:qaoa] epoch 0054  train_log_mse=0.04807  val_log_mse=0.07576  val_mse=0.000472  max_grad=2.03  patience=0/30
+2026-10-08 18:17:19,983  gsv3.training             INFO     [family_holdout:qnn] epoch 0042  layout_ce=0.5939  layout_acc=0.834
+2026-10-08 18:17:19,984  gsv3.training             INFO     [family_holdout:qnn] epoch 0042  train_log_mse=0.06472  val_log_mse=0.06099  val_mse=0.000463  max_grad=1.99  patience=5/30
+2026-10-08 18:17:26,341  gsv3.training             INFO     [family_holdout:qaoa] epoch 0055  layout_ce=0.4463  layout_acc=0.882
+2026-10-08 18:17:26,341  gsv3.training             INFO     [family_holdout:qaoa] epoch 0055  train_log_mse=0.04903  val_log_mse=0.05369  val_mse=0.000495  max_grad=2.56  patience=1/30
+2026-10-08 18:18:38,023  gsv3.training             INFO     [family_holdout:qaoa] epoch 0056  layout_ce=0.4272  layout_acc=0.887
+2026-10-08 18:18:38,023  gsv3.training             INFO     [family_holdout:qaoa] epoch 0056  train_log_mse=0.04652  val_log_mse=0.05241  val_mse=0.000523  max_grad=8.69  patience=2/30
+2026-10-08 18:18:49,755  gsv3.training             INFO     [family_holdout:qnn] epoch 0043  layout_ce=0.5720  layout_acc=0.842
+2026-10-08 18:18:49,755  gsv3.training             INFO     [family_holdout:qnn] epoch 0043  train_log_mse=0.06191  val_log_mse=0.05445  val_mse=0.000475  max_grad=1.88  patience=6/30
+2026-10-08 18:19:49,795  gsv3.training             INFO     [family_holdout:qaoa] epoch 0057  layout_ce=0.4263  layout_acc=0.887
+2026-10-08 18:19:49,796  gsv3.training             INFO     [family_holdout:qaoa] epoch 0057  train_log_mse=0.04663  val_log_mse=0.05339  val_mse=0.000520  max_grad=2.17  patience=3/30
+2026-10-08 18:20:19,538  gsv3.training             INFO     [family_holdout:qnn] epoch 0044  layout_ce=0.5634  layout_acc=0.844
+2026-10-08 18:20:19,538  gsv3.training             INFO     [family_holdout:qnn] epoch 0044  train_log_mse=0.06159  val_log_mse=0.08020  val_mse=0.000576  max_grad=2.46  patience=7/30
+2026-10-08 18:21:01,592  gsv3.training             INFO     [family_holdout:qaoa] epoch 0058  layout_ce=0.4200  layout_acc=0.889
+2026-10-08 18:21:01,593  gsv3.training             INFO     [family_holdout:qaoa] epoch 0058  train_log_mse=0.04586  val_log_mse=0.05193  val_mse=0.000502  max_grad=2.77  patience=4/30
+2026-10-08 18:21:49,649  gsv3.training             INFO     [family_holdout:qnn] epoch 0045  layout_ce=0.5468  layout_acc=0.850
+2026-10-08 18:21:49,651  gsv3.training             INFO     [family_holdout:qnn] epoch 0045  train_log_mse=0.05984  val_log_mse=0.06563  val_mse=0.000451  max_grad=1.74  patience=0/30
+2026-10-08 18:22:13,516  gsv3.training             INFO     [family_holdout:qaoa] epoch 0059  layout_ce=0.4028  layout_acc=0.895
+2026-10-08 18:22:13,516  gsv3.training             INFO     [family_holdout:qaoa] epoch 0059  train_log_mse=0.04429  val_log_mse=0.05717  val_mse=0.000486  max_grad=2.34  patience=5/30
+2026-10-08 18:23:19,760  gsv3.training             INFO     [family_holdout:qnn] epoch 0046  layout_ce=0.5366  layout_acc=0.853
+2026-10-08 18:23:19,762  gsv3.training             INFO     [family_holdout:qnn] epoch 0046  train_log_mse=0.05905  val_log_mse=0.06247  val_mse=0.000450  max_grad=1.93  patience=0/30
+2026-10-08 18:23:25,286  gsv3.training             INFO     [family_holdout:qaoa] epoch 0060  layout_ce=0.4090  layout_acc=0.893
+2026-10-08 18:23:25,287  gsv3.training             INFO     [family_holdout:qaoa] epoch 0060  train_log_mse=0.04522  val_log_mse=0.05109  val_mse=0.000477  max_grad=2.06  patience=6/30
+2026-10-08 18:24:37,194  gsv3.training             INFO     [family_holdout:qaoa] epoch 0061  layout_ce=0.4140  layout_acc=0.892
+2026-10-08 18:24:37,194  gsv3.training             INFO     [family_holdout:qaoa] epoch 0061  train_log_mse=0.04527  val_log_mse=0.05365  val_mse=0.000491  max_grad=3.89  patience=7/30
+2026-10-08 18:24:50,636  gsv3.training             INFO     [family_holdout:qnn] epoch 0047  layout_ce=0.5200  layout_acc=0.858
+2026-10-08 18:24:50,636  gsv3.training             INFO     [family_holdout:qnn] epoch 0047  train_log_mse=0.05706  val_log_mse=0.06639  val_mse=0.000541  max_grad=1.92  patience=1/30
+2026-10-08 18:25:49,095  gsv3.training             INFO     [family_holdout:qaoa] epoch 0062  layout_ce=0.3843  layout_acc=0.900
+2026-10-08 18:25:49,097  gsv3.training             INFO     [family_holdout:qaoa] epoch 0062  train_log_mse=0.04271  val_log_mse=0.05531  val_mse=0.000461  max_grad=2.01  patience=0/30
+2026-10-08 18:26:21,450  gsv3.training             INFO     [family_holdout:qnn] epoch 0048  layout_ce=0.5090  layout_acc=0.862
+2026-10-08 18:26:21,451  gsv3.training             INFO     [family_holdout:qnn] epoch 0048  train_log_mse=0.05568  val_log_mse=0.06735  val_mse=0.000462  max_grad=2.45  patience=2/30
+2026-10-08 18:27:00,915  gsv3.training             INFO     [family_holdout:qaoa] epoch 0063  layout_ce=0.3844  layout_acc=0.900
+2026-10-08 18:27:00,916  gsv3.training             INFO     [family_holdout:qaoa] epoch 0063  train_log_mse=0.04194  val_log_mse=0.05149  val_mse=0.000480  max_grad=2.68  patience=1/30
+2026-10-08 18:27:52,189  gsv3.training             INFO     [family_holdout:qnn] epoch 0049  layout_ce=0.4887  layout_acc=0.868
+2026-10-08 18:27:52,190  gsv3.training             INFO     [family_holdout:qnn] epoch 0049  train_log_mse=0.05390  val_log_mse=0.07746  val_mse=0.000468  max_grad=2.70  patience=3/30
+2026-10-08 18:28:12,721  gsv3.training             INFO     [family_holdout:qaoa] epoch 0064  layout_ce=0.3734  layout_acc=0.903
+2026-10-08 18:28:12,721  gsv3.training             INFO     [family_holdout:qaoa] epoch 0064  train_log_mse=0.04109  val_log_mse=0.05315  val_mse=0.000496  max_grad=1.71  patience=2/30
+2026-10-08 18:29:23,047  gsv3.training             INFO     [family_holdout:qnn] epoch 0050  layout_ce=0.4880  layout_acc=0.868
+2026-10-08 18:29:23,049  gsv3.training             INFO     [family_holdout:qnn] epoch 0050  train_log_mse=0.05349  val_log_mse=0.06956  val_mse=0.000418  max_grad=2.79  patience=0/30
+2026-10-08 18:29:24,400  gsv3.training             INFO     [family_holdout:qaoa] epoch 0065  layout_ce=0.3884  layout_acc=0.899
+2026-10-08 18:29:24,401  gsv3.training             INFO     [family_holdout:qaoa] epoch 0065  train_log_mse=0.04270  val_log_mse=0.05509  val_mse=0.000473  max_grad=2.78  patience=3/30
+2026-10-08 18:30:36,133  gsv3.training             INFO     [family_holdout:qaoa] epoch 0066  layout_ce=0.3589  layout_acc=0.908
+2026-10-08 18:30:36,135  gsv3.training             INFO     [family_holdout:qaoa] epoch 0066  train_log_mse=0.03984  val_log_mse=0.05520  val_mse=0.000459  max_grad=2.10  patience=0/30
+2026-10-08 18:30:53,591  gsv3.training             INFO     [family_holdout:qnn] epoch 0051  layout_ce=0.4746  layout_acc=0.873
+2026-10-08 18:30:53,591  gsv3.training             INFO     [family_holdout:qnn] epoch 0051  train_log_mse=0.05211  val_log_mse=0.07493  val_mse=0.000454  max_grad=1.94  patience=1/30
+2026-10-08 18:31:47,654  gsv3.training             INFO     [family_holdout:qaoa] epoch 0067  layout_ce=0.3725  layout_acc=0.903
+2026-10-08 18:31:47,655  gsv3.training             INFO     [family_holdout:qaoa] epoch 0067  train_log_mse=0.04140  val_log_mse=0.05539  val_mse=0.000500  max_grad=2.32  patience=1/30
+2026-10-08 18:32:24,330  gsv3.training             INFO     [family_holdout:qnn] epoch 0052  layout_ce=0.4632  layout_acc=0.875
+2026-10-08 18:32:24,330  gsv3.training             INFO     [family_holdout:qnn] epoch 0052  train_log_mse=0.05098  val_log_mse=0.05884  val_mse=0.000426  max_grad=1.81  patience=2/30
+2026-10-08 18:32:59,235  gsv3.training             INFO     [family_holdout:qaoa] epoch 0068  layout_ce=0.3641  layout_acc=0.906
+2026-10-08 18:32:59,236  gsv3.training             INFO     [family_holdout:qaoa] epoch 0068  train_log_mse=0.03993  val_log_mse=0.05569  val_mse=0.000477  max_grad=1.29  patience=2/30
+2026-10-08 18:33:55,049  gsv3.training             INFO     [family_holdout:qnn] epoch 0053  layout_ce=0.4521  layout_acc=0.879
+2026-10-08 18:33:55,049  gsv3.training             INFO     [family_holdout:qnn] epoch 0053  train_log_mse=0.05000  val_log_mse=0.06155  val_mse=0.000467  max_grad=2.00  patience=3/30
+2026-10-08 18:34:10,502  gsv3.training             INFO     [family_holdout:qaoa] epoch 0069  layout_ce=0.3673  layout_acc=0.905
+2026-10-08 18:34:10,502  gsv3.training             INFO     [family_holdout:qaoa] epoch 0069  train_log_mse=0.04059  val_log_mse=0.07078  val_mse=0.000521  max_grad=2.53  patience=3/30
+2026-10-08 18:35:21,922  gsv3.training             INFO     [family_holdout:qaoa] epoch 0070  layout_ce=0.3460  layout_acc=0.911
+2026-10-08 18:35:21,923  gsv3.training             INFO     [family_holdout:qaoa] epoch 0070  train_log_mse=0.03849  val_log_mse=0.05802  val_mse=0.000486  max_grad=1.62  patience=4/30
+2026-10-08 18:35:26,003  gsv3.training             INFO     [family_holdout:qnn] epoch 0054  layout_ce=0.4530  layout_acc=0.879
+2026-10-08 18:35:26,004  gsv3.training             INFO     [family_holdout:qnn] epoch 0054  train_log_mse=0.05032  val_log_mse=0.06455  val_mse=0.000577  max_grad=2.03  patience=4/30
+2026-10-08 18:36:33,369  gsv3.training             INFO     [family_holdout:qaoa] epoch 0071  layout_ce=0.3598  layout_acc=0.907
+2026-10-08 18:36:33,369  gsv3.training             INFO     [family_holdout:qaoa] epoch 0071  train_log_mse=0.03969  val_log_mse=0.06124  val_mse=0.000466  max_grad=2.87  patience=5/30
+2026-10-08 18:36:56,595  gsv3.training             INFO     [family_holdout:qnn] epoch 0055  layout_ce=0.4491  layout_acc=0.880
+2026-10-08 18:36:56,595  gsv3.training             INFO     [family_holdout:qnn] epoch 0055  train_log_mse=0.04937  val_log_mse=0.06827  val_mse=0.000484  max_grad=1.68  patience=5/30
+2026-10-08 18:37:45,080  gsv3.training             INFO     [family_holdout:qaoa] epoch 0072  layout_ce=0.3294  layout_acc=0.917
+2026-10-08 18:37:45,080  gsv3.training             INFO     [family_holdout:qaoa] epoch 0072  train_log_mse=0.03635  val_log_mse=0.05919  val_mse=0.000468  max_grad=2.12  patience=6/30
+2026-10-08 18:38:27,051  gsv3.training             INFO     [family_holdout:qnn] epoch 0056  layout_ce=0.4262  layout_acc=0.888
+2026-10-08 18:38:27,052  gsv3.training             INFO     [family_holdout:qnn] epoch 0056  train_log_mse=0.04720  val_log_mse=0.06849  val_mse=0.000505  max_grad=2.18  patience=6/30
+2026-10-08 18:38:56,980  gsv3.training             INFO     [family_holdout:qaoa] epoch 0073  layout_ce=0.3445  layout_acc=0.912
+2026-10-08 18:38:56,982  gsv3.training             INFO     [family_holdout:qaoa] epoch 0073  train_log_mse=0.03806  val_log_mse=0.04755  val_mse=0.000434  max_grad=1.56  patience=0/30
+2026-10-08 18:39:58,231  gsv3.training             INFO     [family_holdout:qnn] epoch 0057  layout_ce=0.4293  layout_acc=0.887
+2026-10-08 18:39:58,232  gsv3.training             INFO     [family_holdout:qnn] epoch 0057  train_log_mse=0.04739  val_log_mse=0.06349  val_mse=0.000518  max_grad=1.78  patience=7/30
+2026-10-08 18:40:09,048  gsv3.training             INFO     [family_holdout:qaoa] epoch 0074  layout_ce=0.3340  layout_acc=0.914
+2026-10-08 18:40:09,048  gsv3.training             INFO     [family_holdout:qaoa] epoch 0074  train_log_mse=0.03689  val_log_mse=0.05087  val_mse=0.000506  max_grad=1.61  patience=1/30
+2026-10-08 18:41:20,955  gsv3.training             INFO     [family_holdout:qaoa] epoch 0075  layout_ce=0.3208  layout_acc=0.918
+2026-10-08 18:41:20,955  gsv3.training             INFO     [family_holdout:qaoa] epoch 0075  train_log_mse=0.03536  val_log_mse=0.05785  val_mse=0.000434  max_grad=1.46  patience=2/30
+2026-10-08 18:41:29,312  gsv3.training             INFO     [family_holdout:qnn] epoch 0058  layout_ce=0.4145  layout_acc=0.891
+2026-10-08 18:41:29,312  gsv3.training             INFO     [family_holdout:qnn] epoch 0058  train_log_mse=0.04571  val_log_mse=0.06332  val_mse=0.000437  max_grad=3.21  patience=8/30
+2026-10-08 18:42:32,713  gsv3.training             INFO     [family_holdout:qaoa] epoch 0076  layout_ce=0.3399  layout_acc=0.912
+2026-10-08 18:42:32,713  gsv3.training             INFO     [family_holdout:qaoa] epoch 0076  train_log_mse=0.03773  val_log_mse=0.06561  val_mse=0.000513  max_grad=2.84  patience=3/30
+2026-10-08 18:42:59,873  gsv3.training             INFO     [family_holdout:qnn] epoch 0059  layout_ce=0.4052  layout_acc=0.893
+2026-10-08 18:42:59,874  gsv3.training             INFO     [family_holdout:qnn] epoch 0059  train_log_mse=0.04488  val_log_mse=0.06200  val_mse=0.000480  max_grad=1.74  patience=9/30
+2026-10-08 18:43:44,758  gsv3.training             INFO     [family_holdout:qaoa] epoch 0077  layout_ce=0.3172  layout_acc=0.920
+2026-10-08 18:43:44,758  gsv3.training             INFO     [family_holdout:qaoa] epoch 0077  train_log_mse=0.03546  val_log_mse=0.05109  val_mse=0.000458  max_grad=1.84  patience=4/30
+2026-10-08 18:44:30,837  gsv3.training             INFO     [family_holdout:qnn] epoch 0060  layout_ce=0.3968  layout_acc=0.897
+2026-10-08 18:44:30,838  gsv3.training             INFO     [family_holdout:qnn] epoch 0060  train_log_mse=0.04378  val_log_mse=0.06186  val_mse=0.000512  max_grad=2.02  patience=10/30
+2026-10-08 18:44:56,487  gsv3.training             INFO     [family_holdout:qaoa] epoch 0078  layout_ce=0.3284  layout_acc=0.916
+2026-10-08 18:44:56,487  gsv3.training             INFO     [family_holdout:qaoa] epoch 0078  train_log_mse=0.03669  val_log_mse=0.05698  val_mse=0.000501  max_grad=2.34  patience=5/30
+2026-10-08 18:46:01,648  gsv3.training             INFO     [family_holdout:qnn] epoch 0061  layout_ce=0.4001  layout_acc=0.895
+2026-10-08 18:46:01,649  gsv3.training             INFO     [family_holdout:qnn] epoch 0061  train_log_mse=0.04434  val_log_mse=0.06128  val_mse=0.000475  max_grad=2.87  patience=11/30
+2026-10-08 18:46:08,021  gsv3.training             INFO     [family_holdout:qaoa] epoch 0079  layout_ce=0.3111  layout_acc=0.921
+2026-10-08 18:46:08,021  gsv3.training             INFO     [family_holdout:qaoa] epoch 0079  train_log_mse=0.03421  val_log_mse=0.05213  val_mse=0.000475  max_grad=1.25  patience=6/30
+2026-10-08 18:47:19,373  gsv3.training             INFO     [family_holdout:qaoa] epoch 0080  layout_ce=0.3278  layout_acc=0.916
+2026-10-08 18:47:19,373  gsv3.training             INFO     [family_holdout:qaoa] epoch 0080  train_log_mse=0.03629  val_log_mse=0.05147  val_mse=0.000514  max_grad=1.79  patience=7/30
+2026-10-08 18:47:32,584  gsv3.training             INFO     [family_holdout:qnn] epoch 0062  layout_ce=0.3887  layout_acc=0.898
+2026-10-08 18:47:32,584  gsv3.training             INFO     [family_holdout:qnn] epoch 0062  train_log_mse=0.04327  val_log_mse=0.05128  val_mse=0.000429  max_grad=2.47  patience=12/30
+2026-10-08 18:48:30,844  gsv3.training             INFO     [family_holdout:qaoa] epoch 0081  layout_ce=0.3149  layout_acc=0.920
+2026-10-08 18:48:30,845  gsv3.training             INFO     [family_holdout:qaoa] epoch 0081  train_log_mse=0.03490  val_log_mse=0.07145  val_mse=0.000520  max_grad=1.88  patience=8/30
+2026-10-08 18:49:03,741  gsv3.training             INFO     [family_holdout:qnn] epoch 0063  layout_ce=0.3871  layout_acc=0.899
+2026-10-08 18:49:03,741  gsv3.training             INFO     [family_holdout:qnn] epoch 0063  train_log_mse=0.04329  val_log_mse=0.05686  val_mse=0.000433  max_grad=1.64  patience=13/30
+2026-10-08 18:49:40,289  gsv3.training             INFO     [family_holdout:qaoa] epoch 0082  layout_ce=0.3148  layout_acc=0.920
+2026-10-08 18:49:40,289  gsv3.training             INFO     [family_holdout:qaoa] epoch 0082  train_log_mse=0.03500  val_log_mse=0.07045  val_mse=0.000446  max_grad=1.92  patience=9/30
+2026-10-08 18:50:29,858  gsv3.training             INFO     [family_holdout:qnn] epoch 0064  layout_ce=0.3816  layout_acc=0.901
+2026-10-08 18:50:29,859  gsv3.training             INFO     [family_holdout:qnn] epoch 0064  train_log_mse=0.04279  val_log_mse=0.05565  val_mse=0.000456  max_grad=1.63  patience=14/30
+2026-10-08 18:50:48,056  gsv3.training             INFO     [family_holdout:qaoa] epoch 0083  layout_ce=0.2971  layout_acc=0.925
+2026-10-08 18:50:48,056  gsv3.training             INFO     [family_holdout:qaoa] epoch 0083  train_log_mse=0.03354  val_log_mse=0.06650  val_mse=0.000554  max_grad=2.83  patience=10/30
+2026-10-08 18:51:55,524  gsv3.training             INFO     [family_holdout:qaoa] epoch 0084  layout_ce=0.3123  layout_acc=0.920
+2026-10-08 18:51:55,524  gsv3.training             INFO     [family_holdout:qaoa] epoch 0084  train_log_mse=0.03477  val_log_mse=0.06792  val_mse=0.000450  max_grad=1.85  patience=11/30
+2026-10-08 18:51:55,848  gsv3.training             INFO     [family_holdout:qnn] epoch 0065  layout_ce=0.3645  layout_acc=0.905
+2026-10-08 18:51:55,850  gsv3.training             INFO     [family_holdout:qnn] epoch 0065  train_log_mse=0.04081  val_log_mse=0.05366  val_mse=0.000412  max_grad=2.81  patience=0/30
+2026-10-08 18:53:02,800  gsv3.training             INFO     [family_holdout:qaoa] epoch 0085  layout_ce=0.3087  layout_acc=0.921
+2026-10-08 18:53:02,801  gsv3.training             INFO     [family_holdout:qaoa] epoch 0085  train_log_mse=0.03422  val_log_mse=0.06547  val_mse=0.000533  max_grad=2.12  patience=12/30
+2026-10-08 18:53:22,134  gsv3.training             INFO     [family_holdout:qnn] epoch 0066  layout_ce=0.3594  layout_acc=0.906
+2026-10-08 18:53:22,135  gsv3.training             INFO     [family_holdout:qnn] epoch 0066  train_log_mse=0.03975  val_log_mse=0.05453  val_mse=0.000463  max_grad=1.49  patience=1/30
+2026-10-08 18:54:10,370  gsv3.training             INFO     [family_holdout:qaoa] epoch 0086  layout_ce=0.3043  layout_acc=0.924
+2026-10-08 18:54:10,371  gsv3.training             INFO     [family_holdout:qaoa] epoch 0086  train_log_mse=0.03398  val_log_mse=0.06148  val_mse=0.000469  max_grad=2.60  patience=13/30
+2026-10-08 18:54:48,181  gsv3.training             INFO     [family_holdout:qnn] epoch 0067  layout_ce=0.3705  layout_acc=0.903
+2026-10-08 18:54:48,183  gsv3.training             INFO     [family_holdout:qnn] epoch 0067  train_log_mse=0.04105  val_log_mse=0.05804  val_mse=0.000409  max_grad=1.57  patience=0/30
+2026-10-08 18:55:18,045  gsv3.training             INFO     [family_holdout:qaoa] epoch 0087  layout_ce=0.2862  layout_acc=0.928
+2026-10-08 18:55:18,045  gsv3.training             INFO     [family_holdout:qaoa] epoch 0087  train_log_mse=0.03163  val_log_mse=0.05393  val_mse=0.000482  max_grad=1.32  patience=14/30
+2026-10-08 18:56:13,773  gsv3.training             INFO     [family_holdout:qnn] epoch 0068  layout_ce=0.3677  layout_acc=0.905
+2026-10-08 18:56:13,774  gsv3.training             INFO     [family_holdout:qnn] epoch 0068  train_log_mse=0.04107  val_log_mse=0.05789  val_mse=0.000502  max_grad=2.62  patience=1/30
+2026-10-08 18:56:25,256  gsv3.training             INFO     [family_holdout:qaoa] epoch 0088  layout_ce=0.3057  layout_acc=0.922
+2026-10-08 18:56:25,257  gsv3.training             INFO     [family_holdout:qaoa] epoch 0088  train_log_mse=0.03417  val_log_mse=0.06846  val_mse=0.000573  max_grad=1.42  patience=15/30
+2026-10-08 18:57:32,729  gsv3.training             INFO     [family_holdout:qaoa] epoch 0089  layout_ce=0.2921  layout_acc=0.926
+2026-10-08 18:57:32,729  gsv3.training             INFO     [family_holdout:qaoa] epoch 0089  train_log_mse=0.03230  val_log_mse=0.05334  val_mse=0.000441  max_grad=1.10  patience=16/30
+2026-10-08 18:57:39,125  gsv3.training             INFO     [family_holdout:qnn] epoch 0069  layout_ce=0.3615  layout_acc=0.906
+2026-10-08 18:57:39,127  gsv3.training             INFO     [family_holdout:qnn] epoch 0069  train_log_mse=0.04057  val_log_mse=0.06268  val_mse=0.000405  max_grad=2.42  patience=0/30
+2026-10-08 18:58:40,169  gsv3.training             INFO     [family_holdout:qaoa] epoch 0090  layout_ce=0.2817  layout_acc=0.929
+2026-10-08 18:58:40,170  gsv3.training             INFO     [family_holdout:qaoa] epoch 0090  train_log_mse=0.03140  val_log_mse=0.05706  val_mse=0.000453  max_grad=2.15  patience=17/30
+2026-10-08 18:59:04,279  gsv3.training             INFO     [family_holdout:qnn] epoch 0070  layout_ce=0.3446  layout_acc=0.911
+2026-10-08 18:59:04,279  gsv3.training             INFO     [family_holdout:qnn] epoch 0070  train_log_mse=0.03847  val_log_mse=0.06948  val_mse=0.000514  max_grad=2.52  patience=1/30
+2026-10-08 18:59:47,712  gsv3.training             INFO     [family_holdout:qaoa] epoch 0091  layout_ce=0.2986  layout_acc=0.925
+2026-10-08 18:59:47,712  gsv3.training             INFO     [family_holdout:qaoa] epoch 0091  train_log_mse=0.03318  val_log_mse=0.07190  val_mse=0.000485  max_grad=2.04  patience=18/30
+2026-10-08 19:00:29,690  gsv3.training             INFO     [family_holdout:qnn] epoch 0071  layout_ce=0.3463  layout_acc=0.910
+2026-10-08 19:00:29,691  gsv3.training             INFO     [family_holdout:qnn] epoch 0071  train_log_mse=0.03875  val_log_mse=0.06662  val_mse=0.000493  max_grad=1.69  patience=2/30
+2026-10-08 19:00:55,451  gsv3.training             INFO     [family_holdout:qaoa] epoch 0092  layout_ce=0.2828  layout_acc=0.928
+2026-10-08 19:00:55,451  gsv3.training             INFO     [family_holdout:qaoa] epoch 0092  train_log_mse=0.03181  val_log_mse=0.05297  val_mse=0.000485  max_grad=3.26  patience=19/30
+2026-10-08 19:01:54,973  gsv3.training             INFO     [family_holdout:qnn] epoch 0072  layout_ce=0.3463  layout_acc=0.910
+2026-10-08 19:01:54,974  gsv3.training             INFO     [family_holdout:qnn] epoch 0072  train_log_mse=0.03888  val_log_mse=0.05436  val_mse=0.000431  max_grad=1.75  patience=3/30
+2026-10-08 19:02:03,138  gsv3.training             INFO     [family_holdout:qaoa] epoch 0093  layout_ce=0.2682  layout_acc=0.932
+2026-10-08 19:02:03,139  gsv3.training             INFO     [family_holdout:qaoa] epoch 0093  train_log_mse=0.02997  val_log_mse=0.04835  val_mse=0.000465  max_grad=1.29  patience=20/30
+2026-10-08 19:03:10,797  gsv3.training             INFO     [family_holdout:qaoa] epoch 0094  layout_ce=0.2895  layout_acc=0.926
+2026-10-08 19:03:10,797  gsv3.training             INFO     [family_holdout:qaoa] epoch 0094  train_log_mse=0.03244  val_log_mse=0.07120  val_mse=0.000434  max_grad=2.09  patience=21/30
+2026-10-08 19:03:20,204  gsv3.training             INFO     [family_holdout:qnn] epoch 0073  layout_ce=0.3269  layout_acc=0.916
+2026-10-08 19:03:20,204  gsv3.training             INFO     [family_holdout:qnn] epoch 0073  train_log_mse=0.03677  val_log_mse=0.07186  val_mse=0.000441  max_grad=1.80  patience=4/30
+2026-10-08 19:04:18,375  gsv3.training             INFO     [family_holdout:qaoa] epoch 0095  layout_ce=0.2939  layout_acc=0.925
+2026-10-08 19:04:18,375  gsv3.training             INFO     [family_holdout:qaoa] epoch 0095  train_log_mse=0.03293  val_log_mse=0.05433  val_mse=0.000497  max_grad=1.77  patience=22/30
+2026-10-08 19:04:45,094  gsv3.training             INFO     [family_holdout:qnn] epoch 0074  layout_ce=0.3417  layout_acc=0.912
+2026-10-08 19:04:45,094  gsv3.training             INFO     [family_holdout:qnn] epoch 0074  train_log_mse=0.03824  val_log_mse=0.06189  val_mse=0.000439  max_grad=1.92  patience=5/30
+2026-10-08 19:05:26,126  gsv3.training             INFO     [family_holdout:qaoa] epoch 0096  layout_ce=0.2581  layout_acc=0.935
+2026-10-08 19:05:26,126  gsv3.training             INFO     [family_holdout:qaoa] epoch 0096  train_log_mse=0.02863  val_log_mse=0.05575  val_mse=0.000444  max_grad=1.12  patience=23/30
+2026-10-08 19:06:10,000  gsv3.training             INFO     [family_holdout:qnn] epoch 0075  layout_ce=0.3312  layout_acc=0.915
+2026-10-08 19:06:10,003  gsv3.training             INFO     [family_holdout:qnn] epoch 0075  train_log_mse=0.03691  val_log_mse=0.05425  val_mse=0.000404  max_grad=1.80  patience=0/30
+2026-10-08 19:06:33,818  gsv3.training             INFO     [family_holdout:qaoa] epoch 0097  layout_ce=0.2791  layout_acc=0.930
+2026-10-08 19:06:33,818  gsv3.training             INFO     [family_holdout:qaoa] epoch 0097  train_log_mse=0.03126  val_log_mse=0.06320  val_mse=0.000445  max_grad=2.16  patience=24/30
+2026-10-08 19:07:35,135  gsv3.training             INFO     [family_holdout:qnn] epoch 0076  layout_ce=0.3202  layout_acc=0.917
+2026-10-08 19:07:35,136  gsv3.training             INFO     [family_holdout:qnn] epoch 0076  train_log_mse=0.03607  val_log_mse=0.06398  val_mse=0.000459  max_grad=1.93  patience=1/30
+2026-10-08 19:07:41,512  gsv3.training             INFO     [family_holdout:qaoa] epoch 0098  layout_ce=0.2823  layout_acc=0.929
+2026-10-08 19:07:41,512  gsv3.training             INFO     [family_holdout:qaoa] epoch 0098  train_log_mse=0.03152  val_log_mse=0.05641  val_mse=0.000478  max_grad=1.98  patience=25/30
+2026-10-08 19:08:49,054  gsv3.training             INFO     [family_holdout:qaoa] epoch 0099  layout_ce=0.2691  layout_acc=0.932
+2026-10-08 19:08:49,054  gsv3.training             INFO     [family_holdout:qaoa] epoch 0099  train_log_mse=0.03040  val_log_mse=0.05231  val_mse=0.000462  max_grad=1.79  patience=26/30
+2026-10-08 19:09:00,239  gsv3.training             INFO     [family_holdout:qnn] epoch 0077  layout_ce=0.3227  layout_acc=0.917
+2026-10-08 19:09:00,240  gsv3.training             INFO     [family_holdout:qnn] epoch 0077  train_log_mse=0.03635  val_log_mse=0.08277  val_mse=0.000424  max_grad=1.33  patience=2/30
+2026-10-08 19:09:56,757  gsv3.training             INFO     [family_holdout:qaoa] epoch 0100  layout_ce=0.2694  layout_acc=0.932
+2026-10-08 19:09:56,757  gsv3.training             INFO     [family_holdout:qaoa] epoch 0100  train_log_mse=0.02983  val_log_mse=0.05212  val_mse=0.000454  max_grad=7.25  patience=27/30
+2026-10-08 19:10:24,555  gsv3.training             INFO     [family_holdout:qnn] epoch 0078  layout_ce=0.3214  layout_acc=0.917
+2026-10-08 19:10:24,555  gsv3.training             INFO     [family_holdout:qnn] epoch 0078  train_log_mse=0.03578  val_log_mse=0.06332  val_mse=0.000422  max_grad=1.95  patience=3/30
+2026-10-08 19:11:04,646  gsv3.training             INFO     [family_holdout:qaoa] epoch 0101  layout_ce=0.2509  layout_acc=0.938
+2026-10-08 19:11:04,646  gsv3.training             INFO     [family_holdout:qaoa] epoch 0101  train_log_mse=0.02815  val_log_mse=0.05610  val_mse=0.000460  max_grad=1.41  patience=28/30
+2026-10-08 19:11:49,236  gsv3.training             INFO     [family_holdout:qnn] epoch 0079  layout_ce=0.3107  layout_acc=0.920
+2026-10-08 19:11:49,237  gsv3.training             INFO     [family_holdout:qnn] epoch 0079  train_log_mse=0.03509  val_log_mse=0.08167  val_mse=0.000472  max_grad=2.07  patience=4/30
+2026-10-08 19:12:12,598  gsv3.training             INFO     [family_holdout:qaoa] epoch 0102  layout_ce=0.2672  layout_acc=0.933
+2026-10-08 19:12:12,599  gsv3.training             INFO     [family_holdout:qaoa] epoch 0102  train_log_mse=0.02996  val_log_mse=0.05582  val_mse=0.000464  max_grad=1.45  patience=29/30
+2026-10-08 19:13:13,911  gsv3.training             INFO     [family_holdout:qnn] epoch 0080  layout_ce=0.3203  layout_acc=0.918
+2026-10-08 19:13:13,912  gsv3.training             INFO     [family_holdout:qnn] epoch 0080  train_log_mse=0.03616  val_log_mse=0.05494  val_mse=0.000411  max_grad=5.74  patience=5/30
+2026-10-08 19:13:20,667  gsv3.training             INFO     [family_holdout:qaoa] epoch 0103  layout_ce=0.2709  layout_acc=0.931
+2026-10-08 19:13:20,667  gsv3.training             INFO     [family_holdout:qaoa] epoch 0103  train_log_mse=0.03015  val_log_mse=0.05561  val_mse=0.000458  max_grad=2.60  patience=30/30
+2026-10-08 19:13:28,516  gsv3.experiment           INFO     [qaoa] TEST  n=2706  MAE=0.0977  R2=0.8219  device-acc=0.552  regret=0.0159
+2026-10-08 19:13:28,522  genstudy.io               INFO     Wrote evaluations/generalization_v6/results/v6_l01/leave_one_family_out/qaoa/metrics.json
+2026-10-08 19:13:28,537  genstudy.io               INFO     Wrote evaluations/generalization_v6/results/v6_l01/leave_one_family_out/qaoa/predictions.json
+2026-10-08 19:13:28,549  genstudy.io               INFO     Wrote evaluations/generalization_v6/results/v6_l01/leave_one_family_out/qaoa/history.json
+2026-10-08 19:13:28,583  genstudy.io               INFO     Wrote evaluations/generalization_v6/results/v6_l01/leave_one_family_out/folds.json
+2026-10-08 19:13:28,590  genstudy.experiment       INFO     Merged held-out predictions for 2706 circuits
+2026-10-08 19:13:28,602  genstudy.io               INFO     Wrote evaluations/generalization_v6/results/v6_l01/leave_one_family_out/heldout_predictions.json
+2026-10-08 19:13:28,602  run_experiment            INFO     leave_one_family_out finished: 1 complete, 0 skipped
+2026-10-08 19:14:31,759  gsv3.training             INFO     [family_holdout:qnn] epoch 0081  layout_ce=0.3117  layout_acc=0.920
+2026-10-08 19:14:31,760  gsv3.training             INFO     [family_holdout:qnn] epoch 0081  train_log_mse=0.03483  val_log_mse=0.07856  val_mse=0.000419  max_grad=2.30  patience=6/30
+2026-10-08 19:15:48,316  gsv3.training             INFO     [family_holdout:qnn] epoch 0082  layout_ce=0.3092  layout_acc=0.921
+2026-10-08 19:15:48,316  gsv3.training             INFO     [family_holdout:qnn] epoch 0082  train_log_mse=0.03483  val_log_mse=0.05701  val_mse=0.000457  max_grad=1.35  patience=7/30
+2026-10-08 19:17:04,804  gsv3.training             INFO     [family_holdout:qnn] epoch 0083  layout_ce=0.3058  layout_acc=0.922
+2026-10-08 19:17:04,805  gsv3.training             INFO     [family_holdout:qnn] epoch 0083  train_log_mse=0.03471  val_log_mse=0.06375  val_mse=0.000495  max_grad=1.60  patience=8/30
+2026-10-08 19:18:21,369  gsv3.training             INFO     [family_holdout:qnn] epoch 0084  layout_ce=0.2996  layout_acc=0.923
+2026-10-08 19:18:21,369  gsv3.training             INFO     [family_holdout:qnn] epoch 0084  train_log_mse=0.03365  val_log_mse=0.06321  val_mse=0.000440  max_grad=1.90  patience=9/30
+2026-10-08 19:19:38,167  gsv3.training             INFO     [family_holdout:qnn] epoch 0085  layout_ce=0.3046  layout_acc=0.921
+2026-10-08 19:19:38,167  gsv3.training             INFO     [family_holdout:qnn] epoch 0085  train_log_mse=0.03428  val_log_mse=0.07908  val_mse=0.000441  max_grad=2.19  patience=10/30
+2026-10-08 19:20:55,112  gsv3.training             INFO     [family_holdout:qnn] epoch 0086  layout_ce=0.2937  layout_acc=0.926
+2026-10-08 19:20:55,113  gsv3.training             INFO     [family_holdout:qnn] epoch 0086  train_log_mse=0.03282  val_log_mse=0.05718  val_mse=0.000464  max_grad=2.36  patience=11/30
+2026-10-08 19:22:12,040  gsv3.training             INFO     [family_holdout:qnn] epoch 0087  layout_ce=0.2949  layout_acc=0.925
+2026-10-08 19:22:12,042  gsv3.training             INFO     [family_holdout:qnn] epoch 0087  train_log_mse=0.03305  val_log_mse=0.06162  val_mse=0.000401  max_grad=1.21  patience=0/30
+2026-10-08 19:23:28,337  gsv3.training             INFO     [family_holdout:qnn] epoch 0088  layout_ce=0.2836  layout_acc=0.927
+2026-10-08 19:23:28,337  gsv3.training             INFO     [family_holdout:qnn] epoch 0088  train_log_mse=0.03224  val_log_mse=0.05772  val_mse=0.000437  max_grad=1.50  patience=1/30
+2026-10-08 19:24:44,490  gsv3.training             INFO     [family_holdout:qnn] epoch 0089  layout_ce=0.2816  layout_acc=0.928
+2026-10-08 19:24:44,491  gsv3.training             INFO     [family_holdout:qnn] epoch 0089  train_log_mse=0.03155  val_log_mse=0.05814  val_mse=0.000412  max_grad=2.22  patience=2/30
+2026-10-08 19:26:00,909  gsv3.training             INFO     [family_holdout:qnn] epoch 0090  layout_ce=0.2852  layout_acc=0.927
+2026-10-08 19:26:00,909  gsv3.training             INFO     [family_holdout:qnn] epoch 0090  train_log_mse=0.03235  val_log_mse=0.05666  val_mse=0.000436  max_grad=4.78  patience=3/30
+2026-10-08 19:27:17,094  gsv3.training             INFO     [family_holdout:qnn] epoch 0091  layout_ce=0.2737  layout_acc=0.930
+2026-10-08 19:27:17,094  gsv3.training             INFO     [family_holdout:qnn] epoch 0091  train_log_mse=0.03083  val_log_mse=0.06373  val_mse=0.000450  max_grad=1.30  patience=4/30
+2026-10-08 19:28:33,296  gsv3.training             INFO     [family_holdout:qnn] epoch 0092  layout_ce=0.2915  layout_acc=0.926
+2026-10-08 19:28:33,296  gsv3.training             INFO     [family_holdout:qnn] epoch 0092  train_log_mse=0.03285  val_log_mse=0.05738  val_mse=0.000403  max_grad=5.07  patience=5/30
+2026-10-08 19:29:49,731  gsv3.training             INFO     [family_holdout:qnn] epoch 0093  layout_ce=0.2605  layout_acc=0.934
+2026-10-08 19:29:49,731  gsv3.training             INFO     [family_holdout:qnn] epoch 0093  train_log_mse=0.02973  val_log_mse=0.05749  val_mse=0.000456  max_grad=1.78  patience=6/30
+2026-10-08 19:31:06,131  gsv3.training             INFO     [family_holdout:qnn] epoch 0094  layout_ce=0.2869  layout_acc=0.927
+2026-10-08 19:31:06,132  gsv3.training             INFO     [family_holdout:qnn] epoch 0094  train_log_mse=0.03245  val_log_mse=0.05984  val_mse=0.000426  max_grad=1.51  patience=7/30
+2026-10-08 19:32:22,802  gsv3.training             INFO     [family_holdout:qnn] epoch 0095  layout_ce=0.2913  layout_acc=0.926
+2026-10-08 19:32:22,802  gsv3.training             INFO     [family_holdout:qnn] epoch 0095  train_log_mse=0.03348  val_log_mse=0.07494  val_mse=0.000507  max_grad=2.36  patience=8/30
+2026-10-08 19:33:38,902  gsv3.training             INFO     [family_holdout:qnn] epoch 0096  layout_ce=0.2742  layout_acc=0.930
+2026-10-08 19:33:38,902  gsv3.training             INFO     [family_holdout:qnn] epoch 0096  train_log_mse=0.03100  val_log_mse=0.05651  val_mse=0.000438  max_grad=1.69  patience=9/30
+2026-10-08 19:34:55,915  gsv3.training             INFO     [family_holdout:qnn] epoch 0097  layout_ce=0.2579  layout_acc=0.935
+2026-10-08 19:34:55,916  gsv3.training             INFO     [family_holdout:qnn] epoch 0097  train_log_mse=0.02901  val_log_mse=0.05336  val_mse=0.000429  max_grad=1.35  patience=10/30
+2026-10-08 19:36:12,641  gsv3.training             INFO     [family_holdout:qnn] epoch 0098  layout_ce=0.2724  layout_acc=0.930
+2026-10-08 19:36:12,643  gsv3.training             INFO     [family_holdout:qnn] epoch 0098  train_log_mse=0.03060  val_log_mse=0.05524  val_mse=0.000399  max_grad=1.83  patience=0/30
+2026-10-08 19:37:29,152  gsv3.training             INFO     [family_holdout:qnn] epoch 0099  layout_ce=0.2646  layout_acc=0.933
+2026-10-08 19:37:29,153  gsv3.training             INFO     [family_holdout:qnn] epoch 0099  train_log_mse=0.03019  val_log_mse=0.05732  val_mse=0.000463  max_grad=1.88  patience=1/30
+2026-10-08 19:38:45,615  gsv3.training             INFO     [family_holdout:qnn] epoch 0100  layout_ce=0.2665  layout_acc=0.933
+2026-10-08 19:38:45,616  gsv3.training             INFO     [family_holdout:qnn] epoch 0100  train_log_mse=0.03000  val_log_mse=0.05558  val_mse=0.000428  max_grad=3.25  patience=2/30
+2026-10-08 19:40:02,096  gsv3.training             INFO     [family_holdout:qnn] epoch 0101  layout_ce=0.2623  layout_acc=0.933
+2026-10-08 19:40:02,096  gsv3.training             INFO     [family_holdout:qnn] epoch 0101  train_log_mse=0.02972  val_log_mse=0.05646  val_mse=0.000459  max_grad=2.35  patience=3/30
+2026-10-08 19:41:18,575  gsv3.training             INFO     [family_holdout:qnn] epoch 0102  layout_ce=0.2637  layout_acc=0.934
+2026-10-08 19:41:18,575  gsv3.training             INFO     [family_holdout:qnn] epoch 0102  train_log_mse=0.02995  val_log_mse=0.05974  val_mse=0.000403  max_grad=4.21  patience=4/30
+2026-10-08 19:42:35,309  gsv3.training             INFO     [family_holdout:qnn] epoch 0103  layout_ce=0.2643  layout_acc=0.933
+2026-10-08 19:42:35,309  gsv3.training             INFO     [family_holdout:qnn] epoch 0103  train_log_mse=0.03022  val_log_mse=0.06238  val_mse=0.000460  max_grad=24.42  patience=5/30
+2026-10-08 19:43:51,943  gsv3.training             INFO     [family_holdout:qnn] epoch 0104  layout_ce=0.2596  layout_acc=0.935
+2026-10-08 19:43:51,945  gsv3.training             INFO     [family_holdout:qnn] epoch 0104  train_log_mse=0.02972  val_log_mse=0.05678  val_mse=0.000395  max_grad=1.56  patience=0/30
+2026-10-08 19:45:08,686  gsv3.training             INFO     [family_holdout:qnn] epoch 0105  layout_ce=0.2503  layout_acc=0.937
+2026-10-08 19:45:08,686  gsv3.training             INFO     [family_holdout:qnn] epoch 0105  train_log_mse=0.02879  val_log_mse=0.06122  val_mse=0.000448  max_grad=6.23  patience=1/30
+2026-10-08 19:46:25,343  gsv3.training             INFO     [family_holdout:qnn] epoch 0106  layout_ce=0.2513  layout_acc=0.937
+2026-10-08 19:46:25,344  gsv3.training             INFO     [family_holdout:qnn] epoch 0106  train_log_mse=0.02857  val_log_mse=0.07049  val_mse=0.000452  max_grad=2.29  patience=2/30
+2026-10-08 19:47:41,438  gsv3.training             INFO     [family_holdout:qnn] epoch 0107  layout_ce=0.2558  layout_acc=0.935
+2026-10-08 19:47:41,440  gsv3.training             INFO     [family_holdout:qnn] epoch 0107  train_log_mse=0.02892  val_log_mse=0.05621  val_mse=0.000383  max_grad=5.32  patience=0/30
+2026-10-08 19:48:57,633  gsv3.training             INFO     [family_holdout:qnn] epoch 0108  layout_ce=0.2336  layout_acc=0.941
+2026-10-08 19:48:57,633  gsv3.training             INFO     [family_holdout:qnn] epoch 0108  train_log_mse=0.02678  val_log_mse=0.05527  val_mse=0.000427  max_grad=1.57  patience=1/30
+2026-10-08 19:50:13,958  gsv3.training             INFO     [family_holdout:qnn] epoch 0109  layout_ce=0.2632  layout_acc=0.934
+2026-10-08 19:50:13,959  gsv3.training             INFO     [family_holdout:qnn] epoch 0109  train_log_mse=0.02972  val_log_mse=0.05374  val_mse=0.000443  max_grad=2.90  patience=2/30
+2026-10-08 19:51:30,431  gsv3.training             INFO     [family_holdout:qnn] epoch 0110  layout_ce=0.2483  layout_acc=0.937
+2026-10-08 19:51:30,432  gsv3.training             INFO     [family_holdout:qnn] epoch 0110  train_log_mse=0.02834  val_log_mse=0.05703  val_mse=0.000399  max_grad=3.88  patience=3/30
+2026-10-08 19:52:47,140  gsv3.training             INFO     [family_holdout:qnn] epoch 0111  layout_ce=0.2410  layout_acc=0.939
+2026-10-08 19:52:47,140  gsv3.training             INFO     [family_holdout:qnn] epoch 0111  train_log_mse=0.02752  val_log_mse=0.05559  val_mse=0.000421  max_grad=2.29  patience=4/30
+2026-10-08 19:54:04,388  gsv3.training             INFO     [family_holdout:qnn] epoch 0112  layout_ce=0.2616  layout_acc=0.935
+2026-10-08 19:54:04,388  gsv3.training             INFO     [family_holdout:qnn] epoch 0112  train_log_mse=0.02992  val_log_mse=0.05370  val_mse=0.000391  max_grad=3.37  patience=5/30
+2026-10-08 19:55:29,727  gsv3.training             INFO     [family_holdout:qnn] epoch 0113  layout_ce=0.2259  layout_acc=0.943
+2026-10-08 19:55:29,727  gsv3.training             INFO     [family_holdout:qnn] epoch 0113  train_log_mse=0.02577  val_log_mse=0.05920  val_mse=0.000418  max_grad=1.70  patience=6/30
+2026-10-08 19:56:46,512  gsv3.training             INFO     [family_holdout:qnn] epoch 0114  layout_ce=0.2400  layout_acc=0.939
+2026-10-08 19:56:46,512  gsv3.training             INFO     [family_holdout:qnn] epoch 0114  train_log_mse=0.02712  val_log_mse=0.06184  val_mse=0.000420  max_grad=1.44  patience=7/30
+2026-10-08 19:58:03,411  gsv3.training             INFO     [family_holdout:qnn] epoch 0115  layout_ce=0.2463  layout_acc=0.938
+2026-10-08 19:58:03,411  gsv3.training             INFO     [family_holdout:qnn] epoch 0115  train_log_mse=0.02803  val_log_mse=0.06133  val_mse=0.000430  max_grad=1.36  patience=8/30
+2026-10-08 19:59:20,059  gsv3.training             INFO     [family_holdout:qnn] epoch 0116  layout_ce=0.2472  layout_acc=0.938
+2026-10-08 19:59:20,059  gsv3.training             INFO     [family_holdout:qnn] epoch 0116  train_log_mse=0.02876  val_log_mse=0.05772  val_mse=0.000409  max_grad=2.84  patience=9/30
+2026-10-08 20:00:36,920  gsv3.training             INFO     [family_holdout:qnn] epoch 0117  layout_ce=0.2272  layout_acc=0.943
+2026-10-08 20:00:36,921  gsv3.training             INFO     [family_holdout:qnn] epoch 0117  train_log_mse=0.02603  val_log_mse=0.07748  val_mse=0.000443  max_grad=2.09  patience=10/30
+2026-10-08 20:01:53,569  gsv3.training             INFO     [family_holdout:qnn] epoch 0118  layout_ce=0.2434  layout_acc=0.938
+2026-10-08 20:01:53,570  gsv3.training             INFO     [family_holdout:qnn] epoch 0118  train_log_mse=0.02772  val_log_mse=0.06129  val_mse=0.000401  max_grad=1.56  patience=11/30
+2026-10-08 20:03:10,446  gsv3.training             INFO     [family_holdout:qnn] epoch 0119  layout_ce=0.2256  layout_acc=0.943
+2026-10-08 20:03:10,446  gsv3.training             INFO     [family_holdout:qnn] epoch 0119  train_log_mse=0.02581  val_log_mse=0.06318  val_mse=0.000397  max_grad=1.55  patience=12/30
+2026-10-08 20:04:25,658  gsv3.training             INFO     [family_holdout:qnn] epoch 0120  layout_ce=0.2362  layout_acc=0.941
+2026-10-08 20:04:25,659  gsv3.training             INFO     [family_holdout:qnn] epoch 0120  train_log_mse=0.02701  val_log_mse=0.05712  val_mse=0.000408  max_grad=2.63  patience=13/30
+2026-10-08 20:05:40,511  gsv3.training             INFO     [family_holdout:qnn] epoch 0121  layout_ce=0.2192  layout_acc=0.945
+2026-10-08 20:05:40,512  gsv3.training             INFO     [family_holdout:qnn] epoch 0121  train_log_mse=0.02525  val_log_mse=0.05721  val_mse=0.000414  max_grad=8.13  patience=14/30
+2026-10-08 20:06:55,160  gsv3.training             INFO     [family_holdout:qnn] epoch 0122  layout_ce=0.2331  layout_acc=0.941
+2026-10-08 20:06:55,161  gsv3.training             INFO     [family_holdout:qnn] epoch 0122  train_log_mse=0.02636  val_log_mse=0.08060  val_mse=0.000468  max_grad=2.50  patience=15/30
+2026-10-08 20:08:09,134  gsv3.training             INFO     [family_holdout:qnn] epoch 0123  layout_ce=0.2465  layout_acc=0.939
+2026-10-08 20:08:09,134  gsv3.training             INFO     [family_holdout:qnn] epoch 0123  train_log_mse=0.02811  val_log_mse=0.07629  val_mse=0.000436  max_grad=7.57  patience=16/30
+2026-10-08 20:09:23,689  gsv3.training             INFO     [family_holdout:qnn] epoch 0124  layout_ce=0.2161  layout_acc=0.946
+2026-10-08 20:09:23,689  gsv3.training             INFO     [family_holdout:qnn] epoch 0124  train_log_mse=0.02519  val_log_mse=0.05648  val_mse=0.000411  max_grad=2.50  patience=17/30
+2026-10-08 20:10:38,305  gsv3.training             INFO     [family_holdout:qnn] epoch 0125  layout_ce=0.2198  layout_acc=0.944
+2026-10-08 20:10:38,305  gsv3.training             INFO     [family_holdout:qnn] epoch 0125  train_log_mse=0.02507  val_log_mse=0.05237  val_mse=0.000410  max_grad=1.24  patience=18/30
+2026-10-08 20:11:52,560  gsv3.training             INFO     [family_holdout:qnn] epoch 0126  layout_ce=0.2271  layout_acc=0.943
+2026-10-08 20:11:52,561  gsv3.training             INFO     [family_holdout:qnn] epoch 0126  train_log_mse=0.02573  val_log_mse=0.06501  val_mse=0.000407  max_grad=1.19  patience=19/30
+2026-10-08 20:13:07,197  gsv3.training             INFO     [family_holdout:qnn] epoch 0127  layout_ce=0.2249  layout_acc=0.944
+2026-10-08 20:13:07,199  gsv3.training             INFO     [family_holdout:qnn] epoch 0127  train_log_mse=0.02554  val_log_mse=0.05612  val_mse=0.000420  max_grad=1.23  patience=20/30
+2026-10-08 20:14:21,646  gsv3.training             INFO     [family_holdout:qnn] epoch 0128  layout_ce=0.2107  layout_acc=0.947
+2026-10-08 20:14:21,647  gsv3.training             INFO     [family_holdout:qnn] epoch 0128  train_log_mse=0.02416  val_log_mse=0.06647  val_mse=0.000455  max_grad=1.87  patience=21/30
+2026-10-08 20:15:36,282  gsv3.training             INFO     [family_holdout:qnn] epoch 0129  layout_ce=0.2282  layout_acc=0.944
+2026-10-08 20:15:36,283  gsv3.training             INFO     [family_holdout:qnn] epoch 0129  train_log_mse=0.02614  val_log_mse=0.06665  val_mse=0.000434  max_grad=2.66  patience=22/30
+2026-10-08 20:16:50,615  gsv3.training             INFO     [family_holdout:qnn] epoch 0130  layout_ce=0.2180  layout_acc=0.945
+2026-10-08 20:16:50,615  gsv3.training             INFO     [family_holdout:qnn] epoch 0130  train_log_mse=0.02483  val_log_mse=0.06477  val_mse=0.000434  max_grad=1.73  patience=23/30
+2026-10-08 20:18:05,323  gsv3.training             INFO     [family_holdout:qnn] epoch 0131  layout_ce=0.2157  layout_acc=0.947
+2026-10-08 20:18:05,323  gsv3.training             INFO     [family_holdout:qnn] epoch 0131  train_log_mse=0.02468  val_log_mse=0.05512  val_mse=0.000384  max_grad=2.35  patience=24/30
+2026-10-08 20:19:20,286  gsv3.training             INFO     [family_holdout:qnn] epoch 0132  layout_ce=0.2174  layout_acc=0.946
+2026-10-08 20:19:20,286  gsv3.training             INFO     [family_holdout:qnn] epoch 0132  train_log_mse=0.02475  val_log_mse=0.05753  val_mse=0.000410  max_grad=1.41  patience=25/30
+2026-10-08 20:20:34,694  gsv3.training             INFO     [family_holdout:qnn] epoch 0133  layout_ce=0.2161  layout_acc=0.946
+2026-10-08 20:20:34,694  gsv3.training             INFO     [family_holdout:qnn] epoch 0133  train_log_mse=0.02466  val_log_mse=0.05627  val_mse=0.000454  max_grad=4.39  patience=26/30
+2026-10-08 20:21:49,126  gsv3.training             INFO     [family_holdout:qnn] epoch 0134  layout_ce=0.2095  layout_acc=0.949
+2026-10-08 20:21:49,126  gsv3.training             INFO     [family_holdout:qnn] epoch 0134  train_log_mse=0.02395  val_log_mse=0.06230  val_mse=0.000400  max_grad=1.32  patience=27/30
+2026-10-08 20:23:03,621  gsv3.training             INFO     [family_holdout:qnn] epoch 0135  layout_ce=0.2091  layout_acc=0.948
+2026-10-08 20:23:03,621  gsv3.training             INFO     [family_holdout:qnn] epoch 0135  train_log_mse=0.02394  val_log_mse=0.06203  val_mse=0.000385  max_grad=1.12  patience=28/30
+2026-10-08 20:24:18,009  gsv3.training             INFO     [family_holdout:qnn] epoch 0136  layout_ce=0.2114  layout_acc=0.948
+2026-10-08 20:24:18,009  gsv3.training             INFO     [family_holdout:qnn] epoch 0136  train_log_mse=0.02420  val_log_mse=0.07193  val_mse=0.000405  max_grad=2.76  patience=29/30
+2026-10-08 20:25:32,241  gsv3.training             INFO     [family_holdout:qnn] epoch 0137  layout_ce=0.2076  layout_acc=0.949
+2026-10-08 20:25:32,241  gsv3.training             INFO     [family_holdout:qnn] epoch 0137  train_log_mse=0.02391  val_log_mse=0.05584  val_mse=0.000447  max_grad=1.62  patience=30/30
+2026-10-08 20:25:33,273  gsv3.experiment           INFO     [qnn] TEST  n=760  MAE=0.0847  R2=0.7205  device-acc=0.580  regret=0.0129
+2026-10-08 20:25:33,276  genstudy.io               INFO     Wrote evaluations/generalization_v6/results/v6_l01/leave_one_family_out/qnn/metrics.json
+2026-10-08 20:25:33,281  genstudy.io               INFO     Wrote evaluations/generalization_v6/results/v6_l01/leave_one_family_out/qnn/predictions.json
+2026-10-08 20:25:33,292  genstudy.io               INFO     Wrote evaluations/generalization_v6/results/v6_l01/leave_one_family_out/qnn/history.json
+2026-10-08 20:25:33,312  genstudy.io               INFO     Wrote evaluations/generalization_v6/results/v6_l01/leave_one_family_out/folds.json
+2026-10-08 20:25:33,313  genstudy.experiment       INFO     Merged held-out predictions for 760 circuits
+2026-10-08 20:25:33,318  genstudy.io               INFO     Wrote evaluations/generalization_v6/results/v6_l01/leave_one_family_out/heldout_predictions.json
+2026-10-08 20:25:33,318  run_experiment            INFO     leave_one_family_out finished: 1 complete, 0 skipped

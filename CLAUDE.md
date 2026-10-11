@@ -27,7 +27,14 @@ little text. Be proactive: launch and chain experiments, report results with num
 
 ## Models (state on 2026-10-11)
 
-- **Main model: v8kd40** (kind `sinkhorn_rf_route_czc`, runs `generalization_v9/results/v8kd40[_s6|_s7]`):
+- **Main model: v8kdc10** (adopted 2026-10-11; kind `sinkhorn_rf_route_czc`, runs `generalization_v9/results/v8kdc10[_s6|_s7]`):
+  the v8kdl40 recipe + `--delta-corr-lambda 0.1` (1 − Pearson of predicted vs true Δ per batch and device).
+  3 seeds: R² qaoa 0.970 ± 0.023, qnn 0.847 ± 0.123, variational 0.939 ± 0.018 (qnn subset 0.93), control 0.996;
+  local tracking 0.66 ± 0.02 (ensemble 0.69, an option at 3× inference), global 0.95–0.98; regret after a local
+  change re-predicted 0.0037; placement probe: reaction agreement with the compiler 0.49 (v8kdl40 0.52), tracking
+  on the probe sample 0.74 (v8kdl40 0.70). The previous best models stay in the paper's comparison (storytelling):
+  v1 → v8a → v8kd40 → v8kdl40 → v8kdc10.
+- **Previous main model: v8kd40** (kind `sinkhorn_rf_route_czc`, runs `generalization_v9/results/v8kd40[_s6|_s7]`):
   v8k trained from scratch, then 40 epochs of change-loss fine-tuning on 100 exactly compiled
   calibrations per device. 3 seeds: R² qaoa 0.965 ± 0.031, qnn 0.855 ± 0.063, variational
   0.918 ± 0.025, control 0.996; local calibration tracking 0.60 ± 0.02, global 0.95–0.98.
@@ -36,10 +43,10 @@ little text. Be proactive: launch and chain experiments, report results with num
   (0.0062 → 0.0049) while R² of F after the change stays 0.99.
 - **v8k**: v8s + CZ count constrained to the gate decomposition when no routing is needed
   (`cz = base(gate) · (1 + κ · hops)`).
-- **Candidate main model: v8kdl40** (runs `v8kdl40[_s6|_s7]`): the v8kd40 fine-tuning plus the
+- **v8kdl40** (runs `v8kdl40[_s6|_s7]`): the v8kd40 fine-tuning plus the
   layout and count losses on each calibration variant (`--aug-aux`). 3 seeds: local tracking
   0.63 ± 0.02, regret after a calibration change −43% when re-predicting, generalization as v8kd40
-  (one qnn seed low). Not yet adopted: decide after the placement experiments below.
+  (one qnn seed low). Superseded by v8kdc10.
 - Done (2026-10-11): per-error-kind placement prior (`*_czc_ep3`, v8kdq40b), MLP placement scorer
   (`*_czc_mlps`, v8kdm40b), v8kdl40 with placement lr ×10 (v8kdl40p), fine-tuning grid
   `v8kg_t{15,30}_d{1,3}_e{40,80}` (Sinkhorn tau × change-loss weight × epochs, control only).
@@ -53,7 +60,7 @@ little text. Be proactive: launch and chain experiments, report results with num
   CZ −0.029 vs compiler −0.024 / −0.016), so the limit is the training signal.
 - **Correlation change loss (2026-10-11): v8kdc10** = v8kdl40 recipe + `--delta-corr-lambda 0.1` (1 − Pearson of
   Δ per batch and device). Local tracking 0.63 / 0.67 / 0.67 (mean 0.66 vs 0.63; ensemble 0.69); weights 0.02 /
-  0.3 / 1 no better. Cold start N = 33 model-only loss 0.0054 vs 0.0064. Splits (3 seeds) running → candidate main.
+  0.3 / 1 no better. Cold start N = 33 model-only loss 0.0054 vs 0.0064. Adopted as main model (above).
 - **v12 placed-circuit network (2026-10-11)**, kind `sinkhorn_rf_route_pgnn_usage` (`PlacedCircuitGNN` in model.py,
   design `evaluations/DESIGN_v12_placed_circuit_gnn.md`, phase 0 `evaluations/v12/phase0_true_layout.py` + `phase0.sh`,
   reports `evaluations/v12/results/report_phase0*.md`). Frozen v11dl40 + network, 577 test circuits, unseen
@@ -188,5 +195,7 @@ Chain 2–6 after the candidate's control job so they run without supervision.
 ## Commits
 
 - Small logical commits on `generalization-study`; never push unless asked; no `Co-Authored-By` trailer.
+- The user does the pushes: commit locally, then tell them which branch to push and why. Branches:
+  `generalization-study` (open PR), `esp-depth` (ESP / duration / depth heads, branched from it).
 - Commit finished results only (metrics, history, run logs; `.gitignore` drops `*.pth`, predictions,
   locks). Leave the user's own `.gitignore` edits and root-level scratch files alone.

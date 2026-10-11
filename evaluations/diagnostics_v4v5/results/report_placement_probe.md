@@ -13,6 +13,7 @@
 | v8kdr40 | 30% | 49% | 0.28 | 0.41 | +0.53 | -0.30 | -0.23 |
 | v8kdp40 | 28% | 49% | 0.24 | 0.41 | +0.52 | -0.29 | -0.23 |
 | v8kdrp40 | 29% | 49% | 0.26 | 0.41 | +0.53 | -0.28 | -0.23 |
+| v8kdc10 | 29% | 49% | 0.23 | 0.41 | +0.49 | -0.31 | -0.23 |
 
 Δu = change of occupancy of each physical qubit (model: Σ_q A; compiler: 0/1 initial layout); Δε = change of r + readout + mean CZ error of the qubit. Negative corr(Δu, Δε) = leaves qubits that got worse.
 
@@ -27,6 +28,7 @@
 | v8kdr40 | 0.202 | 0.43 | 0.50 |
 | v8kdp40 | 0.192 | 0.43 | 0.49 |
 | v8kdrp40 | 0.201 | 0.43 | 0.49 |
+| v8kdc10 | 0.180 | 0.40 | 0.52 |
 
 ## 4. Local tracking with a lower Sinkhorn temperature at inference (no retraining)
 
@@ -39,3 +41,4 @@
 | v8kdr40 | 0.70 | 0.63 | 0.45 | 0.25 |
 | v8kdp40 | 0.68 | 0.58 | 0.42 | 0.25 |
 | v8kdrp40 | 0.68 | 0.58 | 0.45 | 0.29 |
+| v8kdc10 | 0.74 | 0.69 | 0.54 | 0.34 |

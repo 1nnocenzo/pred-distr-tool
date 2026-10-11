@@ -2,7 +2,7 @@
 #SBATCH --job-name=v8b_compile
 #SBATCH --partition=cpu_sapphire
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=8G
+#SBATCH --mem=2G
 #SBATCH --time=06:00:00
 #SBATCH --output=/home/atudisco/pred-distr-tool/evaluations/compile_check/slurm/%x_%j.log
 # v8b: dataset circuits compiled on 8 calibration variants per device (see v8b_variants.py).

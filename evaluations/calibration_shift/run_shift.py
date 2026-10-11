@@ -66,7 +66,33 @@ for _s in (5, 6, 7):
     MODELS[f"v8kd40@s{_s}"] = ("sinkhorn_rf_route_czc", _control("generalization_v9", "v8kd40", _s))  # v8kd, 40 epochs
     MODELS[f"v11@s{_s}"] = ("sinkhorn_rf_route_usage", _control("generalization_v9", "v11", _s))  # usage-map head
     MODELS[f"v11d40@s{_s}"] = ("sinkhorn_rf_route_usage", _control("generalization_v9", "v11d40", _s))  # v11 + change loss
+    MODELS[f"v11du40@s{_s}"] = ("sinkhorn_rf_route_usage", _control("generalization_v9", "v11du40", _s))  # + variant usage maps
+    MODELS[f"v8kdl40@s{_s}"] = ("sinkhorn_rf_route_czc", _control("generalization_v9", "v8kdl40", _s))  # + layout/count losses on variants
+    MODELS[f"v11dl40@s{_s}"] = ("sinkhorn_rf_route_usage", _control("generalization_v9", "v11dl40", _s))
+    for _r, _k in (("v8kdr40", "sinkhorn_rf_route_czc"), ("v8kdp40", "sinkhorn_rf_route_czc_ep"), ("v8kdrp40", "sinkhorn_rf_route_czc_ep")):
+        MODELS[f"{_r}@s{_s}"] = (_k, _control("generalization_v9", _r, _s))   # placement: reaction loss / error prior / both
+    for _t in ("15", "30"):        # fine-tuning grid on the control split: Sinkhorn tau x change-loss weight x epochs
+        for _d in ("1", "3"):
+            for _e in ("40", "80"):
+                MODELS[f"v8kg_t{_t}_d{_d}_e{_e}@s{_s}"] = ("sinkhorn_rf_route_czc", _control("generalization_v9", f"v8kg_t{_t}_d{_d}_e{_e}", _s))
+    for _r, _k in (("v8kdq40", "sinkhorn_rf_route_czc_ep3"), ("v8kdm40", "sinkhorn_rf_route_czc_mlps"), ("v8kdqm40", "sinkhorn_rf_route_czc_ep3_mlps")):
+        MODELS[f"{_r}@s{_s}"] = (_k, _control("generalization_v9", _r, _s))   # per-kind error prior / MLP scorer / both
+    for _r, _k in (("v8kdl40p", "sinkhorn_rf_route_czc"), ("v8kdq40b", "sinkhorn_rf_route_czc_ep3"), ("v8kdm40b", "sinkhorn_rf_route_czc_mlps"),
+                   ("v8kdv40", "sinkhorn_rf_route_czc_vf2"), ("v8kdv40s", "sinkhorn_rf_route_czc_vf2")):
+        MODELS[f"{_r}@s{_s}"] = (_k, _control("generalization_v9", _r, _s))   # placement learning rate x10
     MODELS[f"v9k@s{_s}"] = ("sinkhorn_rf_rel_route_czc", _control("generalization_v9", "v9k", _s))  # v8k + relative features
+# data scaling (2026-10-11): change-loss fine-tuning on the first k calibration variants per device (c12/25/50)
+# or on all 100 with the variant labels of ~1/4 of the circuits (cq4); v8kdl40 and v11dl40 recipes
+for _s in (5, 6, 7):
+    for _c in ("c12", "c25", "c50", "cq4"):
+        MODELS[f"v8k{_c}@s{_s}"] = ("sinkhorn_rf_route_czc", _control("generalization_v9", f"v8k{_c}", _s))
+        MODELS[f"v11{_c}@s{_s}"] = ("sinkhorn_rf_route_usage", _control("generalization_v9", f"v11{_c}", _s))
+
+# correlation change loss (2026-10-11): v8kdl40 recipe + --delta-corr-lambda 0.02 / 0.1
+for _s in (5, 6, 7):
+    for _c in ("v8kdc02", "v8kdc10", "v8kdc30", "v8kdc100"):
+        MODELS[f"{_c}@s{_s}"] = ("sinkhorn_rf_route_czc", _control("generalization_v9", _c, _s))
+
 # v9f: the add-ons kept by generalization_v9/decide_v9f.py (kind written there)
 _DEC = EVAL / "generalization_v9" / "results" / "decision.json"
 if _DEC.is_file() and json.loads(_DEC.read_text()).get("run") == "v9f":
@@ -131,7 +157,7 @@ def cmd_truth(args):
 def _variant_batch(raw_all: dict, keys: list[str], lap_pe: int):
     import torch
     from torch_geometric.data import Batch, Data
-    from gsv3.devices import _laplacian_pe, _physical_errors
+    from gsv3.devices import _coupler_errors, _laplacian_pe, _physical_errors
     # Standardisation statistics of the three ORIGINAL devices (as in gsv2.devices).
     orig = torch.load(EVAL / "generalization_v2/results/device_graphs.pt", weights_only=False)["raw"]
     all_nodes = torch.tensor([r for v in orig.values() for r in v["nodes"]])
@@ -150,6 +176,7 @@ def _variant_batch(raw_all: dict, keys: list[str], lap_pe: int):
         g.x = torch.cat([g.x, _laplacian_pe(g.num_nodes, g.edge_index, lap_pe)], dim=1)
         g.phys = _physical_errors({"nodes": r["nodes"], "edges": [tuple(e) for e in r["edges"]],
                                    "edge_feats": r["edge_feats"]})
+        _coupler_errors(r, g)                # per-coupler CZ errors for the v11 usage head
         graphs.append(g)
     return Batch.from_data_list(graphs)
 

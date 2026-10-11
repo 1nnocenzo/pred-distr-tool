@@ -319,10 +319,10 @@ table.matrix { width: 100%; min-width: 760px; border-collapse: collapse; font-va
   <section class="card" aria-labelledby="h-res">
     <div class="sechead">
       <h2 id="h-res">All results</h2>
-      <span class="kicker">test R² · tracking = corr. of predicted vs true Δlog F, local calibration changes</span>
+      <span class="kicker">R² of F on held-out splits · tracking = correlation (not R²) of predicted vs true Δlog F under local calibration changes</span>
     </div>
     <div class="matrix-wrap"><table class="matrix" id="matrix"></table></div>
-    <p class="note">Mean over the seeds listed (5, 6, 7). LOFO = one circuit family held out, LOGO = a group of families held out, control = random split. The best value of each column is in teal. Label noise caps local tracking near 0.85; the oracle study puts the ceiling of the current head near 0.6.</p>
+    <p class="note"><b>Reading tracking.</b> Local calibration changes move F by 0.006 (median) to 0.048 (90th percentile), so tracking is a correlation of small changes while R² of F after the change stays 0.99. In practice: re-predicting after a change cuts the fidelity lost to a wrong device choice by 21% with v8kd40 (regret 0.0062 → 0.0049, right device 64%) and by 9% with v8a; the best of three devices changes in 29% of the cases. Mean over the seeds listed (5, 6, 7). LOFO = one circuit family held out, LOGO = a group of families held out, control = random split. The best value of each column is in teal. Label noise caps local tracking near 0.85; the oracle study puts the ceiling of the current head near 0.6.</p>
   </section>
 </div>
 
@@ -599,6 +599,17 @@ const V1_HEAD = { eyebrow: "Output (v1)", title: "Direct regression",
     { kind: "facts", items: [["LOGO variational regret", "0.054 (v8kd40: 0.013)"], ["qnn held out", "R² 0.18 ± 0.51 over 3 seeds"]] }],
   src: "evaluations/generalization (v1 study)" };
 
+const HEAD_V8KDL = { eyebrow: "Output (v8kdl40)", title: "Change loss + layout and counts on every calibration",
+  lead: "The v8kd40 fine-tuning, plus the layout loss (used region, qubit distances) and the count loss applied also to the calibration variant of each batch, against the compiler's layout and counts on that variant.",
+  sections: [{ kind: "facts", items: [["local tracking", "0.60 → 0.63 (3 seeds)"], ["regret after a change", "−43% when re-predicting (v8kd40: −21%)"], ["placement reaction vs compiler", "0.33 → 0.52 (compiler vs itself 0.87)"], ["generalization", "unchanged; one qnn seed low"]] }],
+  src: "gsv3/training.py · aug_aux (--aug-aux)" };
+const PLACE_PROBE = { eyebrow: "Placement (analysis)", title: "What the placement gets wrong",
+  lead: "The embeddings carry every error (ridge probe R² 0.97–0.99), but the placement moves half as much as the compiler and weighs the errors differently.",
+  sections: [
+    { kind: "facts", items: [["qubits moved", "28% (compiler 49%)"], ["reaction like the compiler", "0.52 (compiler vs itself 0.87)"], ["weakest", "EQE1 chips, circuits with 1–5 qubits"]] },
+    { kind: "stack", title: "Weight of each error change on where the qubits go", layers: [["compiler", "readout −0.024 · CZ −0.016 · 1q −0.009", ""], ["model", "CZ −0.028 · readout −0.019 · 1q −0.009", ""]] }],
+  src: "diagnostics_v4v5/tracking_anatomy.py · placement_probe.py · compile_check/compiler_consistency.py" };
+
 const P7 = ["Sinkhorn placement", "logical × physical,", "one to one, per device", "τ = 0.3 · 20 iterations", "loss v7 · λ 0.1"];
 const G_RF = ["643 values", "+ routing-free flag"], G_RE = ["644 values", "+ flag + routing estimate"];
 const M_CZC = ["cz = base · (1 + κ · hops)", "count loss · cz-weighted"];
@@ -706,15 +717,40 @@ const VERSIONS = [
     changed: ["din", "head"], o: { din: DIN_V8D, head: HEAD_V8KD, gate: GATE_V8S, mlp: MLP_CZC, train: TRAIN_K },
     diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: M_CZC, head: "fidelity + change loss" },
     r: [0.965, 0.855, 0.918, 0.996, 0.60], n: 3 },
-  { k: "v11", parent: "v8kd40", path: true, s: "plan", label: "training", what: "Usage-map head: CZ per coupler, r and measure per physical qubit.",
+  { k: "v11", parent: "v8k", s: "diag", label: "not adopted", what: "Usage-map head: CZ per coupler, r and measure per physical qubit.",
     why: "With layout, counts and coupler errors all given exactly, the current head still stops near 0.6 local tracking: the routed circuit is not described.",
     changed: ["mlp", "head"], o: { head: HEAD_V11, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D },
     diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: ["→ U_cz(p,p′), U_r(p), U_m(p)", "usage loss"], head: "fidelity + change + usage", headText: "log F = −Σ U·ε (exact)" },
+    r: [0.950, 0.860, 0.941, 0.996, 0.47], n: 1 },
+  { k: "v11d40", parent: "v11", s: "drop", label: "discarded", what: "v11 + the change-loss fine-tuning (also with variant usage maps, v11du40, and variant layouts and counts, v11dl40).",
+    why: "Check whether the exact head turns into better tracking once fine-tuned.",
+    changed: ["head"], o: { head: HEAD_V11, gate: GATE_V8S, din: DIN_V8D },
+    diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: ["→ U_cz(p,p′), U_r(p), U_m(p)", "usage loss"], head: "fidelity + change + usage", headText: "log F = −Σ U·ε (exact)" },
+    r: [0.949, 0.940, 0.943, 0.996, 0.59], n: 1 },
+  { k: "v8kdl40", parent: "v8kd40", path: true, s: "line", label: "candidate", what: "v8kd40 fine-tuning + layout and count losses on every calibration variant.",
+    why: "The oracle and anatomy studies point at the placement: supervise where the compiler puts the circuit on each calibration, not only on the original one.",
+    changed: ["place", "head"], o: { place: PLACE_PROBE, head: HEAD_V8KDL, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D, train: TRAIN_K },
+    diag: { din: "+ 100 variants each", place: ["Sinkhorn placement", "logical × physical,", "one to one, per device", "τ = 0.3 · 20 iterations", "layout loss on variants too"], gate: G_RE, mlp: M_CZC, head: "fidelity + change loss" },
+    r: [0.969, 0.836, 0.933, 0.996, 0.63], n: 3 },
+  { k: "v8kdr40", parent: "v8kdl40", s: "drop", label: "discarded", what: "+ a loss on how the qubit occupancy moves between the original and the variant calibration, vs the compiler's.",
+    why: "The placement moves half as much as the compiler.",
+    changed: ["place"], o: { place: PLACE_PROBE, head: HEAD_V8KDL, gate: GATE_V8S, mlp: MLP_CZC },
+    diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: M_CZC, head: "fidelity + change + reaction" },
+    r: [0.985, 0.888, 0.947, 0.996, 0.58], n: 1 },
+  { k: "v8kdp40", parent: "v8kdl40", s: "drop", label: "discarded", what: "+ an explicit preference for low-error qubits in the placement score (one learned weight on the total error).",
+    why: "Make the placement react in proportion to the error change.",
+    changed: ["place"], o: { place: PLACE_PROBE, head: HEAD_V8KDL, gate: GATE_V8S, mlp: MLP_CZC },
+    diag: { din: "+ 100 variants each", place: ["Sinkhorn placement", "score − w(q) · z(error)", "one to one, per device", "τ = 0.3 · 20 iterations", "layout loss on variants too"], gate: G_RE, mlp: M_CZC, head: "fidelity + change loss" },
+    r: [0.984, 0.865, 0.950, 0.996, 0.61], n: 1 },
+  { k: "v8kdq40/m40", parent: "v8kdl40", path: true, s: "plan", label: "running", what: "One learned weight per error kind (1q, readout, CZ) in the placement score, and an MLP placement scorer; alone and together.",
+    why: "The anatomy study shows the model over-weights CZ and under-weights readout compared with the compiler, and that the errors combine non-linearly.",
+    changed: ["place"], o: { place: PLACE_PROBE, head: HEAD_V8KDL, gate: GATE_V8S, mlp: MLP_CZC },
+    diag: { din: "+ 100 variants each", place: ["Sinkhorn placement", "score: MLP + Σ_k w_k(q) · z_k", "one to one, per device", "τ = 0.3 · 20 iterations", "layout loss on variants too"], gate: G_RE, mlp: M_CZC, head: "fidelity + change loss" },
     r: [null, null, null, null, null], n: 0 }
 ];
 const MAIN = "v8kd40", BASE = "v8a", FIRST = "v1";
-const METRICS = ["LOFO qaoa", "LOFO qnn", "LOGO variational", "control", "local tracking"];
-const SHORT = ["qaoa", "qnn", "variational", "control", "tracking"];
+const METRICS = ["R² LOFO qaoa", "R² LOFO qnn", "R² LOGO variational", "R² control", "local tracking (corr.)"];
+const SHORT = ["R² qaoa", "R² qnn", "R² variational", "R² control", "tracking (corr.)"];
 
 let cur = MAIN, curBlock = "head";
 const panel = document.getElementById("panel");

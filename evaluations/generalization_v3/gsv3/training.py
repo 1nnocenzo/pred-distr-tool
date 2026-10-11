@@ -72,20 +72,22 @@ def count_loss(model, batch, kind_weights=None) -> tuple[torch.Tensor, float]:
     return loss, rel2.item()
 
 
-def usage_loss(model, batch) -> tuple[torch.Tensor, float]:
-    """v11: predicted usage maps vs the compiled circuit's (``batch.usage_r/m/cz``, -1 = no maps).
+def usage_loss(model, batch, true_maps=None) -> tuple[torch.Tensor, float]:
+    """v11: predicted usage maps vs the compiled circuit's (``batch.usage_r/m/cz``, -1 = no maps),
+    or vs ``true_maps`` = (r, m, cz) given explicitly (calibration variants).
     MSE on log1p over the real qubits / couplers of each device, the three maps weighted alike;
     also returns the mean correlation between predicted and true CZ maps (diagnostic)."""
     u_r, u_m, u_cz, qmask, emask = model.last_usage               # (B, D, P|E), (D, P|E)
+    t_r, t_m, t_cz = true_maps if true_maps is not None else (batch.usage_r, batch.usage_m, batch.usage_cz)
     loss, n = u_r.new_tensor(0.0), 0
-    for pred, true, m in ((u_r, batch.usage_r, qmask), (u_m, batch.usage_m, qmask), (u_cz, batch.usage_cz, emask)):
+    for pred, true, m in ((u_r, t_r, qmask), (u_m, t_m, qmask), (u_cz, t_cz, emask)):
         true = true.view(pred.size(0), pred.size(1), -1)[..., : pred.size(2)]
         known = (true >= 0) & m.unsqueeze(0)
         if known.any():
             err = (torch.log1p(pred) - torch.log1p(true.clamp(min=0))) ** 2
             loss = loss + (err * known).sum() / known.sum()
             n += 1
-    tc = batch.usage_cz.view(u_cz.size(0), u_cz.size(1), -1)[..., : u_cz.size(2)]
+    tc = t_cz.view(u_cz.size(0), u_cz.size(1), -1)[..., : u_cz.size(2)]
     ok = (tc >= 0).all(-1) & (tc.sum(-1) > 0)
     corr = 0.0
     if ok.any():
@@ -93,6 +95,43 @@ def usage_loss(model, batch) -> tuple[torch.Tensor, float]:
         a = a - a.mean(-1, keepdim=True); b = b - b.mean(-1, keepdim=True)
         corr = float(((a * b).sum(-1) / (a.norm(dim=-1) * b.norm(dim=-1)).clamp(min=1e-9)).mean())
     return loss / max(n, 1), corr
+
+
+def _occupancy(layout, n_qubits, p_max):
+    """compiler layout (sum n, D) node indices -> 0/1 occupancy (B, D, P) and a (B, D) mask of
+    the circuits whose every logical qubit has a known place."""
+    from torch_geometric.utils import to_dense_batch
+    n_q = n_qubits.view(-1).long()
+    q_batch = torch.repeat_interleave(torch.arange(n_q.numel(), device=n_q.device), n_q)
+    lay, qm = to_dense_batch(layout, q_batch, fill_value=-1)                  # (B, Qm, D)
+    known = ((lay >= 0) | ~qm.unsqueeze(-1)).all(1)                            # (B, D)
+    onehot = torch.nn.functional.one_hot((lay + 1).clamp(min=0), p_max + 1)[..., 1:].float()
+    return onehot.sum(1).clamp(max=1.0), known                                 # (B, D, P)
+
+
+def reaction_loss(assign_o, assign_v, col_mask, batch, j) -> tuple[torch.Tensor, float]:
+    """How the placement moves when the calibration changes, vs how the compiler moves:
+    MSE between Δu_model = Σ_q A_variant − Σ_q A_original and Δu_compiler (0/1 occupancy of the
+    compiled initial layouts), over the physical qubits of each device; also returns their mean
+    correlation over the cases where the compiler moves (diagnostic)."""
+    p_max = assign_o.size(-1)
+    occ_o, k_o = _occupancy(batch.layout, batch.n_qubits, p_max)
+    occ_v, k_v = _occupancy(batch.layout_aug[:, j], batch.n_qubits, p_max)
+    du_m = assign_v.sum(2) - assign_o.sum(2)                                   # (B, D, P)
+    du_c = occ_v - occ_o
+    m = (k_o & k_v).unsqueeze(-1) & col_mask.unsqueeze(0)                     # (B, D, P)
+    if not m.any():
+        return du_m.new_tensor(0.0), float("nan")
+    loss = (((du_m - du_c) ** 2) * m).sum() / m.sum()
+    with torch.no_grad():
+        mv = m & (du_c.abs().sum(-1, keepdim=True) > 0)
+        a = (du_m * mv); b = (du_c * mv)
+        n = mv.float().sum(-1).clamp(min=1)
+        a = a - a.sum(-1, keepdim=True) / n.unsqueeze(-1); b = b - b.sum(-1, keepdim=True) / n.unsqueeze(-1)
+        c = ((a * b * mv).sum(-1) / ((a * a * mv).sum(-1).sqrt() * (b * b * mv).sum(-1).sqrt()).clamp(min=1e-9))
+        ok = mv.any(-1)
+        corr = float(c[ok].mean()) if ok.any() else float("nan")
+    return loss, corr
 
 
 def layout_loss(model, batch) -> tuple[torch.Tensor, torch.Tensor]:
@@ -222,9 +261,26 @@ def train_model(
     torch.manual_seed(seed)
     model = build_model(protocol["model"], params, devices, device)
     if protocol.get("init_from"):     # fine-tuning (e.g. the change loss on a trained v8a)
-        model.load_state_dict(torch.load(protocol["init_from"], map_location=device))
-        logger.info("[%s] initialised from %s", tag, protocol["init_from"])
-    optimizer = torch.optim.Adam(model.parameters(), lr=protocol["lr"])
+        tau_wanted = getattr(model, "tau", None)
+        missing, unexpected = model.load_state_dict(torch.load(protocol["init_from"], map_location=device), strict=False)
+        if tau_wanted is not None:          # the fine-tuning's temperature, not the checkpoint's
+            model.tau = float(tau_wanted); model.tau_saved.fill_(float(tau_wanted))
+        if unexpected:
+            raise RuntimeError(f"init_from has unexpected keys: {unexpected}")
+        logger.info("[%s] initialised from %s%s", tag, protocol["init_from"],
+                    f" (new parameters, not in the checkpoint: {missing})" if missing else "")
+    # optional higher learning rate for the placement (fine-tuning that must move it):
+    # projections w_q / w_p, dummy score, low-error preference err_w, MLP scorer sc_*
+    plr = float(protocol.get("placement_lr_mult", 1) or 1)
+    if plr != 1:
+        place_names = ("w_q.", "w_p.", "dummy_score", "err_w.", "vf2_log_beta", "sc_a.", "sc_b.", "sc_ab", "sc_out.")
+        place = [p_ for n_, p_ in model.named_parameters() if n_.startswith(place_names)]
+        rest = [p_ for n_, p_ in model.named_parameters() if not n_.startswith(place_names)]
+        optimizer = torch.optim.Adam([{"params": rest, "lr": protocol["lr"]},
+                                      {"params": place, "lr": protocol["lr"] * plr}])
+        logger.info("[%s] placement learning rate x%g on %d tensors", tag, plr, len(place))
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=protocol["lr"])
 
     sampler = balanced_sampler(train_families, protocol["balance_alpha"], seed)
     loader = DataLoader(list(train_graphs), batch_size=protocol["batch_size"],
@@ -249,6 +305,17 @@ def train_model(
     # v8 (opt-in): weight of the count loss; needs ``counts`` on the graphs.
     count_lambda = float(protocol.get("count_lambda", 0) or 0)
     usage_lambda = float(protocol.get("usage_lambda", 0) or 0)
+    # usage maps on the calibration variants (change-loss pass), indexed by ``batch.usage_id``
+    usage_aug_lambda = float(protocol.get("usage_aug_lambda", 0) or 0)
+    # layout (v7) and count losses also on the calibration variant of the change-loss pass,
+    # against the compiler's layout and counts on that variant (v8d labels, every circuit)
+    aug_aux = bool(protocol.get("aug_aux"))
+    react_lambda = float(protocol.get("react_lambda", 0) or 0)   # placement reaction (needs calib_aug)
+    if usage_aug_lambda:
+        lab = torch.load(protocol["usage_path_aug"], weights_only=False)
+        names = sorted(n for n, e in lab.items() if "r_aug" in e)
+        usage_aug = tuple(torch.stack([lab[n][k] for n in names]).to(device) for k in ("r_aug", "m_aug", "cz_aug"))
+        del lab
     # optional per-kind weights of the count loss, "r,measure,cz" (e.g. "0.1,0.1,1": cz-heavy)
     count_w = ([float(v) for v in str(protocol["count_weights"]).split(",")]
                if protocol.get("count_weights") else None)
@@ -272,6 +339,10 @@ def train_model(
     # the original devices (absolute loss as usual) and on one random variant, and
     # (log F^_var - log F^_orig) is fitted to (log F_var - log F_orig), both best-of-K labels.
     delta_lambda = float(protocol.get("delta_lambda", 0) or 0)
+    # correlation change loss: 1 − Pearson(Δ predicted, Δ true) over the batch, per device (each batch
+    # uses one calibration variant, so this is the local-tracking metric itself); added to the MSE
+    corr_lambda = float(protocol.get("delta_corr_lambda", 0) or 0)
+    dc_sum, dc_n = 0.0, 0
     if delta_lambda and aug_devices is None:
         raise ValueError("delta_lambda needs calib_aug")
         logger.info("[%s] calibration augmentation: variant sets %s of %d, p(orig) = %.2f",
@@ -320,7 +391,11 @@ def train_model(
         v7_stats: dict[str, float] = {}
         cnt_loss, cnt_rel2, cnt_n = 0.0, 0.0, 0
         dl_sum, dl_n = 0.0, 0
+        dc_sum, dc_n = 0.0, 0
         us_loss, us_corr, us_n = 0.0, 0.0, 0
+        ua_loss, ua_corr, ua_n = 0.0, 0.0, 0
+        ax_lay, ax_ov, ax_cnt, ax_rel, ax_n = 0.0, 0.0, 0.0, 0.0, 0
+        rx_loss, rx_n, rx_corr, rx_cn = 0.0, 0, 0.0, 0
         for batch in loader:
             batch = batch.to(device)
             batch_devices = devices
@@ -360,7 +435,14 @@ def train_model(
                 us_loss, us_corr, us_n = us_loss + uloss.item(), us_corr + ucorr, us_n + 1
             if delta_lambda:          # second pass on a random calibration variant
                 j = aug_ids[int(aug_rng.integers(len(aug_ids)))]
+                assign_o = model.last_assign
                 log_var = model(batch, aug_devices[j])
+                if react_lambda:
+                    rloss, rcorr = reaction_loss(assign_o, model.last_assign, model.last_col_mask, batch, j)
+                    loss = loss + react_lambda * rloss
+                    rx_loss, rx_n = rx_loss + rloss.item(), rx_n + 1
+                    if rcorr == rcorr:
+                        rx_corr, rx_cn = rx_corr + rcorr, rx_cn + 1
                 y_v = batch.y_aug[:, j].float().view(log_var.shape)
                 y_o = batch.y_ob.float().view(log_var.shape)
                 ok = ((y_v > 0.01) & (y_o > 0.01)).float()
@@ -368,6 +450,44 @@ def train_model(
                 d_pred = torch.clamp(log_var, max=0.0) - torch.clamp(log_pred, max=0.0)
                 dloss = (ok * (d_pred - d_true) ** 2).sum() / ok.sum().clamp(min=1)
                 loss = loss + delta_lambda * dloss
+                if corr_lambda:
+                    cs = []
+                    for k in range(d_pred.size(-1)):
+                        m = ok[:, k] > 0
+                        if int(m.sum()) > 4:
+                            a, b = d_pred[m, k], d_true[m, k]
+                            a, b = a - a.mean(), b - b.mean()
+                            cs.append((a * b).sum() / (a.norm() * b.norm()).clamp(min=1e-8))
+                    if cs:
+                        pcl = 1 - torch.stack(cs).mean()
+                        loss = loss + corr_lambda * pcl
+                        dc_sum, dc_n = dc_sum + pcl.item(), dc_n + 1
+                if aug_aux:
+                    lay0, cnt0 = batch.layout, getattr(batch, "counts", None)
+                    batch.layout = batch.layout_aug[:, j]
+                    if cnt0 is not None:
+                        batch.counts = batch.counts_aug[:, j]
+                    if layout_lambda and layout_kind == "region_dist":
+                        aux_v, st_v = region_distance_loss(model, batch)
+                        loss = loss + layout_lambda * aux_v
+                        ax_lay, ax_n = ax_lay + float(aux_v), ax_n + 1
+                        ax_ov += st_v.get("region_overlap", 0.0)
+                    if count_lambda and cnt0 is not None:
+                        closs_v, rel2_v = count_loss(model, batch, count_w)
+                        loss = loss + count_lambda * closs_v
+                        ax_cnt, ax_rel = ax_cnt + closs_v.item(), ax_rel + rel2_v
+                    batch.layout = lay0
+                    if cnt0 is not None:
+                        batch.counts = cnt0
+                if usage_aug_lambda:              # where the compiler puts the work on this variant
+                    uid = batch.usage_aug_id.view(-1)
+                    have = (uid >= 0).view(-1, 1, 1)
+                    tm = tuple(torch.where(have, t[uid.clamp(min=0), j], torch.full_like(t[uid.clamp(min=0), j], -1.0))
+                               for t in usage_aug)
+                    if bool(have.any()):
+                        ualoss, uacorr = usage_loss(model, batch, tm)
+                        loss = loss + usage_aug_lambda * ualoss
+                        ua_loss, ua_corr, ua_n = ua_loss + ualoss.item(), ua_corr + uacorr, ua_n + 1
                 dl_sum, dl_n = dl_sum + dloss.item(), dl_n + 1
             optimizer.zero_grad()
             loss.backward()
@@ -387,11 +507,32 @@ def train_model(
         if delta_lambda:
             history[-1]["train_delta_mse"] = dl_sum / max(1, dl_n)
             logger.info("[%s] epoch %04d  delta_mse=%.4f", tag, epoch, history[-1]["train_delta_mse"])
+            if corr_lambda:
+                history[-1]["train_delta_corr"] = 1 - dc_sum / max(1, dc_n)
+                logger.info("[%s] epoch %04d  delta_corr=%.3f", tag, epoch, history[-1]["train_delta_corr"])
         if usage_lambda:
             history[-1]["train_usage_mse"] = us_loss / max(1, us_n)
             history[-1]["train_usage_cz_corr"] = us_corr / max(1, us_n)
             logger.info("[%s] epoch %04d  usage_mse=%.4f  usage_cz_corr=%.3f", tag, epoch,
                         history[-1]["train_usage_mse"], history[-1]["train_usage_cz_corr"])
+        if react_lambda:
+            history[-1]["train_react_mse"] = rx_loss / max(1, rx_n)
+            history[-1]["train_react_corr"] = rx_corr / max(1, rx_cn)
+            logger.info("[%s] epoch %04d  react_mse=%.4f  react_corr=%.3f", tag, epoch,
+                        history[-1]["train_react_mse"], history[-1]["train_react_corr"])
+        if aug_aux:
+            history[-1]["train_aug_layout"] = ax_lay / max(1, ax_n)
+            history[-1]["train_aug_region_overlap"] = ax_ov / max(1, ax_n)
+            history[-1]["train_aug_count_mse"] = ax_cnt / max(1, ax_n)
+            history[-1]["train_aug_count_rel_err_2q"] = ax_rel / max(1, ax_n)
+            logger.info("[%s] epoch %04d  aug_layout=%.4f  aug_region_overlap=%.3f  aug_count_mse=%.4f  aug_count_rel_err_2q=%.3f",
+                        tag, epoch, *(history[-1][k] for k in ("train_aug_layout", "train_aug_region_overlap",
+                                                               "train_aug_count_mse", "train_aug_count_rel_err_2q")))
+        if usage_aug_lambda:
+            history[-1]["train_usage_aug_mse"] = ua_loss / max(1, ua_n)
+            history[-1]["train_usage_aug_cz_corr"] = ua_corr / max(1, ua_n)
+            logger.info("[%s] epoch %04d  usage_aug_mse=%.4f  usage_aug_cz_corr=%.3f", tag, epoch,
+                        history[-1]["train_usage_aug_mse"], history[-1]["train_usage_aug_cz_corr"])
         if count_lambda:
             history[-1]["train_count_mse"] = cnt_loss / max(1, cnt_n)
             history[-1]["train_count_rel_err_2q"] = cnt_rel2 / max(1, cnt_n)

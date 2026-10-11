@@ -43,7 +43,8 @@ USAGE = EVAL / "compile_check/results/v8u/usage_labels.pt"
 DEVS = ("EQE1_Top", "EQE1_Bottom", "QExa20")
 LOCAL_KINDS = {0, 1, 2, 3, 4, 5, 6, 9}
 MODELS = {"v8kd40": ("sinkhorn_rf_route_czc", "v8kd40"), "v11 (phase 1)": ("sinkhorn_rf_route_usage", "v11"),
-          "v11d40": ("sinkhorn_rf_route_usage", "v11d40")}
+          "v11d40": ("sinkhorn_rf_route_usage", "v11d40"), "v11du40": ("sinkhorn_rf_route_usage", "v11du40"),
+          "v8kdl40": ("sinkhorn_rf_route_czc", "v8kdl40"), "v11dl40": ("sinkhorn_rf_route_usage", "v11dl40")}
 
 
 def predict(model, batch, devices, layout=None, counts=None, maps=None):

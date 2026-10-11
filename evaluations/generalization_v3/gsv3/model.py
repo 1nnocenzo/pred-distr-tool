@@ -63,7 +63,7 @@ XATTN_DEFAULTS: dict[str, Any] = {
     "cost_bias_init": -6.0,   # softplus(-6) ≈ 2.5e-3 per gate at initialisation
 }
 
-MODEL_KINDS = ("pooled", "xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage")
+MODEL_KINDS = ("pooled", "xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_pgnn_usage")
 
 
 def load_hparams(params_path: Path | str | None = None) -> dict[str, Any]:
@@ -309,6 +309,65 @@ def _hop_distances(n: int, edge_index: torch.Tensor) -> torch.Tensor:
     return dist
 
 
+class PlacedCircuitGNN(nn.Module):
+    """v12: message passing on the placed circuit, refining the v11 usage maps.
+
+    Graph = the device's physical qubits.  Node p: v11 usage prior U_r(p), U_m(p), occupancy, total
+    CZ demand, raw errors, the device embedding h_p.  Coupling edges: the v11 CZ prior U_cz(e), the
+    coupler error, the direct demand between its two ends.  Demand edges: every pair (p, r) with
+    CZ demand between the logical qubits placed there (A^T W A), gated by (demand, hop distance), so
+    messages follow both the chip and the circuit's needs (where routing comes from).
+    Outputs are corrections, zero at init (the model starts exactly as v11 up to ~1e-5):
+      U_r' = U_r · exp(δ_r),  U_m' = U_m · exp(δ_m),  U_cz' = U_cz · exp(δ_cz) + softplus(γ)  (γ₀ = −12).
+    """
+
+    def __init__(self, d_dev: int, hidden: int = 64, layers: int = 4) -> None:
+        super().__init__()
+        h = hidden
+        self.node_in = nn.Linear(7, h)
+        self.dev_in = nn.Linear(d_dev, h, bias=False)
+        self.edge_in = nn.Linear(3, h)
+        self.edge_mlp = nn.ModuleList(nn.Sequential(nn.Linear(2 * h, h), nn.SiLU(), nn.Linear(h, h)) for _ in range(layers))
+        self.dem_gate = nn.ModuleList(nn.Linear(3, h) for _ in range(layers))
+        self.dem_val = nn.ModuleList(nn.Linear(h, h, bias=False) for _ in range(layers))
+        self.node_mlp = nn.ModuleList(nn.Sequential(nn.Linear(3 * h, h), nn.SiLU(), nn.Linear(h, h)) for _ in range(layers))
+        self.node_ln = nn.ModuleList(nn.LayerNorm(h) for _ in range(layers))
+        self.edge_ln = nn.ModuleList(nn.LayerNorm(h) for _ in range(layers))
+        self.node_out = nn.Linear(h, 2)
+        self.edge_out = nn.Linear(h, 2)
+        for lin in (self.node_out, self.edge_out):
+            nn.init.zeros_(lin.weight); nn.init.zeros_(lin.bias)
+        nn.init.constant_(self.edge_out.bias[1:], -12.0)
+
+    def forward(self, u_r, u_m, u_cz, occ, pair_m, hops, dev_h, eps_q, eps_e, inc_a, inc_b, qmask, emask):
+        """u_r, u_m, occ (B, D, P); u_cz (B, D, E); pair_m (B, D, P, P); hops (D, P, P); dev_h (D, P, d);
+        eps_q (D, P, 3); eps_e (D, E); inc_a / inc_b (D, E, P) one-hot ends of each coupler."""
+        qm, em = qmask.float(), emask.float()
+        dem = pair_m + pair_m.transpose(-1, -2)                                  # symmetric demand
+        x = torch.stack([torch.log1p(u_r), torch.log1p(u_m), occ, torch.log1p(dem.sum(-1)),
+                         *(100 * eps_q).unsqueeze(0).expand(u_r.size(0), -1, -1, -1).unbind(-1)], -1)
+        hn = (self.node_in(x) + self.dev_in(dev_h).unsqueeze(0)) * qm.unsqueeze(0).unsqueeze(-1)
+        d_e = torch.einsum("bdpr,dep,der->bde", dem, inc_a, inc_b)               # direct demand per coupler
+        xe = torch.stack([torch.log1p(u_cz), (100 * eps_e).unsqueeze(0).expand_as(u_cz), torch.log1p(d_e)], -1)
+        he = self.edge_in(xe) * em.unsqueeze(0).unsqueeze(-1)
+        gfeat = torch.stack([torch.log1p(dem), (hops / 4).unsqueeze(0).expand_as(dem), torch.ones_like(dem)], -1)
+        inc = inc_a + inc_b
+        for l in range(len(self.edge_mlp)):
+            ends = torch.einsum("bdph,dep->bdeh", hn, inc)
+            me = self.edge_mlp[l](torch.cat([ends, he], -1)) * em.unsqueeze(0).unsqueeze(-1)
+            he = self.edge_ln[l](he + me) * em.unsqueeze(0).unsqueeze(-1)
+            agg_c = torch.einsum("bdeh,dep->bdph", me, inc)
+            g = self.dem_gate[l](gfeat)                                          # (B, D, P, P, h)
+            agg_d = torch.einsum("bdprh,bdrh->bdph", g, self.dem_val[l](hn)) / hn.size(2)
+            hn = self.node_ln[l](hn + self.node_mlp[l](torch.cat([hn, agg_c, agg_d], -1))) * qm.unsqueeze(0).unsqueeze(-1)
+        dn = self.node_out(hn).clamp(-5, 5)
+        de = self.edge_out(he)
+        u_r2 = u_r * torch.exp(dn[..., 0])
+        u_m2 = u_m * torch.exp(dn[..., 1])
+        u_cz2 = (u_cz * torch.exp(de[..., 0].clamp(-5, 5)) + F.softplus(de[..., 1])) * em.unsqueeze(0)
+        return u_r2, u_m2, u_cz2
+
+
 class SinkhornPlacementPredictor(PhysicsHeadPredictor):
     """v5 ``sinkhorn``: the v4 physics head with a (soft) one-to-one placement.
 
@@ -338,7 +397,8 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
 
     def __init__(self, params: dict[str, Any], dev_node_dim: int, dev_edge_dim: int,
                  devices, routing_flag: bool = False, routing_est: bool = False,
-                 cz_constrained: bool = False, usage_head: bool = False) -> None:
+                 cz_constrained: bool = False, usage_head: bool = False, err_prior: int = 0,
+                 mlp_scorer: bool = False, vf2_prior: bool = False, placed_gnn: bool = False) -> None:
         super().__init__(params, dev_node_dim, dev_edge_dim)
         d = params["fusion_dim"]
         # ``sinkhorn_rf``: one more count-head input per (circuit, device), 1 if the circuit's
@@ -363,15 +423,54 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         #                   (softmax(-beta * path error), beta learned);
         #   log F = -(s_r Σ_p U_r ε_r + s_m Σ_p U_m ε_m + s_cz Σ_e U_cz ε_cz)   — exact for true maps.
         self.usage_head = usage_head
+        # ``*_ep``: explicit preference for low-error physical qubits in the placement scores,
+        #   score(q, p) -= w(q) * z_p,   z_p = error of p (r + readout + mean CZ) as a z-score within
+        #   its device, w(q) = softplus(linear(h_q)) >= 0, started near 0 (behaves as without it).
+        #   ``*_ep3``: one weight per error kind (1q, readout, mean CZ), each with its own z-score.
+        self.err_prior = int(err_prior)
+        if self.err_prior:
+            self.err_w = nn.Linear(d, self.err_prior)
+            nn.init.zeros_(self.err_w.weight)
+            nn.init.constant_(self.err_w.bias, float(params.get("err_prior_init", -4.0)))   # softplus(-1.05) = 0.3
+        # ``*_vf2``: the compiler's own layout score (Qiskit VF2Layout / VF2PostLayout) as a prior.
+        #   cost(q, p) = s_r n_1q(q) ε_r(p) + s_m n_meas(q) ε_m(p) + s_cz n_cz(q) ε̄_cz(p)
+        #   = the log-fidelity the circuit would lose if logical q sat on physical p, with the head's
+        #   own scales s, gate counts read from the circuit (CZ via the constrained base count) and
+        #   the unstandardised errors of p (the 2q term linearised: mean CZ of p's couplers).
+        #   score(q, p) -= β · cost(q, p), β = exp(learned), one for routing-free circuits (VF2 finds
+        #   such a layout and picks it on this score) and one for the others (Sabre, then
+        #   VF2PostLayout rescoring).  Unlike ``*_ep3`` the weights are not per qubit and the errors
+        #   are not z-scored: the score is in the same units as the fidelity it predicts.
+        self.vf2_prior = vf2_prior
+        if vf2_prior:
+            assert cz_constrained, "the vf2 prior uses the constrained CZ base count"
+            b0 = math.log(float(params.get("vf2_beta_init", 10.0)))
+            self.vf2_log_beta = nn.Parameter(torch.tensor([b0, b0]))
+        # ``*_mlps``: placement score = dot product + MLP(a, b, a ⊙ b) on the projected logical (a) and
+        # physical (b) embeddings, so errors can combine non-linearly; last layer zero-initialised.
+        self.mlp_scorer = mlp_scorer
+        if mlp_scorer:
+            hdim = 64
+            self.sc_a, self.sc_b = nn.Linear(d, hdim), nn.Linear(d, hdim, bias=False)
+            self.sc_ab = nn.Parameter(torch.randn(hdim, d) / d)
+            self.sc_out = nn.Linear(hdim, 1)
+            nn.init.zeros_(self.sc_out.weight); nn.init.zeros_(self.sc_out.bias)
         if usage_head:
             assert cz_constrained, "the usage head builds on the constrained CZ count"
             self.log_beta = nn.Parameter(torch.tensor(math.log(50.0)))
             self._paths: dict = {}
+        # ``*_pgnn_usage`` (v12): a network on the placed circuit refines the v11 usage maps
+        self.placed_gnn = PlacedCircuitGNN(d) if placed_gnn else None
+        if placed_gnn:
+            assert usage_head, "the placed-circuit network refines the usage maps"
         if cz_constrained:
             assert routing_flag and routing_est, "the constrained CZ count needs both routing inputs"
             self.cz_base = nn.Linear(N_GATE_LOCAL, 1)
             nn.init.constant_(self.cz_base.bias, 0.5413)   # softplus -> 1 CZ per gate at init
         self.tau = params.get("sinkhorn_tau", SINKHORN_DEFAULTS["sinkhorn_tau"])
+        # the temperature travels with the weights (models fine-tuned at another tau); checkpoints
+        # without it keep the constructor's value (see _load_from_state_dict)
+        self.register_buffer("tau_saved", torch.tensor(float(self.tau)))
         self.iters = params.get("sinkhorn_iters", SINKHORN_DEFAULTS["sinkhorn_iters"])
         self.w_q = nn.Linear(d, d)
         self.w_p = nn.Linear(d, d)
@@ -395,6 +494,16 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
             mats.append(F.pad(h, (0, p_max - n, 0, p_max - n)))
             offset += n
         self.register_buffer("hops", torch.stack(mats), persistent=False)
+
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict, missing_keys,
+                              unexpected_keys, error_msgs):
+        key = prefix + "tau_saved"
+        had = key in state_dict
+        super()._load_from_state_dict(state_dict, prefix, local_metadata, strict, missing_keys,
+                                      unexpected_keys, error_msgs)
+        if not had and key in missing_keys:
+            missing_keys.remove(key)
+        self.tau = float(self.tau_saved)
 
     def _sinkhorn(self, scores: torch.Tensor, n_logical: torch.Tensor,
                   n_phys: torch.Tensor) -> torch.Tensor:
@@ -427,6 +536,7 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         g = self.gate_proj(self.circuit_encoder(circuits))
         q, gq_glob, valid = self._qubits(circuits, g)
         phys, mask, dev_glob = self._devices(devices)                # (D, P, d)
+        self._dev_h = phys                                           # v12: device embeddings for the placed-circuit network
         n_dev, p_max = phys.size(0), phys.size(1)
         n_q = circuits.n_qubits.view(-1).long()
         n_circ = n_q.size(0)
@@ -435,6 +545,23 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
 
         scores = torch.einsum("bqk,dpk->bdqp", self.w_q(q_dense), self.w_p(phys))
         scores = scores / phys.size(-1) ** 0.5
+        if self.mlp_scorer:
+            a, b_ = self.w_q(q_dense), self.w_p(phys)                              # (B, Qm, d), (D, P, d)
+            hid = (self.sc_a(a).unsqueeze(1).unsqueeze(3) + self.sc_b(b_).unsqueeze(0).unsqueeze(2)
+                   + torch.einsum("bqk,dpk,hk->bdqph", a, b_, self.sc_ab))
+            scores = scores + self.sc_out(F.relu(hid)).squeeze(-1)
+        if self.err_prior:
+            ph, _ = to_dense_batch(devices.phys, devices.batch)                    # (D, P, 3)
+            e_p = ph.sum(-1, keepdim=True) if self.err_prior == 1 else ph           # (D, P, K)
+            mf = mask.float().unsqueeze(-1)
+            mu = (e_p * mf).sum(1, keepdim=True) / mf.sum(1, keepdim=True)
+            sd = (((e_p - mu) ** 2 * mf).sum(1, keepdim=True) / mf.sum(1, keepdim=True)).sqrt().clamp(min=1e-6)
+            z = (e_p - mu) / sd * mf                                                # (D, P, K)
+            w = F.softplus(self.err_w(q_dense))                                     # (B, Qm, K)
+            scores = scores - torch.einsum("bqk,dpk->bdqp", w, z)
+            self.last_err_w = w
+        if self.vf2_prior:
+            scores = scores - self._vf2_cost(circuits, devices, g, q_dense.size(1), n_circ, valid)
         assign = self._sinkhorn(scores, n_q, mask.sum(1))           # (B, D, Qm, P)
         # Kept for the v6 layout loss (training.layout_loss); not used by the head.
         self.last_assign, self.last_q_mask = assign, q_mask
@@ -491,6 +618,42 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         cost = (n_ops * g_eps * self.log_scale.exp()).sum(-1)
         return -scatter(cost, gb, dim=0, dim_size=n_circ, reduce="sum")
 
+    def _vf2_cost(self, circuits, devices, g, q_max, n_circ, valid):
+        """(B, D, Qm, P) β · estimated log-fidelity lost by putting logical q on physical p."""
+        gb = circuits.batch
+        local = circuits.gate_qubits.clamp(min=0)
+        n_op = valid.sum(1)
+        meas = circuits.x[:, GATE2IDX_MEASURE] > 0.5
+        one = ((n_op == 1) & ~meas).float()
+        cz = F.softplus(self.cz_base(circuits.x[:, :N_GATE_LOCAL])).squeeze(-1) * (n_op > 1)
+        per = torch.stack([one, meas.float(), cz], -1)              # (G, 3) per operand
+        cnt = torch.zeros(n_circ * q_max, 3, device=g.device)
+        for k in range(local.size(1)):
+            m = valid[:, k]
+            cnt = cnt.index_add(0, (gb * q_max + local[:, k])[m], per[m])
+        cnt = cnt.view(n_circ, q_max, 3) * self.log_scale.exp()
+        eps, _ = to_dense_batch(devices.phys, devices.batch)       # (D, P, 3)
+        cost = torch.einsum("bqk,dpk->bdqp", cnt, eps)
+        rf = routing_free(circuits, devices, self._rf_cache).to(g.device)     # (B, D)
+        beta = self.vf2_log_beta.exp()
+        b_ = rf * beta[0] + (1 - rf) * beta[1]
+        self.last_vf2_beta = beta
+        return b_.view(n_circ, -1, 1, 1) * cost
+
+    def _incidence(self, devices, p_max: int, e_max: int):
+        """(D, E, P) one-hot first / second end of each coupler (zero rows for padding)."""
+        n_c = devices.n_coupler.view(-1).tolist()
+        dev = devices.coupler_pairs.device
+        inc_a = torch.zeros(len(n_c), e_max, p_max, device=dev)
+        inc_b = torch.zeros_like(inc_a)
+        off = 0
+        for d, E in enumerate(n_c):
+            pr = devices.coupler_pairs[off: off + E]
+            off += E
+            inc_a[d, torch.arange(E, device=dev), pr[:, 0]] = 1.0
+            inc_b[d, torch.arange(E, device=dev), pr[:, 1]] = 1.0
+        return inc_a, inc_b
+
     # ------------------------------------------------------------------ v11 usage maps
     def _route_kernel(self, devices, p_max: int):
         """(D, P, P, E) share of a CZ between physical qubits (p, r) on each coupler: mean over
@@ -545,6 +708,11 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         K, eps_e, emask = self._route_kernel(devices, p_max)
         u_cz = torch.einsum("bdpr,dpre->bde", pair_m, K)
         eps_q, qmask = to_dense_batch(devices.phys, devices.batch)  # (D, P, 3)
+        if self.placed_gnn is not None:
+            inc_a, inc_b = self._incidence(devices, p_max, eps_e.size(1))
+            occ = assign.sum(2)
+            u_r, u_m, u_cz = self.placed_gnn(u_r, u_m, u_cz, occ, pair_m, self.hops[:, :p_max, :p_max],
+                                             self._dev_h, eps_q, eps_e, inc_a, inc_b, qmask, emask)
         s = self.log_scale.exp()
         log_f = -(s[0] * (u_r * eps_q[..., 0]).sum(-1) + s[1] * (u_m * eps_q[..., 1]).sum(-1)
                   + s[2] * (u_cz * eps_e).sum(-1))
@@ -555,6 +723,7 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
 # Gate-local inputs of the constrained CZ base: type one-hot (28), sin/cos of 3 parameters (6),
 # arity, control qubits, number of parameters — nothing about the circuit or the device.
 N_GATE_LOCAL = 28 + 6 + 3
+GATE2IDX_MEASURE = 27   # one-hot column of "measure" (last of fast_encoding.UNIQUE)
 N_RELATIVE = 5   # per-device z-scores of the first 5 qubit features (1q err, readout, T1, T2, degree)
 
 
@@ -761,7 +930,7 @@ def routing_free(circuits, devices, cache: dict | None = None) -> torch.Tensor:
 def build_model(kind: str, params: dict[str, Any], devices, device: torch.device) -> nn.Module:
     if kind == "pooled":
         return build_v2_model(params, devices, device)
-    if kind in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage"):
+    if kind in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_pgnn_usage"):
         rel = kind in ("sinkhorn_rf_rel", "sinkhorn_rf_rel_route", "sinkhorn_rf_rel_route_czc")
         model = SinkhornPlacementPredictor(
             params, dev_node_dim=devices.x.size(1) + (N_RELATIVE if rel else 0),
@@ -769,8 +938,10 @@ def build_model(kind: str, params: dict[str, Any], devices, device: torch.device
             devices=devices.clone().cpu(),   # clone: PyG .cpu() moves the batch in place
             routing_flag=kind != "sinkhorn",
             routing_est="route" in kind,
-            cz_constrained=kind.endswith(("_czc", "_usage")),
+            cz_constrained="_czc" in kind or kind.endswith("_usage"),
             usage_head=kind.endswith("_usage"),
+            err_prior=3 if "_ep3" in kind else (1 if kind.endswith("_ep") else 0),
+            mlp_scorer="_mlps" in kind, vf2_prior=kind.endswith("_vf2"), placed_gnn="_pgnn" in kind,
         )
         model.relative_dev = rel
         return model.to(device)

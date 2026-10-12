@@ -85,6 +85,7 @@ for _s in (5, 6, 7):
     MODELS[f"v8kda10@s{_s}"] = ("sinkhorn_rf_route_czc_espa", _control("generalization_v9", "v8kda10", _s))  # v8kdc10 + analytic ESP / duration / depth head
     MODELS[f"v8kds10@s{_s}"] = ("sinkhorn_rf_route_czc_espa", _control("generalization_v9", "v8kds10", _s))  # v8kda10 + per-qubit structure loss
     MODELS[f"v8kdi10@s{_s}"] = ("sinkhorn_rf_route_czc_espi", _control("generalization_v9", "v8kdi10", _s))  # exact measurements + idle-time head
+    MODELS[f"v8kdg10@s{_s}"] = ("sinkhorn_rf_route_czc_esps", _control("generalization_v9", "v8kdg10", _s))  # ESP from the ASAP schedule of the circuit DAG
 # data scaling (2026-10-11): change-loss fine-tuning on the first k calibration variants per device (c12/25/50)
 # or on all 100 with the variant labels of ~1/4 of the circuits (cq4); v8kdl40 and v11dl40 recipes
 for _s in (5, 6, 7):

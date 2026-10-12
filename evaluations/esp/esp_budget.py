@@ -36,7 +36,7 @@ from gsv3.model import SinkhornPlacementPredictor, build_model, load_hparams  # 
 
 STRUCT = EVAL / "compile_check/results/struct_labels.pt"
 ROOT = EVAL / "generalization_v9/results"
-KINDS = {"v5_espa": "sinkhorn_espa", "v8a_espa": "sinkhorn_espa", "v8kdi10": "sinkhorn_rf_route_czc_espi"}
+KINDS = {"v5_espa": "sinkhorn_espa", "v8a_espa": "sinkhorn_espa", "v8kdi10": "sinkhorn_rf_route_czc_espi", "v8kdg10": "sinkhorn_rf_route_czc_esps"}
 
 
 def choice(score, esp):

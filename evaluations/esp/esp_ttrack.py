@@ -34,12 +34,32 @@ from gsv3.model import build_model, load_hparams  # noqa: E402
 
 DEVS = ("EQE1_Top", "EQE1_Bottom", "QExa20")
 TV = EVAL / "compile_check/results/esp_tvariants"
-MODELS = {"v8kdi10 (v16)": ("v8kdi10", "sinkhorn_rf_route_czc_espi"), "v8kdg10 (v17)": ("v8kdg10", "sinkhorn_rf_route_czc_esps")}
+MODELS = {"v8kdi10 (v16), fixed gate times": ("v8kdi10", "sinkhorn_rf_route_czc_espi", False),
+          "v8kdi10 (v16) + per-qubit gate times, no training": ("v8kdi10", "sinkhorn_rf_route_czc_espi", True),
+          "v8kdg10 (v17), fixed gate times": ("v8kdg10", "sinkhorn_rf_route_czc_esps", False),
+          "v8kdg10 (v17) + per-qubit gate times, no training (v18 zero-shot)": ("v8kdg10", "sinkhorn_rf_route_czc_esps", True),
+          "v8kdt10 (v18): v17 fine-tuned on T1 / T2 / gate-time variants": ("v8kdt10", "sinkhorn_rf_route_czc_esps", True)}
 T_FIX = {"QExa20": 10.0}
 
 
-def raw_graphs() -> dict:
-    """Raw device graphs of every T / duration variant; T1 / T2 read from the target, where the variants change them."""
+def _times(be, t) -> list:
+    """Per active qubit [r, measure, mean incident CZ] durations in µs (v18 ``raw["t"]``)."""
+    qubits = list(getattr(be, "active_qubits", None) or range(be.num_qubits))
+    pos = {q: i for i, q in enumerate(qubits)}
+    cz = {i: [] for i in range(len(qubits))}
+    for (a, b), p in t["cz"].items():
+        if p is not None and p.duration and a in pos and b in pos:
+            cz[pos[a]].append(p.duration); cz[pos[b]].append(p.duration)
+    out = []
+    for q in qubits:
+        r, m = t["r"].get((q,)), t["measure"].get((q,))
+        out.append([r.duration * 1e6, m.duration * 1e6, float(np.mean(cz[pos[q]])) * 1e6 if cz[pos[q]] else 0.130])
+    return out
+
+
+def raw_graphs(with_t: bool = False) -> dict:
+    """Raw device graphs of every T / duration variant; T1 / T2 read from the target, where the variants change them.
+    ``with_t``: also the per-qubit gate durations (v18), else the model uses the uniform GATE_US."""
     from esp_tvariants import tvariants
     import gsv3  # noqa: F401
     from gsv2.devices import _backend_graph
@@ -49,6 +69,8 @@ def raw_graphs() -> dict:
         shim = SimpleNamespace(target=t, qubit_properties=t.qubit_properties, num_qubits=be.num_qubits,
                                active_qubits=getattr(be, "active_qubits", None))
         out[k] = dict(zip(("nodes", "edges", "edge_feats"), _backend_graph(shim)))
+        if with_t:
+            out[k]["t"] = _times(be, t)
     return out
 
 
@@ -81,12 +103,13 @@ def main():
     torch.set_num_threads(8)
     params = load_hparams()
     raw = raw_graphs()
+    raw_t = raw_graphs(with_t=True)
     keys = list(raw)
     ref = torch.load(paths.V2_DEVICE_GRAPHS, weights_only=False)["raw"]
     for d in DEVS:         # sanity: the original devices must match the training-time graphs
         a, b = np.array(raw[f"{d}/orig"]["nodes"]), np.array(ref[d]["nodes"])
         print(f"orig graph {d}: {'OK' if a.shape == b.shape and np.allclose(a, b, atol=1e-6) else 'MISMATCH'}", flush=True)
-    dev = variant_batch(raw, keys, params["lap_pe"])
+    devs = {False: variant_batch(raw, keys, params["lap_pe"]), True: variant_batch(raw_t, keys, params["lap_pe"])}
     names, recs = truth()
     data = {g.circuit_name: g for g in torch.load(paths.DATA_DIR / "graph_dataset_expected_fidelity.pt", weights_only=False)}
     names = [n for n in names if n in data]
@@ -95,7 +118,8 @@ def main():
     L = [f"# Do the ESP heads follow T1 / T2 and gate-duration changes? {args.tag}", "",
          f"{len(names)} calibration-test circuits × 3 devices; per kind 2 variants per device; control-split models, "
          "mean over seeds 5–7. Δ = variant − original. Only T1 / T2 or durations change, so the true Δlog F is 0.", ""]
-    for mname, (run, kind) in MODELS.items():
+    for mname, (run, kind, use_t) in MODELS.items():
+        dev = devs[use_t]
         res = {}
         for seed in (5, 6, 7):
             sfx = "" if seed == 5 else f"_s{seed}"

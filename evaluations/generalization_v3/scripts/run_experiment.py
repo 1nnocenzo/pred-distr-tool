@@ -107,6 +107,25 @@ def attach_esp(dataset, path: Path) -> None:
     logger.info("ESP / duration / depth labels (%s): %d/%d circuits", path, found, len(dataset.data))
 
 
+def attach_tvar(dataset, directory: Path) -> None:
+    """v18: ``d.tdec`` / ``d.tdur`` = (1, 1 + K, n_devices) ESP decay and duration (µs) of the stored compilation
+    rescheduled on the original devices (row 0) and on K T1 / T2 / gate-duration variants
+    (compile_check/esp_tvar_train.py: the layout never moves, so rescheduling is exact); NaN if missing."""
+    import math
+    import torch
+    labels = torch.load(Path(directory) / "esp_tvar_labels.pt", weights_only=False)
+    k = next(iter(labels.values()))["decay"].size(0)
+    found = 0
+    for d, name in zip(dataset.data, dataset.names):
+        r = labels.get(name)
+        if r is not None:
+            d.tdec, d.tdur, found = r["decay"].float().unsqueeze(0), r["duration"].float().unsqueeze(0), found + 1
+        else:
+            d.tdec = torch.full((1, k, len(DEVICE_NAMES)), math.nan)
+            d.tdur = torch.full((1, k, len(DEVICE_NAMES)), math.nan)
+    logger.info("T / duration variant labels (%s): %d/%d circuits, %d variants", directory, found, len(dataset.data), k - 1)
+
+
 def attach_struct(dataset, path: Path) -> None:
     """v15: ``d.struct`` = (tmax µs, mmax, omax, active) per device ``(1, n_devices, 4)`` of the stored seed-0
     compilation (compile_check/struct_labels.py); NaN if missing."""
@@ -234,6 +253,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--esp-path", type=Path, default=None,
                    help="v13: ESP / duration / depth labels (compile_check/results/esp_labels.pt)")
     p.add_argument("--esp-lambda", type=float, default=None, help="v13: weight of the ESP / duration / depth loss")
+    p.add_argument("--tvar-path", type=Path, default=None,
+                   help="v18: directory with esp_tvar_labels.pt and tvar_raw.json (compile_check/esp_tvar_train.py)")
+    p.add_argument("--tvar-lambda", type=float, default=None,
+                   help="v18: weight of the change loss on ESP decay and log duration under T1 / T2 / gate-time variants")
+    p.add_argument("--tvar-f-lambda", type=float, default=None,
+                   help="v18: weight of the invariance of log F under those variants (true change 0; default = tvar-lambda)")
     p.add_argument("--struct-path", type=Path, default=None,
                    help="v15: per-qubit structure labels (compile_check/results/struct_labels.pt)")
     p.add_argument("--struct-lambda", type=float, default=None, help="v15: weight of the per-qubit structure loss (*_espa)")
@@ -309,7 +334,7 @@ def main() -> int:
     # Opt-in v5b keys: only present when requested, so older configurations (and
     # their checkpoints) are unchanged.
     for key in ("epoch_budget", "swa_frac", "tau_start", "layout_lambda", "layout_loss", "count_lambda",
-                "aug_p_orig", "delta_lambda", "aug_variants", "count_weights", "usage_lambda", "usage_aug_lambda", "react_lambda", "placement_lr_mult", "delta_corr_lambda", "esp_lambda", "esp_weights", "struct_lambda"):
+                "aug_p_orig", "delta_lambda", "aug_variants", "count_weights", "usage_lambda", "usage_aug_lambda", "react_lambda", "placement_lr_mult", "delta_corr_lambda", "esp_lambda", "esp_weights", "struct_lambda", "tvar_lambda", "tvar_f_lambda"):
         if getattr(args, key) is not None:
             protocol[key] = getattr(args, key)
     if args.model == "v1":
@@ -369,6 +394,11 @@ def main() -> int:
         if not args.model.endswith(("_esp", "_espa", "_espi", "_esps")) or args.esp_path is None:
             raise SystemExit("--esp-lambda needs a *_esp / *_espa model and --esp-path")
         attach_esp(dataset, args.esp_path)
+    if args.tvar_lambda:
+        if not args.model.endswith(("_espa", "_espi", "_esps")) or args.tvar_path is None:
+            raise SystemExit("--tvar-lambda needs an *_espa / *_espi / *_esps model and --tvar-path")
+        attach_tvar(dataset, args.tvar_path)
+        protocol["tvar_path"] = str(args.tvar_path)
     if args.struct_lambda:
         if not args.model.endswith(("_espa", "_espi", "_esps")) or args.struct_path is None:
             raise SystemExit("--struct-lambda needs a *_espa model and --struct-path")

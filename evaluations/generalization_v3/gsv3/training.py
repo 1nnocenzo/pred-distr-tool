@@ -376,6 +376,23 @@ def train_model(
     # uses one calibration variant, so this is the local-tracking metric itself); added to the MSE
     corr_lambda = float(protocol.get("delta_corr_lambda", 0) or 0)
     dc_sum, dc_n = 0.0, 0
+    # v18 (opt-in): T1 / T2 / gate-duration variants (``tvar_path``: device graphs with per-qubit durations and
+    # labels ``tdec`` / ``tdur`` on the graphs).  Every batch is also run on one random variant: the change of the
+    # ESP decay (as log1p(−decay), like esp_loss) and of log duration is fitted to the rescheduled compilation's, and
+    # log F must not move (the compiler's layout and counts do not change with T1 / T2 / durations).
+    tvar_lambda = float(protocol.get("tvar_lambda", 0) or 0)
+    tvar_f_lambda = float(protocol.get("tvar_f_lambda", tvar_lambda) or 0)
+    tv_acc, tv_n = [0.0, 0.0, 0.0], 0
+    if tvar_lambda:
+        import json as _json
+        from .devices import variant_batch
+        raw_t = _json.loads((Path(protocol["tvar_path"]) / "tvar_raw.json").read_text())
+        names_t = ("EQE1_Top", "EQE1_Bottom", "QExa20")
+        n_tv = sum(1 for k in raw_t if k.startswith(names_t[0] + "/t"))
+        tvar_devices = [variant_batch(raw_t, [f"{d}/t{j}" for d in names_t], params["lap_pe"]).to(device)
+                        for j in range(n_tv)]
+        tv_rng = np.random.default_rng(seed + 7)
+        logger.info("[%s] T / duration variants: %d sets, lambda %.3g (F invariance %.3g)", tag, n_tv, tvar_lambda, tvar_f_lambda)
     if delta_lambda and aug_devices is None:
         raise ValueError("delta_lambda needs calib_aug")
         logger.info("[%s] calibration augmentation: variant sets %s of %d, p(orig) = %.2f",
@@ -441,6 +458,7 @@ def train_model(
                 batch.layout = batch.layout_aug[:, j]
                 batch.counts = batch.counts_aug[:, j]
             log_pred = model(batch, batch_devices)
+            esp_main = getattr(model, "last_esp", None)     # v18: the original-calibration ESP, before other passes
             y = batch.y.float().view(log_pred.shape)
             w = (y >= 0).float()            # v8b: circuits without a label on this variant
             n_w = w.sum().clamp(min=1)
@@ -534,6 +552,25 @@ def train_model(
                         loss = loss + usage_aug_lambda * ualoss
                         ua_loss, ua_corr, ua_n = ua_loss + ualoss.item(), ua_corr + uacorr, ua_n + 1
                 dl_sum, dl_n = dl_sum + dloss.item(), dl_n + 1
+            if tvar_lambda and batch_devices is devices and esp_main is not None:
+                dec_o, ldur_o = esp_main[0], esp_main[1]
+                jt = int(tv_rng.integers(len(tvar_devices)))
+                log_tv = model(batch, tvar_devices[jt])
+                dec_v, ldur_v = model.last_esp[0], model.last_esp[1]
+                td = batch.tdec.view(-1, batch.tdec.size(-2), batch.tdec.size(-1))      # (B, 1 + K, D)
+                tu = batch.tdur.view_as(td)
+                t_dec = torch.log1p(-td[:, 1 + jt].clamp(max=0)) - torch.log1p(-td[:, 0].clamp(max=0))
+                t_dur = torch.log(tu[:, 1 + jt].clamp(min=1e-6)) - torch.log(tu[:, 0].clamp(min=1e-6))
+                ok = torch.isfinite(t_dec) & torch.isfinite(t_dur)
+                p_dec = torch.log1p(-dec_v.clamp(max=0)) - torch.log1p(-dec_o.clamp(max=0))
+                p_dur = ldur_v - ldur_o
+                n_ok = ok.sum().clamp(min=1)
+                l_dec = torch.where(ok, (p_dec - torch.nan_to_num(t_dec)) ** 2, torch.zeros_like(p_dec)).sum() / n_ok
+                l_dur = torch.where(ok, (p_dur - torch.nan_to_num(t_dur)) ** 2, torch.zeros_like(p_dur)).sum() / n_ok
+                l_f = ((torch.clamp(log_tv, max=0.0) - torch.clamp(log_pred, max=0.0)) ** 2).mean()
+                loss = loss + tvar_lambda * (l_dec + l_dur) + tvar_f_lambda * l_f
+                tv_acc = [a + b for a, b in zip(tv_acc, (l_dec.item(), l_dur.item(), l_f.item()))]
+                tv_n += 1
             optimizer.zero_grad()
             loss.backward()
             if protocol["grad_clip"]:
@@ -578,6 +615,11 @@ def train_model(
             history[-1]["train_usage_aug_cz_corr"] = ua_corr / max(1, ua_n)
             logger.info("[%s] epoch %04d  usage_aug_mse=%.4f  usage_aug_cz_corr=%.3f", tag, epoch,
                         history[-1]["train_usage_aug_mse"], history[-1]["train_usage_aug_cz_corr"])
+        if tvar_lambda:
+            for k, v in zip(("train_tvar_decay_mse", "train_tvar_duration_mse", "train_tvar_f_mse"), tv_acc):
+                history[-1][k] = v / max(1, tv_n)
+            logger.info("[%s] epoch %04d  tvar decay_mse=%.4f  duration_mse=%.4f  f_mse=%.5f", tag, epoch,
+                        *(history[-1][k] for k in ("train_tvar_decay_mse", "train_tvar_duration_mse", "train_tvar_f_mse")))
         if esp_lambda:
             for k, v in zip(("train_esp_decay_mse", "train_log_duration_mse", "train_log_depth_mse"), esp_acc):
                 history[-1][k] = v / max(1, esp_n)

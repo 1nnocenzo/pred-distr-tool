@@ -660,24 +660,25 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         Per logical qubit q, the count head's gates spread over their operands (1-qubit gates and measurements
         split over the operands, every CZ occupies two): busy_q (µs, measurements included), gate time t_q
         (µs, no measurements), measurements m_q, operations o_q.  inv_t = 1 / min(T1, T2) through the placement."""
-        from .devices import GATE_US
         b, n_dev, q_max, _ = assign.shape
         cnt = valid.sum(1).clamp(min=1).float().unsqueeze(1)                      # operands per gate
         two = torch.where(cnt > 1, 2.0 / cnt, torch.zeros_like(cnt))
-        t_us = n_ops.new_tensor(GATE_US)
-        per = torch.stack([n_ops[..., 0] * t_us[0] / cnt + n_ops[..., 2] * t_us[2] * two,
+        t_g = self.gate_times(devices, assign, valid, local, gb)                   # (G, D, 3) µs: r, measure, cz
+        per = torch.stack([n_ops[..., 0] * t_g[..., 0] / cnt + n_ops[..., 2] * t_g[..., 2] * two,
                            n_ops[..., 1] / cnt,
-                           (n_ops[..., 0] + n_ops[..., 1]) / cnt + n_ops[..., 2] * two], -1)   # (G, D, 3)
-        acc = torch.zeros(b * q_max, n_dev, 3, device=g.device)
+                           (n_ops[..., 0] + n_ops[..., 1]) / cnt + n_ops[..., 2] * two,
+                           n_ops[..., 1] * t_g[..., 1] / cnt], -1)   # (G, D, 4)
+        acc = torch.zeros(b * q_max, n_dev, 4, device=g.device)
         for k in range(local.size(1)):
             m = valid[:, k]
             acc = acc.index_add(0, (gb * q_max + local[:, k])[m], per[m])
-        t_q, m_q, o_q = acc.view(b, q_max, n_dev, 3).permute(0, 2, 1, 3).unbind(-1)   # (B, D, Qm)
-        busy = t_q + m_q * t_us[1]
+        t_q, m_q, o_q, mt_q = acc.view(b, q_max, n_dev, 4).permute(0, 2, 1, 3).unbind(-1)   # (B, D, Qm)
+        busy = t_q + mt_q
         active = (busy > 0).float()
         coh, _ = to_dense_batch(devices.coh, devices.batch)                          # (D, P) 1/µs
         f = {"busy": busy, "active": active, "inv_t": torch.einsum("bdqp,dp->bdq", assign, coh),
-             "counts": self.last_counts, "tmax": t_q.amax(-1), "mmax": m_q.amax(-1), "omax": o_q.amax(-1)}
+             "counts": self.last_counts, "tmax": t_q.amax(-1), "mmax": m_q.amax(-1), "omax": o_q.amax(-1),
+             "mtmax": mt_q.amax(-1)}
         if self.esp_head == "v13" or getattr(self, "esp_all_features", False):   # probes cache both heads' inputs
             g_pool = scatter(g, gb, dim=0, dim_size=n_circ, reduce="mean")
             f["emb"] = torch.cat([g_pool.unsqueeze(1).expand(-1, n_dev, -1),
@@ -689,8 +690,26 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         if self.esp_head == "s":
             if not hasattr(self, "_lvl_cache"):
                 self._lvl_cache = {}
-            f.update(dag_schedule(circuits, n_ops, self._lvl_cache))
+            f.update(dag_schedule(circuits, n_ops, self._lvl_cache, gate_t=t_g))
         return f
+
+    @staticmethod
+    def gate_times(devices, assign, valid, local, gb) -> torch.Tensor:
+        """v18: (G, D, 3) durations in µs of r, measure and CZ for every logical gate on every device: each physical
+        qubit's times (``devices.tg``, uniform GATE_US when absent) through the placement, averaged over the gate's
+        operands.  With uniform times this is exactly GATE_US, so models trained before v18 are unchanged."""
+        from .devices import GATE_US
+        b, n_dev, q_max, _ = assign.shape
+        n_g = local.size(0)
+        if not hasattr(devices, "tg"):
+            return assign.new_tensor(GATE_US).expand(n_g, n_dev, 3)
+        tg, _ = to_dense_batch(devices.tg, devices.batch)                            # (D, P, 3)
+        tq = torch.einsum("bdqp,dpk->bqdk", assign, tg).reshape(b * q_max, n_dev, 3)
+        cnt = valid.sum(1).clamp(min=1).float().view(-1, 1, 1)
+        acc = assign.new_zeros(n_g, n_dev, 3)
+        for k in range(local.size(1)):
+            acc = acc + tq[gb * q_max + local[:, k]] * valid[:, k].float().view(-1, 1, 1)
+        return acc / cnt
 
     @staticmethod
     def esp_from_features(mlp, f: dict, kind: str):
@@ -728,10 +747,10 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
                 return -idle * inv_m, torch.log(dur), logdep
             if kind == "i":
                 # structural idle time: every active qubit waits for the busiest gate chain and the most measurements
-                base = (((f["tmax"] + GATE_US[1] * f["mmax"]).unsqueeze(-1) - busy).clamp(min=0) * active).sum(-1)
+                base = (((f["tmax"] + f["mtmax"]).unsqueeze(-1) - busy).clamp(min=0) * active).sum(-1)
                 z.append(torch.log1p(base).unsqueeze(-1))
             out = mlp(torch.cat(z, -1))
-            dur = GATE_US[1] * f["mmax"] + f["tmax"] * (1 + F.softplus(out[..., 0])) + 1e-3
+            dur = f["mtmax"] + f["tmax"] * (1 + F.softplus(out[..., 0])) + 1e-3
             logdep = torch.log(f["omax"].clamp(min=1)) + F.softplus(out[..., 1])
             if kind == "i":
                 # v16: total idle time predicted directly (not as duration − busy, a small difference of large
@@ -1073,7 +1092,7 @@ def _dag_levels(edge_index: np.ndarray, n: int) -> np.ndarray:
 
 
 @torch.no_grad()
-def dag_schedule(circuits, n_ops: torch.Tensor, cache: dict | None = None) -> dict:
+def dag_schedule(circuits, n_ops: torch.Tensor, cache: dict | None = None, gate_t: torch.Tensor | None = None) -> dict:
     """v17: ASAP schedule of each circuit's logical gate DAG with every gate weighted by its compiled cost.
 
     n_ops (G, D, 3) = r / measure / CZ per gate and device (measurements exact upstream).  Each operand of a gate is
@@ -1082,15 +1101,19 @@ def dag_schedule(circuits, n_ops: torch.Tensor, cache: dict | None = None) -> di
     (longest path in operations), idle µs = Σ_active logical qubits (duration − busy).  No gradient: the counts are
     trained by the count loss; the ESP head learns a correction on top."""
     from .devices import GATE_US
-    t1, tm, tcz = GATE_US
     dev = n_ops.device
     no = n_ops.detach().float().cpu().numpy()
+    if gate_t is None:                     # v18: per-gate durations through the placement (G, D, 3)
+        t1, tm, tcz = GATE_US
+    else:
+        gt = gate_t.detach().float().cpu().numpy()
+        t1, tm, tcz = gt[..., 0], gt[..., 1], gt[..., 2]
     G, D = no.shape[0], no.shape[1]
     gq = circuits.gate_qubits.cpu().numpy()
     gb = circuits.batch.cpu().numpy()
     meas = circuits.x[:, GATE2IDX_MEASURE].cpu().numpy() > 0.5
     n_op = (gq >= 0).sum(1).clip(min=1)
-    t_gate = np.where(meas[:, None], tm, no[..., 0] * t1 / n_op[:, None] + no[..., 2] * tcz)
+    t_gate = np.where(meas[:, None], tm, no[..., 0] * t1 / n_op[:, None] + no[..., 2] * tcz)   # scalars or (G, D)
     o_gate = np.where(meas[:, None], 1.0, no[..., 0] / n_op[:, None] + no[..., 2])
     ei = circuits.edge_index.cpu().numpy()
     # levels per circuit (cached by name), then global

@@ -75,6 +75,15 @@ def _coherence(raw: dict, g, name: str = "") -> None:
     g.coh = (10.0 ** (-torch.minimum(nodes[:, 2], nodes[:, 3])) * 1e-6 / fix).float()
 
 
+def _gate_times(raw: dict, g) -> None:
+    """v18: ``g.tg`` (P, 3) = durations in µs of the r gate, the measurement and the mean incident CZ of every
+    physical qubit, from ``raw["t"]`` when the device graph carries them (T / duration variants,
+    compile_check/esp_tvariants.py), else the uniform GATE_US of the original devices."""
+    n = len(raw["nodes"])
+    t = raw.get("t")
+    g.tg = (torch.tensor(t, dtype=torch.float32) if t is not None else torch.tensor(GATE_US).float().expand(n, 3).clone())
+
+
 def _coupler_errors(raw: dict, g) -> None:
     """v11 usage-map head: the couplers of the device in ``raw["edges"]`` order, as local node
     pairs (``coupler_pairs``, E x 2), their unstandardised ``-log(1-e)`` CZ error
@@ -99,6 +108,7 @@ def load_devices(path: Path, device_names: tuple[str, ...], lap_pe: int = 0,
             assert g.phys.size(0) == g.num_nodes, name
             _coupler_errors(raw[name], g)
             _coherence(raw[name], g, name)
+            _gate_times(raw[name], g)
     logger.info("Device graphs: node features %d (Laplacian PE %d), physical errors %s",
                 graphs[0].x.size(1), lap_pe, physical_errors)
     return Batch.from_data_list(graphs)
@@ -134,5 +144,6 @@ def variant_batch(raw_variants: dict, keys: list[str], lap_pe: int, path: Path |
                                    "edge_feats": r["edge_feats"]})
         _coupler_errors(r, g)
         _coherence(r, g, k)
+        _gate_times(r, g)
         graphs.append(g)
     return Batch.from_data_list(graphs)

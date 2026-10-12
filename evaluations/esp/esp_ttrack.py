@@ -39,7 +39,8 @@ MODELS = {"v8kdi10 (v16), fixed gate times": ("v8kdi10", "sinkhorn_rf_route_czc_
           "v8kdg10 (v17), fixed gate times": ("v8kdg10", "sinkhorn_rf_route_czc_esps", False),
           "v8kdg10 (v17) + per-qubit gate times, no training (v18 zero-shot)": ("v8kdg10", "sinkhorn_rf_route_czc_esps", True),
           "v8kdt10 (v18): v17 fine-tuned on T1 / T2 / gate-time variants": ("v8kdt10", "sinkhorn_rf_route_czc_esps", True),
-          "v8kdt10b (v18b): as v18, change loss × 0.1, F invariance × 3": ("v8kdt10b", "sinkhorn_rf_route_czc_esps", True)}
+          "v8kdt10b (v18b): as v18, change loss × 0.1, F invariance × 3": ("v8kdt10b", "sinkhorn_rf_route_czc_esps", True),
+          "v8kdg10 (v17) weights in the formula head, hard placement (v19 zero-shot)": ("v8kdg10", "sinkhorn_rf_route_czc_espf", True)}
 T_FIX = {"QExa20": 10.0}
 
 

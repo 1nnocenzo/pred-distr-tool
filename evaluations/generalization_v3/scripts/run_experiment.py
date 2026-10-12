@@ -57,7 +57,7 @@ EXPERIMENTS = {
 
 #: ``v1`` = the original v1 predictor (genstudy: linear target, 3 fixed outputs,
 #: random validation split), run unchanged through ``genstudy.experiment.run_split``.
-ALL_MODELS = (*MODEL_KINDS, *(k + s for k in SINKHORN_KINDS for s in ("_esp", "_espa", "_espi", "_esps") if k + s not in MODEL_KINDS), "v1")
+ALL_MODELS = (*MODEL_KINDS, *(k + s for k in SINKHORN_KINDS for s in ("_esp", "_espa", "_espi", "_esps", "_espf") if k + s not in MODEL_KINDS), "v1")
 
 
 def attach_layouts(dataset, path: Path) -> None:
@@ -391,16 +391,16 @@ def main() -> int:
             raise SystemExit("--count-lambda needs a physics-head model and --counts-path")
         attach_counts(dataset, args.counts_path)
     if args.esp_lambda:
-        if not args.model.endswith(("_esp", "_espa", "_espi", "_esps")) or args.esp_path is None:
+        if not args.model.endswith(("_esp", "_espa", "_espi", "_esps", "_espf")) or args.esp_path is None:
             raise SystemExit("--esp-lambda needs a *_esp / *_espa model and --esp-path")
         attach_esp(dataset, args.esp_path)
     if args.tvar_lambda:
-        if not args.model.endswith(("_espa", "_espi", "_esps")) or args.tvar_path is None:
+        if not args.model.endswith(("_espa", "_espi", "_esps", "_espf")) or args.tvar_path is None:
             raise SystemExit("--tvar-lambda needs an *_espa / *_espi / *_esps model and --tvar-path")
         attach_tvar(dataset, args.tvar_path)
         protocol["tvar_path"] = str(args.tvar_path)
     if args.struct_lambda:
-        if not args.model.endswith(("_espa", "_espi", "_esps")) or args.struct_path is None:
+        if not args.model.endswith(("_espa", "_espi", "_esps", "_espf")) or args.struct_path is None:
             raise SystemExit("--struct-lambda needs a *_espa model and --struct-path")
         attach_struct(dataset, args.struct_path)
     if args.usage_lambda:

@@ -61,7 +61,8 @@ def is_qaoa(n: str) -> bool:
 def new_graph(old, F):
     """Rebuild one qaoa graph from its new QASM as the original pipeline did."""
     from build_qubit_dataset import _process
-    from mqt.predictor.ml.helper import create_dag, create_feature_vector, get_openqasm3_gates
+    from encoding import create_dag, get_openqasm3_gates          # src/model/encoding.py, as build_qubit_dataset.py
+    from mqt.predictor.ml.helper import create_feature_vector       # equals the stored feature_vec (checked)
     from qiskit import qasm3, transpile
     name = old.circuit_name
     path = QASM / f"{name}.qasm"
@@ -138,6 +139,16 @@ def main():
     q_idx = [i for i, g in enumerate(data) if is_qaoa(g.circuit_name)]
     have = [i for i in q_idx if data[i].circuit_name in lay]
     print(f"dataset: {len(data)} graphs, qaoa {len(q_idx)}, with a new label {len(have)}")
+    # self-check: the rebuild applied to unchanged circuits must reproduce their stored graphs exactly
+    for ref_name in ("qnn/qnn_q4_v0000", "vqe_su2/vqe_su2_q6_v0000", "ghz/ghz_q10_v0000"):
+        ref = next((g for g in data if g.circuit_name == ref_name), None)
+        if ref is None:
+            continue
+        r = new_graph(ref, ref.y.view(-1).tolist())
+        same = (torch.equal(r.x, ref.x) and torch.equal(r.edge_index, ref.edge_index) and torch.equal(r.gate_qubits, ref.gate_qubits)
+                and int(r.n_qubits) == int(ref.n_qubits) and torch.allclose(r.feature_vec, ref.feature_vec, atol=1e-5))
+        print(f"  self-check {ref_name}: rebuilt graph identical = {same}")
+        assert same, f"rebuild does not reproduce {ref_name}"
     if have:
         g0 = new_graph(data[have[0]], lay[data[have[0]].circuit_name])
         o = data[have[0]]

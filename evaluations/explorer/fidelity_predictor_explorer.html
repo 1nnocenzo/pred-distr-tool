@@ -322,7 +322,7 @@ table.matrix { width: 100%; min-width: 760px; border-collapse: collapse; font-va
       <span class="kicker">R² of F on held-out splits · tracking = correlation (not R²) of predicted vs true Δlog F under local calibration changes</span>
     </div>
     <div class="matrix-wrap"><table class="matrix" id="matrix"></table></div>
-    <p class="note"><b>Reading tracking.</b> Local calibration changes move F by 0.006 (median) to 0.048 (90th percentile), so tracking is a correlation of small changes while R² of F after the change stays 0.99. In practice: re-predicting after a change cuts the fidelity lost to a wrong device choice by 21% with v8kd40 (regret 0.0062 → 0.0049, right device 64%) and by 9% with v8a; the best of three devices changes in 29% of the cases. Mean over the seeds listed (5, 6, 7). LOFO = one circuit family held out, LOGO = a group of families held out, control = random split. The best value of each column is in teal. Label noise caps local tracking near 0.85; the oracle study puts the ceiling of the current head near 0.6.</p>
+    <p class="note"><b>Reading tracking.</b> Local calibration changes move F by 0.006 (median) to 0.048 (90th percentile), so tracking is a correlation of small changes while R² of F after the change stays 0.99. In practice: re-predicting after a local change cuts the fidelity lost to a wrong device choice from 0.0050–0.0068 to 0.0037 with v8kdc10 (21% with v8kd40, 9% with v8a); the best of three devices changes in 29% of the cases. Mean over the seeds listed (5, 6, 7). LOFO = one circuit family held out, LOGO = a group of families held out, control = random split. The best value of each column is in teal. Label noise caps local tracking near 0.85; the oracle study puts the ceiling of the current head near 0.6.</p>
   </section>
 </div>
 
@@ -610,6 +610,38 @@ const PLACE_PROBE = { eyebrow: "Placement (analysis)", title: "What the placemen
     { kind: "stack", title: "Weight of each error change on where the qubits go", layers: [["compiler", "readout −0.024 · CZ −0.016 · 1q −0.009", ""], ["model", "CZ −0.028 · readout −0.019 · 1q −0.009", ""]] }],
   src: "diagnostics_v4v5/tracking_anatomy.py · placement_probe.py · compile_check/compiler_consistency.py" };
 
+
+const HEAD_V8KDC = { eyebrow: "Output (v8kdc10)", title: "Change loss + correlation term",
+  lead: "The v8kdl40 fine-tuning plus a term that rewards getting the direction and ranking of calibration changes right, not only their size: 1 − Pearson correlation of predicted vs true Δlog F, per batch and device, weight 0.1.",
+  sections: [
+    { kind: "formula", title: "Fine-tuning loss", text: "L = L_v8kdl40 + 0.1 · (1 − corr(ΔlogF̂, ΔlogF))     per batch and device" },
+    { kind: "facts", items: [["local tracking", "0.63 → 0.66 (3 seeds; ensemble 0.69)"], ["regret after a local change, re-predicted", "0.0037"], ["generalization", "as v8kdl40"], ["weights 0.02 / 0.3 / 1", "no better than 0.1"]] }],
+  src: "gsv3/training.py · delta_corr_lambda" };
+const ESP_FORMULA = "ESP = F · Π_active q exp(−idle_q / min(T1_q, T2_q))     (MQT, ASAP schedule)\nidle_q = duration − busy_q";
+const HEAD_ESP13 = { eyebrow: "ESP (v13, v8kde10)", title: "ESP, duration and depth heads",
+  lead: "Same fidelity model; a second head predicts the compiled circuit's duration and depth and the ESP decay from the circuit and device embeddings. Duration = busiest qubit × learned factor, depth = free output.",
+  sections: [
+    { kind: "formula", title: "Estimated success probability", text: ESP_FORMULA },
+    { kind: "facts", items: [["control", "duration error 6%, ESP R² 0.98"], ["unseen families", "depth error up to 96% (variational), duration 19–66%"], ["F", "unchanged"]] }],
+  src: "gsv3/model.py · esp_head v13 · esp/esp_eval.py" };
+const HEAD_ESPA = { eyebrow: "ESP (v14, v8kda10)", title: "Analytic ESP head",
+  lead: "Duration and depth from the circuit's structure only (busiest qubit's gate time, measurements and operations from the count head), no circuit embedding: an unseen family gets the rule learned on the others.",
+  sections: [
+    { kind: "formula", title: "Head", text: "duration = 15 µs · max_q m_q + max_q t_q · (1 + softplus(a))\ndepth    = max_q o_q · exp(softplus(b))\n" + ESP_FORMULA },
+    { kind: "facts", items: [["depth error, variational", "96% → 39%"], ["duration", "still 18–55% on unseen families"], ["why (error budget)", "the count head invents measurements: 1.4 per qubit on qaoa, which has none"]] }],
+  src: "gsv3/model.py · esp_from_features · esp/esp_budget.py, esp_activity.py" };
+const HEAD_ESPI = { eyebrow: "ESP (v16, v8kdi10)", title: "Exact measurements + idle time",
+  lead: "Measurements read from the circuit (compilation never adds or removes one) and the total idle time predicted directly, instead of as duration − busy time, a small difference of two large numbers.",
+  sections: [
+    { kind: "formula", title: "Head", text: "idle = Σ_active (t_max + 15 µs · m_max − busy_q) · exp(c)\ndecay = −idle · mean_active 1/min(T1, T2)" },
+    { kind: "facts", items: [["ESP R², qnn / variational", "0.40 / 0.46 → 0.97 / 0.90"], ["duration error, qnn / variational", "3% / 6%"], ["cost", "F of qaoa 0.970 → 0.926: exact measurements also enter F"]] }],
+  src: "gsv3/model.py · esp_head i" };
+const HEAD_ESPS = { eyebrow: "ESP (v17, v8kdg10)", title: "ASAP schedule of the circuit DAG",
+  lead: "Duration, depth and idle time computed by scheduling the circuit's own gate graph with every gate weighted by its predicted compiled cost (measurements exact); a small network only corrects them. F keeps its own counts.",
+  sections: [
+    { kind: "formula", title: "Schedule", text: "start(g) = max over predecessors on its wires of finish(p)\nfinish(g) = start(g) + r_g · 42 ns / operands + cz_g · 130 ns   (measure: 15 µs)\nduration = max finish · depth = longest path in operations\nidle = Σ_q (duration − busy_q) · exp(c) + duration · softplus(d)   (routing ancillas)" },
+    { kind: "facts", items: [["schedule alone, no training", "duration error 4–27% on unseen families (head: 20–81%)"], ["cost", "+2 ms per circuit (3 devices)"], ["status", "training, 3 seeds"]] }],
+  src: "gsv3/model.py · dag_schedule · esp/esp_dag.py" };
 const P7 = ["Sinkhorn placement", "logical × physical,", "one to one, per device", "τ = 0.3 · 20 iterations", "loss v7 · λ 0.1"];
 const G_RF = ["643 values", "+ routing-free flag"], G_RE = ["644 values", "+ flag + routing estimate"];
 const M_CZC = ["cz = base · (1 + κ · hops)", "count loss · cz-weighted"];
@@ -712,7 +744,7 @@ const VERSIONS = [
     changed: ["din", "head"], o: { din: DIN_V8D, head: HEAD_V8KD, gate: GATE_V8S, mlp: MLP_CZC },
     diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: M_CZC, head: "fidelity + change loss" },
     r: [null, null, null, 0.996, 0.54], n: 1 },
-  { k: "v8kd40", parent: "v8kd", path: true, s: "main", label: "main model", what: "The v8kd fine-tuning for 40 epochs, on every split.",
+  { k: "v8kd40", parent: "v8kd", path: true, s: "line", label: "previous main", what: "The v8kd fine-tuning for 40 epochs, on every split.",
     why: "Check that the change loss does not cost generalization, and give it more epochs (its training loss was still falling at 20).",
     changed: ["din", "head"], o: { din: DIN_V8D, head: HEAD_V8KD, gate: GATE_V8S, mlp: MLP_CZC, train: TRAIN_K },
     diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: M_CZC, head: "fidelity + change loss" },
@@ -727,7 +759,7 @@ const VERSIONS = [
     changed: ["head"], o: { head: HEAD_V11, gate: GATE_V8S, din: DIN_V8D },
     diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: ["→ U_cz(p,p′), U_r(p), U_m(p)", "usage loss"], head: "fidelity + change + usage", headText: "log F = −Σ U·ε (exact)" },
     r: [0.949, 0.940, 0.943, 0.996, 0.59], n: 1 },
-  { k: "v8kdl40", parent: "v8kd40", path: true, s: "line", label: "candidate", what: "v8kd40 fine-tuning + layout and count losses on every calibration variant.",
+  { k: "v8kdl40", parent: "v8kd40", path: true, s: "line", label: "superseded", what: "v8kd40 fine-tuning + layout and count losses on every calibration variant.",
     why: "The oracle and anatomy studies point at the placement: supervise where the compiler puts the circuit on each calibration, not only on the original one.",
     changed: ["place", "head"], o: { place: PLACE_PROBE, head: HEAD_V8KDL, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D, train: TRAIN_K },
     diag: { din: "+ 100 variants each", place: ["Sinkhorn placement", "logical × physical,", "one to one, per device", "τ = 0.3 · 20 iterations", "layout loss on variants too"], gate: G_RE, mlp: M_CZC, head: "fidelity + change loss" },
@@ -742,13 +774,48 @@ const VERSIONS = [
     changed: ["place"], o: { place: PLACE_PROBE, head: HEAD_V8KDL, gate: GATE_V8S, mlp: MLP_CZC },
     diag: { din: "+ 100 variants each", place: ["Sinkhorn placement", "score − w(q) · z(error)", "one to one, per device", "τ = 0.3 · 20 iterations", "layout loss on variants too"], gate: G_RE, mlp: M_CZC, head: "fidelity + change loss" },
     r: [0.984, 0.865, 0.950, 0.996, 0.61], n: 1 },
-  { k: "v8kdq40/m40", parent: "v8kdl40", path: true, s: "plan", label: "running", what: "One learned weight per error kind (1q, readout, CZ) in the placement score, and an MLP placement scorer; alone and together.",
-    why: "The anatomy study shows the model over-weights CZ and under-weights readout compared with the compiler, and that the errors combine non-linearly.",
+  { k: "v8kdq40/m40", parent: "v8kdl40", s: "drop", label: "not adopted", what: "One learned weight per error kind (1q, readout, CZ) in the placement score, and an MLP placement scorer; alone and together.",
+    why: "The anatomy study shows the model over-weights CZ and under-weights readout compared with the compiler. The weights never moved: local tracking 0.58–0.61, so the limit is the training signal.",
     changed: ["place"], o: { place: PLACE_PROBE, head: HEAD_V8KDL, gate: GATE_V8S, mlp: MLP_CZC },
     diag: { din: "+ 100 variants each", place: ["Sinkhorn placement", "score: MLP + Σ_k w_k(q) · z_k", "one to one, per device", "τ = 0.3 · 20 iterations", "layout loss on variants too"], gate: G_RE, mlp: M_CZC, head: "fidelity + change loss" },
+    r: [0.985, 0.897, 0.942, 0.996, 0.61], n: 1 },
+  { k: "v8kdv40", parent: "v8kdl40", s: "drop", label: "side variant", what: "The compiler's own layout score (Qiskit VF2Layout, linearised) as a prior on the placement.",
+    why: "Qiskit picks where the circuit goes by an average-error score: give the placement that score directly.",
+    changed: ["place"], o: { place: PLACE_PROBE, head: HEAD_V8KDL, gate: GATE_V8S, mlp: MLP_CZC },
+    diag: { din: "+ 100 variants each", place: ["Sinkhorn placement", "score − β · VF2 cost", "one to one, per device", "τ = 0.3 · 20 iterations", "layout loss on variants too"], gate: G_RE, mlp: M_CZC, head: "fidelity + change loss" },
+    r: [null, null, null, null, null], n: 1 },
+  { k: "v8kdc10", parent: "v8kdl40", path: true, s: "main", label: "main model", what: "v8kdl40 + a correlation term in the change loss.",
+    why: "The change loss fitted the size of calibration changes; device choice needs their direction and ranking.",
+    changed: ["head"], o: { head: HEAD_V8KDC, place: PLACE_PROBE, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D, train: TRAIN_K },
+    diag: { din: "+ 100 variants each", place: ["Sinkhorn placement", "logical × physical,", "one to one, per device", "τ = 0.3 · 20 iterations", "layout loss on variants too"], gate: G_RE, mlp: M_CZC, head: "fidelity + change + corr." },
+    r: [0.970, 0.847, 0.939, 0.996, 0.66], n: 3 },
+  { k: "v8kde10", parent: "v8kdc10", path: true, s: "diag", label: "ESP, v13", what: "v8kdc10 + heads for duration, depth and estimated success probability (ESP).",
+    why: "ESP adds the decay of idle qubits (T1, T2) to F; device choice by ESP can differ from choice by F.",
+    changed: ["head"], o: { head: HEAD_ESP13, place: PLACE_PROBE, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D, train: TRAIN_K },
+    diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: M_CZC, head: "F + ESP / duration / depth", headText: "ESP = F · exp(decay)" },
+    r: [0.976, 0.826, 0.941, 0.994, 0.67], n: 3 },
+  { k: "v8kda10", parent: "v8kde10", path: true, s: "diag", label: "ESP, analytic", what: "ESP head from the circuit's structure only (v14).",
+    why: "The v13 head's depth did not transfer to unseen families (96% error on variational).",
+    changed: ["head"], o: { head: HEAD_ESPA, place: PLACE_PROBE, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D },
+    diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: M_CZC, head: "F + analytic ESP head", headText: "ESP = F · exp(decay)" },
+    r: [0.962, 0.829, 0.937, 0.994, 0.66], n: 3 },
+  { k: "v8kds10", parent: "v8kda10", s: "drop", label: "not adopted", what: "v8kda10 + a loss on the busiest qubit's gate time, measurements and operations.",
+    why: "Supervise the structure the analytic head reads.",
+    changed: ["mlp"], o: { head: HEAD_ESPA, place: PLACE_PROBE, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D },
+    diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: [M_CZC[0], "+ per-qubit structure loss"], head: "F + analytic ESP head" },
+    r: [0.970, 0.832, 0.923, 0.993, 0.67], n: 3 },
+  { k: "v8kdi10", parent: "v8kda10", path: true, s: "diag", label: "ESP, v16", what: "Measurements from the circuit + total idle time predicted directly.",
+    why: "Error budget: almost all of the ESP error is in the decay, mostly from invented measurements and from idle = duration − busy.",
+    changed: ["mlp", "head"], o: { head: HEAD_ESPI, place: PLACE_PROBE, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D },
+    diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: [M_CZC[0], "measurements exact"], head: "F + idle-time head", headText: "decay = −idle · ⟨1/T⟩" },
+    r: [0.926, 0.895, 0.952, 0.993, null], n: 3 },
+  { k: "v8kdg10", parent: "v8kdi10", path: true, s: "plan", label: "running", what: "ESP from the ASAP schedule of the circuit's gate DAG (v17).",
+    why: "The learned duration ratios are family-specific; the schedule of the circuit's own DAG is not.",
+    changed: ["head"], o: { head: HEAD_ESPS, place: PLACE_PROBE, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D },
+    diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: [M_CZC[0], "measurements exact (ESP only)"], head: "F + DAG-schedule ESP", headText: "ASAP on the gate DAG" },
     r: [null, null, null, null, null], n: 0 }
 ];
-const MAIN = "v8kd40", BASE = "v8a", FIRST = "v1";
+const MAIN = "v8kdc10", BASE = "v8a", FIRST = "v1";
 const METRICS = ["R² LOFO qaoa", "R² LOFO qnn", "R² LOGO variational", "R² control", "local tracking (corr.)"];
 const SHORT = ["R² qaoa", "R² qnn", "R² variational", "R² control", "tracking (corr.)"];
 

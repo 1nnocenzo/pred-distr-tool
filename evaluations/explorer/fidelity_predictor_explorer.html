@@ -209,6 +209,7 @@ table.matrix { width: 100%; min-width: 760px; border-collapse: collapse; font-va
         <button type="button" role="tab" data-view="F" aria-selected="true">Fidelity F</button>
         <button type="button" role="tab" data-view="ESP" aria-selected="false">ESP · duration · depth</button>
         <button type="button" role="tab" data-view="DUR" aria-selected="false">Circuit duration estimate</button>
+        <button type="button" role="tab" data-view="TT" aria-selected="false">ESP when the chip changes</button>
         <button type="button" role="tab" data-view="TIME" aria-selected="false">Predictor speed</button>
       </div>
     </div>
@@ -657,6 +658,18 @@ const HEAD_ESPS = { eyebrow: "ESP (v17, v8kdg10)", title: "ASAP schedule of the 
     { kind: "formula", title: "Schedule", text: "start(g) = max over predecessors on its wires of finish(p)\nfinish(g) = start(g) + r_g · 42 ns / operands + cz_g · 130 ns   (measure: 15 µs)\nduration = max finish · depth = longest path in operations\nidle = Σ_q (duration − busy_q) · exp(c) + duration · softplus(d)   (routing ancillas)" },
     { kind: "facts", items: [["schedule alone, no training", "duration error 4–27% on unseen families (head: 20–81%)"], ["cost", "+2 ms per circuit (3 devices)"], ["status", "training, 3 seeds"]] }],
   src: "gsv3/model.py · dag_schedule · esp/esp_dag.py" };
+const HEAD_ESPT = { eyebrow: "ESP (v18, v8kdt10)", title: "Fine-tuning on gate-time and T1/T2 variants",
+  lead: "v17 with per-qubit and per-coupler gate times as input, fine-tuned 20 epochs on the same circuits rescheduled under random T1, T2 and gate-time changes (the compiled circuit never moves, so F must not either).",
+  sections: [
+    { kind: "formula", title: "Change loss", text: "loss += λ · [(Δdecay_pred − Δdecay_true)² + (Δlog dur_pred − Δlog dur_true)²] + λ_F · (Δlog F_pred)²\nλ = 1, λ_F = 1 (v18) · λ = 0.1, λ_F = 3 (v18b)" },
+    { kind: "facts", items: [["gate-time slope", "0.35 → 0.48 (ideal 1)"], ["cost", "spurious ΔF ×2, ESP R² qnn 0.959 → 0.883"], ["status", "dropped: the placement averages the change away"]] }],
+  src: "gsv3/training.py · tvar_lambda · compile_check/esp_tvar_train.py" };
+const HEAD_ESPF = { eyebrow: "ESP (v19, v8kdf10)", title: "Formula head with hard placement",
+  lead: "The schedule is computed twice: at reference gate times for the small network, at the chip's real times for the formula. Each logical qubit sits on one physical qubit, so its own gate times and T1/T2 enter the decay. F keeps its soft placement.",
+  sections: [
+    { kind: "formula", title: "Head", text: "placement: Hungarian on the Sinkhorn matrix (gradient through the soft one)\nduration = schedule(real times) · exp(a(ref))\ndecay    = −[ Σ_q idle_q(real) / min(T1, T2)_q · exp(c(ref)) + routing term ]\nCZ time  = the coupler's own when the two qubits are coupled\na, c = network outputs from reference-time inputs only" },
+    { kind: "facts", items: [["gate-time slope, no training", "0.99 (v17: 0.35)"], ["ESP lost after T + time change", "0.0087 → 0.0028"], ["standard ESP test", "unchanged"], ["status", "training, 3 seeds"]] }],
+  src: "gsv3/model.py · esp_head f · hard_placement · esp/esp_ttrack.py" };
 const P7 = ["Sinkhorn placement", "logical × physical,", "one to one, per device", "τ = 0.3 · 20 iterations", "loss v7 · λ 0.1"];
 const G_RF = ["643 values", "+ routing-free flag"], G_RE = ["644 values", "+ flag + routing estimate"];
 const M_CZC = ["cz = base · (1 + κ · hops)", "count loss · cz-weighted"];
@@ -828,7 +841,17 @@ const VERSIONS = [
     why: "The learned duration ratios are family-specific; the schedule of the circuit's own DAG is not.",
     changed: ["head"], o: { head: HEAD_ESPS, place: PLACE_PROBE, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D },
     diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: [M_CZC[0], "measurements exact (ESP only)"], head: "F + DAG-schedule ESP", headText: "ASAP on the gate DAG" },
-    r: [0.970, 0.819, 0.942, 0.995, 0.66], n: 3 }
+    r: [0.970, 0.819, 0.942, 0.995, 0.66], n: 3 },
+  { k: "v8kdt10", parent: "v8kdg10", path: false, s: "drop", label: "ESP, v18", what: "v17 fine-tuned on T1/T2 and gate-time variants.",
+    why: "Gate times did not enter v17's ESP: a change in them left ESP and duration unchanged.",
+    changed: ["head", "train"], o: { head: HEAD_ESPT, place: PLACE_PROBE, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D },
+    diag: { din: "+ T / gate-time variants", place: P7, gate: G_RE, mlp: M_CZC, head: "F + DAG-schedule ESP", headText: "change loss on ESP, duration" },
+    r: null, n: 3 },
+  { k: "v8kdf10", parent: "v8kdg10", path: true, s: "diag", label: "ESP, v19", what: "Formula ESP head: real gate times and T1/T2 of one physical qubit per logical qubit.",
+    why: "v18 showed the soft placement spreads each qubit over 5–6 physical ones and halves any per-qubit change.",
+    changed: ["head"], o: { head: HEAD_ESPF, place: PLACE_PROBE, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D },
+    diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: [M_CZC[0], "measurements exact (ESP only)"], head: "F + formula ESP", headText: "hard placement, real times" },
+    r: null, n: 3 }
 ];
 const MAIN = "v8kdc10", BASE = "v8a", FIRST = "v1";
 const NOTE_F = "<b>Reading tracking.</b> Local calibration changes move F by 0.006 (median) to 0.048 (90th percentile), so tracking is a correlation of small changes while R\u00b2 of F after the change stays 0.99. In practice: re-predicting after a local change cuts the fidelity lost to a wrong device choice from 0.0050\u20130.0068 to 0.0037 with v8kdc10 (21% with v8kd40, 9% with v8a); the best of three devices changes in 29% of the cases. Mean over the seeds listed (5, 6, 7). LOFO = one circuit family held out, LOGO = a group of families held out, control = random split. The best value of each column is in teal. Label noise caps local tracking near 0.85; the oracle study puts the ceiling of the current head near 0.6.";
@@ -869,11 +892,25 @@ const R10 = {
   v11d40: [[null, null, 0.941, null, null], 1],
   v8kdc10: [[0.955, 0.905, 0.916, 0.995, 0.68], 3],
   v8kdi10: [[0.965, 0.905, 0.953, 0.994, 0.66], 3],
-  v8kdg10: [[0.945, 0.875, 0.915, 0.996, 0.69], 3]
+  v8kdg10: [[0.945, 0.875, 0.915, 0.996, 0.69], 3],
+  v8kdt10: [[0.950, 0.911, 0.924, 0.994, null], 3],
+  v8kdf10: [[0.945, 0.875, 0.915, 0.996, 0.69], "v17 weights"]
 };
 const ESPD10 = {
   v8kdi10: [0.974, 0.940, 0.894, 0.985, 0.074, 0.366, 0.0093],
-  v8kdg10: [0.960, 0.959, 0.906, 0.987, 0.097, 0.435, 0.0100]
+  v8kdg10: [0.960, 0.959, 0.906, 0.987, 0.097, 0.435, 0.0100],
+  v8kdt10: [0.965, 0.883, 0.878, 0.974, 0.118, 0.460, 0.0110],
+  v8kdf10: [0.958, 0.959, 0.903, 0.986, 0.097, 0.435, 0.0103]
+};
+/* T view: ESP and duration when only T1/T2 or gate times change (esp/esp_ttrack.py, report_esp_ttrack_v10_v19zs_oracle.md;
+   457 calibration-test circuits × 3 chips × 2 variants per kind, control models, seeds 5–7). Columns: ESP slope and
+   duration slope under per-qubit gate-time jitter, ESP slope under T + time changes (mix), ESP regret re-predicting
+   after mix, after 2–3 degraded qubits, ESP tracking (corr.) under T1/T2 jitter, ESP slope with slower CZs on 3–5
+   couplers. v8kdg10 = v17 with per-qubit times as input; v8kdf10 = v17 weights in the formula head (training running). */
+const TTD = {
+  v8kdg10: [0.35, 0.37, 0.39, 0.0087, 0.0053, 0.86, 0.17],
+  v8kdt10: [0.48, 0.55, 0.71, 0.0084, 0.0117, 0.66, 0.38],
+  v8kdf10: [0.99, 0.92, 0.95, 0.0028, 0.0049, 0.79, 0.39]
 };
 /* Duration view: predicted one-shot QPU time (ASAP schedule) vs the compiled circuit's, retrained models, seeds 5–7
    pooled (esp/esp_duration.py → report_esp_duration_v10.json; R² from esp_eval). Columns: typical (median) relative
@@ -900,6 +937,11 @@ function durTable(k) {
   return `<div class="dwrap"><table class="dtable"><thead><tr><th>${esc(k)} · split</th><th>typical duration</th><th>typical error</th><th>worst 10% beyond</th>` +
     `<th>within 10%</th><th>within 25%</th><th>systematic bias</th><th>R² log duration</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
+function ttTable() {
+  const r = [["exact qubit", "9%", "13%", "7%", "16%"], ["in the compiler's region", "75%", "88%", "77%", "93%"], ["distance to its qubit", "2.6 hops", "2.5 hops", "2.9 hops", "2.3 hops"]];
+  return `<div class="dwrap"><table class="dtable"><thead><tr><th>hard placement vs the compiler's layout</th><th>qaoa (unseen)</th><th>qnn (unseen)</th><th>variational (unseen)</th><th>control</th></tr></thead><tbody>` +
+    r.map(x => `<tr><td>${esc(x[0])}</td>` + x.slice(1).map(c => `<td>${c}</td>`).join("") + "</tr>").join("") + `</tbody></table></div>`;
+}
 let DATA = "v10";
 const isNew = () => DATA === "v10";
 const seedsOf = v => view === "TIME" ? v.n : isNew() ? (v.n10 || "–") : v.n;
@@ -909,7 +951,7 @@ const seedsOf = v => view === "TIME" ? v.n : isNew() ? (v.n10 || "–") : v.n;
 const TIMED = {
   v8a: [12.9, 66.7, 5.4, 13.2, null]
 };
-VERSIONS.forEach(v => { v.esp = ESPD[v.k] || null; v.time = TIMED[v.k] || null; v.esp10 = ESPD10[v.k] || null; v.dur = DURD[v.k] || null;
+VERSIONS.forEach(v => { v.esp = ESPD[v.k] || null; v.time = TIMED[v.k] || null; v.esp10 = ESPD10[v.k] || null; v.dur = DURD[v.k] || null; v.tt = TTD[v.k] || null;
   const x = R10[v.k]; v.r10 = x ? x[0] : null; v.n10 = x ? x[1] : null; });
 const NOTE_F10 = "<b>Retrained data.</b> Every version is retrained after qaoa was regenerated with its final measurements (labels, calibration variants and the calibration test recomputed). On LOFO qaoa the test circuits themselves changed, so compare that column only within this data set, never with the other one. Versions not listed are still retraining; the seeds column shows how many seeds are in so far. <b>Reading tracking.</b> Tracking is a correlation (not R\u00b2) of predicted vs true \u0394log F when a few qubits or couplers change; R\u00b2 of F after the change stays 0.99. Label noise caps local tracking near 0.85. LOFO = one circuit family held out, LOGO = a group of families held out, control = random split. The best value of each column is in teal.";
 const VIEWS = {
@@ -948,6 +990,20 @@ const VIEWS = {
       "On qnn it is low (0.41) while the error is 5% because qnn circuits all last about the same: there is little to explain." + durTable("v8kdi10") + durTable("v8kdg10") +
       "A job takes about shots × duration plus overheads (reset, transfer, queue) that the model does not see. Green: at least 90% of cases within 25%; red: fewer than 75%."; },
     cap: m => `best duration model ${m.k} (3 seeds, retrained) vs v17 (v8kdg10) · error = |predicted / true − 1| of the one-shot QPU time` },
+  TT: { main: "v8kdf10", cmp: ["v8kdg10", "v8kdt10"], get: v => v.tt,
+    cols: [{ name: "ESP slope, gate times jitter", short: "ESP · times", lo: 0, hi: 1, dig: 2 },
+           { name: "duration slope, gate times jitter", short: "duration · times", lo: 0, hi: 1, dig: 2 },
+           { name: "ESP slope, T + times", short: "ESP · T + times", lo: 0, hi: 1, dig: 2 },
+           { name: "ESP regret re-predicting, T + times", short: "regret · T + times", lo: 0.014, hi: 0, dig: 4, low: true },
+           { name: "ESP regret re-predicting, degraded qubits", short: "regret · bad qubits", lo: 0.01, hi: 0, dig: 4, low: true },
+           { name: "ESP tracking (corr.), T1/T2 jitter", short: "corr. · T1/T2", lo: 0.5, hi: 1, dig: 2 },
+           { name: "ESP slope, slower CZ on 3–5 couplers", short: "ESP · slow CZ", lo: 0, hi: 1, dig: 2 }],
+    kicker: "Only T1, T2 or gate durations change, so the compiled circuit and F stay the same · slope 1 = the predicted change has the true size · regret = ESP lost by the chip chosen after re-predicting (0.014 / 0.006 if the old choice is kept)",
+    get note() { return "<b>Reading this view.</b> Each chip's calibration is changed in one way at a time: every gate time ×lognormal(0.2) per qubit and coupler; T1/T2 ×lognormal(0.3); 2–3 qubits with T ×0.15–0.3; 3–5 couplers with the CZ 2–3× slower; and T + times together. " +
+      "The real calibrations have one time per gate type (r 42 ns, CZ 130 ns, readout 15 µs, the same on the three chips), so per-qubit time changes are stress tests; chip-wide changes (all CZs, readout) are followed exactly by every head that reads times (readout slower: duration slope 1.05). " +
+      "<b>Why v19 works.</b> The learned placement spreads each logical qubit over 5–6 physical qubits, so a per-qubit change arrived at half size (v17, and v18 even after fine-tuning). v19 puts each logical qubit on one physical qubit for the ESP only. " +
+      ttTable() + "<b>Limits.</b> The hard placement lands in the compiler's region but rarely on its exact qubit; with the compiler's own layout the ESP lost after degraded qubits halves (0.0049 → 0.0021). Slower CZs on single couplers stay at 0.38 even then: routing SWAPs use couplers the circuit's own schedule does not see. Next: an ESP-only placement trained on the exact layout."; },
+    cap: m => `v19 formula head (${m.k}, v17 weights, no training on these changes) vs v17 and the v18 fine-tuning` },
   TIME: { main: "v8a", cmp: [], get: v => v.time,
     cols: [{ name: "predictor, 3 devices", short: "predictor", lo: 30, hi: 0, dig: 1, unit: " ms", low: true },
            { name: "compile all, 3 devices", short: "compile", lo: 0, hi: 300, dig: 1, unit: " ms" },
@@ -1055,7 +1111,7 @@ function versionCard() {
   const row = (x, xv, cls, withDelta) => `<tr class="${cls}"><td>${esc(x.k)}</td>` + W.cols.map((c, i) => `<td>${fmt(xv[i], c)}${withDelta ? delta(i) : ""}</td>`).join("") + `<td>${seedsOf(x) || "–"}</td></tr>`;
   const table = vals ? `<div style="overflow-x:auto"><table class="res"><thead><tr><th>model</th>` + W.cols.map(c => `<th>${esc(c.short)}</th>`).join("") +
     `<th>seeds</th></tr></thead><tbody>${row(v, vals, "cur", true)}${pv ? row(par, pv, "", false) : ""}</tbody></table></div>`
-    : `<p class="why">${isNew() && view !== "TIME" && view !== "DUR" ? "Still retraining on the corrected data (qaoa with measurements): numbers arrive with the full evaluation." : `No ${view === "ESP" ? "ESP" : view === "DUR" ? "duration" : view === "TIME" ? "timing" : ""} numbers for this version.`}</p>`;
+    : `<p class="why">${isNew() && view !== "TIME" && view !== "DUR" && view !== "TT" ? "Still retraining on the corrected data (qaoa with measurements): numbers arrive with the full evaluation." : `No ${view === "ESP" ? "ESP" : view === "DUR" ? "duration" : view === "TIME" ? "timing" : view === "TT" ? "calibration-change" : ""} numbers for this version.`}</p>`;
   return `<div class="vcard"><div class="vtop"><span class="vname">${esc(v.k)}</span><span class="status s-${v.s}">${esc(v.label)}</span>${par ? `<span class="src">builds on ${esc(par.k)}</span>` : ""}</div>` +
     `<p><b>Changes:</b> ${esc(v.what)}</p><p class="why"><b>Why:</b> ${esc(v.why)}</p>` + (v.s === "plan" ? "" : table) + `</div>`;
 }

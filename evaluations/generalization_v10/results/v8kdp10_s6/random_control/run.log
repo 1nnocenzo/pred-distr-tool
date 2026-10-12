@@ -1,0 +1,185 @@
+2026-10-12 21:04:06,808  genstudy.io               INFO     Logging to evaluations/generalization_v10/results/v8kdp10_s6/random_control/run.log
+2026-10-12 21:04:06,809  run_experiment            INFO     Command line: evaluations/generalization_v3/scripts/run_experiment.py control --model sinkhorn_rf_route_czc_espp --balance-alpha 0 --lr 3e-4 --grad-clip 1.0 --seed 6 --loss mixed --val-mode random --layout-lambda 0.1 --layout-loss region_dist --layouts-path evaluations/compile_check/results/compiler_layouts_v6pilot.pt --count-lambda 0.1 --count-weights 0.1,0.1,1 --counts-path evaluations/compile_check/results/compiler_counts_v8.pt --calib-aug evaluations/compile_check/results/v8d --orig-best evaluations/compile_check/results/v8b_orig/v8b_orig_labels.pt --delta-lambda 1 --keep-last --epochs 20 --patience 100 --lr 1e-4 --aug-aux --delta-corr-lambda 0.1 --esp-path evaluations/compile_check/results/esp_labels.pt --esp-lambda 0.1 --init-from evaluations/generalization_v10/results/v8kdf10_s6/random_control/random_seed6/model.pth --families x --groups x --results-dir evaluations/generalization_v10/results/v8kdp10_s6 --esp-place-lambda 1
+2026-10-12 21:04:06,809  gsv2.gpu                  WARNING  No CUDA device available — running on the CPU.
+2026-10-12 21:04:06,809  gsv3.model                INFO     Hyper-parameters (/home/atudisco/pred-distr-tool/src/model/best_params.json + v3 defaults): {'device_hidden': 64, 'device_layers': 3, 'fusion_dim': 128, 'qubit_layers': 2, 'attn_heads': 4, 'lap_pe': 8, 'cost_bias_init': -6.0, 'hidden_dim': 142, 'num_conv_wo_resnet': 3, 'num_resnet_layers': 1, 'dropout': 0.0, 'bidirectional': True, 'mlp': [512, 256, 128], 'lr': 0.001, 'readout': 'meanmaxsum'}
+2026-10-12 21:04:06,824  gsv3.devices              INFO     Device graphs: node features 13 (Laplacian PE 8), physical errors True
+2026-10-12 21:04:06,826  genstudy.data             INFO     Loading graph dataset: /home/atudisco/pred-distr-tool/evaluations/generalization_v3/data/graph_dataset_expected_fidelity.pt
+2026-10-12 21:04:10,606  genstudy.data             INFO     Loaded 17056 graphs
+2026-10-12 21:04:11,205  run_experiment            INFO     Compiler layouts (evaluations/compile_check/results/compiler_layouts_v6pilot.pt): 16994/17056 circuits
+2026-10-12 21:04:14,195  run_experiment            INFO     Calibration variants (evaluations/compile_check/results/v8d): 100 variant sets, 16994/17056 circuits
+2026-10-12 21:04:16,337  run_experiment            INFO     Original-calibration best-of-K labels (evaluations/compile_check/results/v8b_orig/v8b_orig_labels.pt): 16994/17056 circuits
+2026-10-12 21:04:16,866  run_experiment            INFO     Compiler counts (evaluations/compile_check/results/compiler_counts_v8.pt): 16994/17056 circuits
+2026-10-12 21:04:21,189  run_experiment            INFO     ESP / duration / depth labels (evaluations/compile_check/results/esp_labels.pt): 16400/17056 circuits
+2026-10-12 21:04:21,327  genstudy.io               INFO     Wrote evaluations/generalization_v10/results/v8kdp10_s6/random_control/dataset_summary.json
+2026-10-12 21:04:21,463  run_experiment            INFO     [1/1] random_seed6
+2026-10-12 21:04:21,466  gsv3.experiment           INFO     === random / random_seed6 ===
+2026-10-12 21:04:21,466  gsv3.experiment           INFO     Random split stratified by fidelity (test_fraction=0.3, seed=6): train = 11939, test = 5117 circuits; families and sizes appear on both sides.
+2026-10-12 21:04:21,468  gsv3.experiment           INFO     train=9551  val=2388 ({'mode': 'random'})  test=5117
+2026-10-12 21:04:21,568  gsv3.training             INFO     [random:random_seed6] initialised from evaluations/generalization_v10/results/v8kdf10_s6/random_control/random_seed6/model.pth (new parameters, not in the checkpoint: ['ep_q.weight', 'ep_q.bias', 'ep_p.weight', 'ep_p.bias'])
+2026-10-12 21:04:21,569  gsv3.training             INFO     [random:random_seed6] ESP placement: 4 tensors at lr x10
+2026-10-12 21:04:22,488  gsv3.training             INFO     [random:random_seed6] model=sinkhorn_rf_route_czc_espp (1023817 params) train=9551 val=2388 lr=0.0001 clip=1.0 alpha=0.00
+2026-10-12 21:07:26,401  gsv3.training             INFO     [random:random_seed6] epoch 0001  delta_mse=0.0104
+2026-10-12 21:07:26,402  gsv3.training             INFO     [random:random_seed6] epoch 0001  delta_corr=0.815
+2026-10-12 21:07:26,402  gsv3.training             INFO     [random:random_seed6] epoch 0001  aug_layout=0.3740  aug_region_overlap=0.824  aug_count_mse=0.0185  aug_count_rel_err_2q=0.116
+2026-10-12 21:07:26,402  gsv3.training             INFO     [random:random_seed6] epoch 0001  ESP placement ce=2.654  exact qubit=0.161
+2026-10-12 21:07:26,402  gsv3.training             INFO     [random:random_seed6] epoch 0001  esp_decay_mse=0.0179  log_duration_mse=0.0020  log_depth_mse=0.0074
+2026-10-12 21:07:26,402  gsv3.training             INFO     [random:random_seed6] epoch 0001  count_mse=0.0190  count_rel_err_2q=0.117
+2026-10-12 21:07:26,402  gsv3.training             INFO     [random:random_seed6] epoch 0001  region_bce=0.1006  dist_mse=0.0728  region_overlap=0.905
+2026-10-12 21:07:26,404  gsv3.training             INFO     [random:random_seed6] epoch 0001  train_log_mse=0.00260  val_log_mse=0.05246  val_mse=0.000467  max_grad=4.71  patience=0/100
+2026-10-12 21:10:08,308  gsv3.training             INFO     [random:random_seed6] epoch 0002  delta_mse=0.0107
+2026-10-12 21:10:08,309  gsv3.training             INFO     [random:random_seed6] epoch 0002  delta_corr=0.813
+2026-10-12 21:10:08,309  gsv3.training             INFO     [random:random_seed6] epoch 0002  aug_layout=0.3619  aug_region_overlap=0.829  aug_count_mse=0.0185  aug_count_rel_err_2q=0.116
+2026-10-12 21:10:08,309  gsv3.training             INFO     [random:random_seed6] epoch 0002  ESP placement ce=2.478  exact qubit=0.185
+2026-10-12 21:10:08,309  gsv3.training             INFO     [random:random_seed6] epoch 0002  esp_decay_mse=0.0184  log_duration_mse=0.0019  log_depth_mse=0.0069
+2026-10-12 21:10:08,309  gsv3.training             INFO     [random:random_seed6] epoch 0002  count_mse=0.0189  count_rel_err_2q=0.118
+2026-10-12 21:10:08,309  gsv3.training             INFO     [random:random_seed6] epoch 0002  region_bce=0.1003  dist_mse=0.0726  region_overlap=0.905
+2026-10-12 21:10:08,311  gsv3.training             INFO     [random:random_seed6] epoch 0002  train_log_mse=0.00254  val_log_mse=0.04877  val_mse=0.000412  max_grad=9.21  patience=0/100
+2026-10-12 21:12:51,255  gsv3.training             INFO     [random:random_seed6] epoch 0003  delta_mse=0.0103
+2026-10-12 21:12:51,256  gsv3.training             INFO     [random:random_seed6] epoch 0003  delta_corr=0.814
+2026-10-12 21:12:51,256  gsv3.training             INFO     [random:random_seed6] epoch 0003  aug_layout=0.3731  aug_region_overlap=0.824  aug_count_mse=0.0183  aug_count_rel_err_2q=0.117
+2026-10-12 21:12:51,256  gsv3.training             INFO     [random:random_seed6] epoch 0003  ESP placement ce=2.434  exact qubit=0.195
+2026-10-12 21:12:51,256  gsv3.training             INFO     [random:random_seed6] epoch 0003  esp_decay_mse=0.0178  log_duration_mse=0.0019  log_depth_mse=0.0072
+2026-10-12 21:12:51,256  gsv3.training             INFO     [random:random_seed6] epoch 0003  count_mse=0.0190  count_rel_err_2q=0.120
+2026-10-12 21:12:51,256  gsv3.training             INFO     [random:random_seed6] epoch 0003  region_bce=0.1002  dist_mse=0.0724  region_overlap=0.905
+2026-10-12 21:12:51,256  gsv3.training             INFO     [random:random_seed6] epoch 0003  train_log_mse=0.00257  val_log_mse=0.05137  val_mse=0.000480  max_grad=5.23  patience=1/100
+2026-10-12 21:15:35,373  gsv3.training             INFO     [random:random_seed6] epoch 0004  delta_mse=0.0106
+2026-10-12 21:15:35,373  gsv3.training             INFO     [random:random_seed6] epoch 0004  delta_corr=0.824
+2026-10-12 21:15:35,374  gsv3.training             INFO     [random:random_seed6] epoch 0004  aug_layout=0.3660  aug_region_overlap=0.827  aug_count_mse=0.0183  aug_count_rel_err_2q=0.116
+2026-10-12 21:15:35,374  gsv3.training             INFO     [random:random_seed6] epoch 0004  ESP placement ce=2.405  exact qubit=0.203
+2026-10-12 21:15:35,374  gsv3.training             INFO     [random:random_seed6] epoch 0004  esp_decay_mse=0.0176  log_duration_mse=0.0019  log_depth_mse=0.0072
+2026-10-12 21:15:35,374  gsv3.training             INFO     [random:random_seed6] epoch 0004  count_mse=0.0189  count_rel_err_2q=0.119
+2026-10-12 21:15:35,374  gsv3.training             INFO     [random:random_seed6] epoch 0004  region_bce=0.0989  dist_mse=0.0723  region_overlap=0.906
+2026-10-12 21:15:35,374  gsv3.training             INFO     [random:random_seed6] epoch 0004  train_log_mse=0.00266  val_log_mse=0.05272  val_mse=0.000415  max_grad=3.77  patience=2/100
+2026-10-12 21:18:19,925  gsv3.training             INFO     [random:random_seed6] epoch 0005  delta_mse=0.0102
+2026-10-12 21:18:19,926  gsv3.training             INFO     [random:random_seed6] epoch 0005  delta_corr=0.844
+2026-10-12 21:18:19,926  gsv3.training             INFO     [random:random_seed6] epoch 0005  aug_layout=0.3620  aug_region_overlap=0.830  aug_count_mse=0.0184  aug_count_rel_err_2q=0.115
+2026-10-12 21:18:19,926  gsv3.training             INFO     [random:random_seed6] epoch 0005  ESP placement ce=2.389  exact qubit=0.208
+2026-10-12 21:18:19,926  gsv3.training             INFO     [random:random_seed6] epoch 0005  esp_decay_mse=0.0180  log_duration_mse=0.0018  log_depth_mse=0.0072
+2026-10-12 21:18:19,926  gsv3.training             INFO     [random:random_seed6] epoch 0005  count_mse=0.0191  count_rel_err_2q=0.118
+2026-10-12 21:18:19,926  gsv3.training             INFO     [random:random_seed6] epoch 0005  region_bce=0.0984  dist_mse=0.0722  region_overlap=0.907
+2026-10-12 21:18:19,927  gsv3.training             INFO     [random:random_seed6] epoch 0005  train_log_mse=0.00255  val_log_mse=0.04988  val_mse=0.000464  max_grad=10.78  patience=3/100
+2026-10-12 21:21:04,316  gsv3.training             INFO     [random:random_seed6] epoch 0006  delta_mse=0.0099
+2026-10-12 21:21:04,317  gsv3.training             INFO     [random:random_seed6] epoch 0006  delta_corr=0.819
+2026-10-12 21:21:04,317  gsv3.training             INFO     [random:random_seed6] epoch 0006  aug_layout=0.3621  aug_region_overlap=0.828  aug_count_mse=0.0182  aug_count_rel_err_2q=0.115
+2026-10-12 21:21:04,317  gsv3.training             INFO     [random:random_seed6] epoch 0006  ESP placement ce=2.377  exact qubit=0.211
+2026-10-12 21:21:04,317  gsv3.training             INFO     [random:random_seed6] epoch 0006  esp_decay_mse=0.0178  log_duration_mse=0.0019  log_depth_mse=0.0072
+2026-10-12 21:21:04,317  gsv3.training             INFO     [random:random_seed6] epoch 0006  count_mse=0.0189  count_rel_err_2q=0.118
+2026-10-12 21:21:04,317  gsv3.training             INFO     [random:random_seed6] epoch 0006  region_bce=0.0997  dist_mse=0.0718  region_overlap=0.905
+2026-10-12 21:21:04,318  gsv3.training             INFO     [random:random_seed6] epoch 0006  train_log_mse=0.00256  val_log_mse=0.05254  val_mse=0.000437  max_grad=3.20  patience=4/100
+2026-10-12 21:23:49,166  gsv3.training             INFO     [random:random_seed6] epoch 0007  delta_mse=0.0104
+2026-10-12 21:23:49,167  gsv3.training             INFO     [random:random_seed6] epoch 0007  delta_corr=0.812
+2026-10-12 21:23:49,167  gsv3.training             INFO     [random:random_seed6] epoch 0007  aug_layout=0.3574  aug_region_overlap=0.831  aug_count_mse=0.0181  aug_count_rel_err_2q=0.115
+2026-10-12 21:23:49,167  gsv3.training             INFO     [random:random_seed6] epoch 0007  ESP placement ce=2.363  exact qubit=0.216
+2026-10-12 21:23:49,167  gsv3.training             INFO     [random:random_seed6] epoch 0007  esp_decay_mse=0.0175  log_duration_mse=0.0019  log_depth_mse=0.0071
+2026-10-12 21:23:49,167  gsv3.training             INFO     [random:random_seed6] epoch 0007  count_mse=0.0188  count_rel_err_2q=0.118
+2026-10-12 21:23:49,167  gsv3.training             INFO     [random:random_seed6] epoch 0007  region_bce=0.0998  dist_mse=0.0719  region_overlap=0.905
+2026-10-12 21:23:49,167  gsv3.training             INFO     [random:random_seed6] epoch 0007  train_log_mse=0.00260  val_log_mse=0.05183  val_mse=0.000501  max_grad=4.90  patience=5/100
+2026-10-12 21:26:28,911  gsv3.training             INFO     [random:random_seed6] epoch 0008  delta_mse=0.0099
+2026-10-12 21:26:28,912  gsv3.training             INFO     [random:random_seed6] epoch 0008  delta_corr=0.823
+2026-10-12 21:26:28,912  gsv3.training             INFO     [random:random_seed6] epoch 0008  aug_layout=0.3619  aug_region_overlap=0.829  aug_count_mse=0.0181  aug_count_rel_err_2q=0.115
+2026-10-12 21:26:28,912  gsv3.training             INFO     [random:random_seed6] epoch 0008  ESP placement ce=2.355  exact qubit=0.218
+2026-10-12 21:26:28,912  gsv3.training             INFO     [random:random_seed6] epoch 0008  esp_decay_mse=0.0176  log_duration_mse=0.0018  log_depth_mse=0.0069
+2026-10-12 21:26:28,912  gsv3.training             INFO     [random:random_seed6] epoch 0008  count_mse=0.0189  count_rel_err_2q=0.118
+2026-10-12 21:26:28,912  gsv3.training             INFO     [random:random_seed6] epoch 0008  region_bce=0.0992  dist_mse=0.0718  region_overlap=0.906
+2026-10-12 21:26:28,912  gsv3.training             INFO     [random:random_seed6] epoch 0008  train_log_mse=0.00255  val_log_mse=0.05032  val_mse=0.000453  max_grad=7.68  patience=6/100
+2026-10-12 21:29:10,890  gsv3.training             INFO     [random:random_seed6] epoch 0009  delta_mse=0.0099
+2026-10-12 21:29:10,891  gsv3.training             INFO     [random:random_seed6] epoch 0009  delta_corr=0.824
+2026-10-12 21:29:10,891  gsv3.training             INFO     [random:random_seed6] epoch 0009  aug_layout=0.3679  aug_region_overlap=0.827  aug_count_mse=0.0178  aug_count_rel_err_2q=0.113
+2026-10-12 21:29:10,891  gsv3.training             INFO     [random:random_seed6] epoch 0009  ESP placement ce=2.346  exact qubit=0.220
+2026-10-12 21:29:10,891  gsv3.training             INFO     [random:random_seed6] epoch 0009  esp_decay_mse=0.0177  log_duration_mse=0.0019  log_depth_mse=0.0070
+2026-10-12 21:29:10,891  gsv3.training             INFO     [random:random_seed6] epoch 0009  count_mse=0.0187  count_rel_err_2q=0.117
+2026-10-12 21:29:10,891  gsv3.training             INFO     [random:random_seed6] epoch 0009  region_bce=0.0989  dist_mse=0.0718  region_overlap=0.906
+2026-10-12 21:29:10,891  gsv3.training             INFO     [random:random_seed6] epoch 0009  train_log_mse=0.00255  val_log_mse=0.04751  val_mse=0.000464  max_grad=4.14  patience=7/100
+2026-10-12 21:31:53,808  gsv3.training             INFO     [random:random_seed6] epoch 0010  delta_mse=0.0099
+2026-10-12 21:31:53,809  gsv3.training             INFO     [random:random_seed6] epoch 0010  delta_corr=0.820
+2026-10-12 21:31:53,809  gsv3.training             INFO     [random:random_seed6] epoch 0010  aug_layout=0.3640  aug_region_overlap=0.828  aug_count_mse=0.0179  aug_count_rel_err_2q=0.115
+2026-10-12 21:31:53,809  gsv3.training             INFO     [random:random_seed6] epoch 0010  ESP placement ce=2.341  exact qubit=0.221
+2026-10-12 21:31:53,809  gsv3.training             INFO     [random:random_seed6] epoch 0010  esp_decay_mse=0.0172  log_duration_mse=0.0018  log_depth_mse=0.0069
+2026-10-12 21:31:53,809  gsv3.training             INFO     [random:random_seed6] epoch 0010  count_mse=0.0187  count_rel_err_2q=0.118
+2026-10-12 21:31:53,809  gsv3.training             INFO     [random:random_seed6] epoch 0010  region_bce=0.0989  dist_mse=0.0714  region_overlap=0.906
+2026-10-12 21:31:53,809  gsv3.training             INFO     [random:random_seed6] epoch 0010  train_log_mse=0.00251  val_log_mse=0.05116  val_mse=0.000430  max_grad=3.67  patience=8/100
+2026-10-12 21:34:36,911  gsv3.training             INFO     [random:random_seed6] epoch 0011  delta_mse=0.0102
+2026-10-12 21:34:36,912  gsv3.training             INFO     [random:random_seed6] epoch 0011  delta_corr=0.825
+2026-10-12 21:34:36,912  gsv3.training             INFO     [random:random_seed6] epoch 0011  aug_layout=0.3638  aug_region_overlap=0.829  aug_count_mse=0.0179  aug_count_rel_err_2q=0.114
+2026-10-12 21:34:36,912  gsv3.training             INFO     [random:random_seed6] epoch 0011  ESP placement ce=2.334  exact qubit=0.226
+2026-10-12 21:34:36,912  gsv3.training             INFO     [random:random_seed6] epoch 0011  esp_decay_mse=0.0168  log_duration_mse=0.0018  log_depth_mse=0.0072
+2026-10-12 21:34:36,912  gsv3.training             INFO     [random:random_seed6] epoch 0011  count_mse=0.0186  count_rel_err_2q=0.118
+2026-10-12 21:34:36,912  gsv3.training             INFO     [random:random_seed6] epoch 0011  region_bce=0.0984  dist_mse=0.0715  region_overlap=0.906
+2026-10-12 21:34:36,912  gsv3.training             INFO     [random:random_seed6] epoch 0011  train_log_mse=0.00266  val_log_mse=0.05102  val_mse=0.000434  max_grad=6.08  patience=9/100
+2026-10-12 21:37:11,064  gsv3.training             INFO     [random:random_seed6] epoch 0012  delta_mse=0.0100
+2026-10-12 21:37:11,065  gsv3.training             INFO     [random:random_seed6] epoch 0012  delta_corr=0.836
+2026-10-12 21:37:11,065  gsv3.training             INFO     [random:random_seed6] epoch 0012  aug_layout=0.3675  aug_region_overlap=0.826  aug_count_mse=0.0179  aug_count_rel_err_2q=0.114
+2026-10-12 21:37:11,065  gsv3.training             INFO     [random:random_seed6] epoch 0012  ESP placement ce=2.329  exact qubit=0.227
+2026-10-12 21:37:11,065  gsv3.training             INFO     [random:random_seed6] epoch 0012  esp_decay_mse=0.0171  log_duration_mse=0.0017  log_depth_mse=0.0067
+2026-10-12 21:37:11,065  gsv3.training             INFO     [random:random_seed6] epoch 0012  count_mse=0.0186  count_rel_err_2q=0.117
+2026-10-12 21:37:11,065  gsv3.training             INFO     [random:random_seed6] epoch 0012  region_bce=0.0988  dist_mse=0.0716  region_overlap=0.906
+2026-10-12 21:37:11,065  gsv3.training             INFO     [random:random_seed6] epoch 0012  train_log_mse=0.00252  val_log_mse=0.04994  val_mse=0.000470  max_grad=3.83  patience=10/100
+2026-10-12 21:39:45,121  gsv3.training             INFO     [random:random_seed6] epoch 0013  delta_mse=0.0093
+2026-10-12 21:39:45,122  gsv3.training             INFO     [random:random_seed6] epoch 0013  delta_corr=0.837
+2026-10-12 21:39:45,122  gsv3.training             INFO     [random:random_seed6] epoch 0013  aug_layout=0.3625  aug_region_overlap=0.828  aug_count_mse=0.0175  aug_count_rel_err_2q=0.113
+2026-10-12 21:39:45,122  gsv3.training             INFO     [random:random_seed6] epoch 0013  ESP placement ce=2.327  exact qubit=0.228
+2026-10-12 21:39:45,122  gsv3.training             INFO     [random:random_seed6] epoch 0013  esp_decay_mse=0.0171  log_duration_mse=0.0018  log_depth_mse=0.0067
+2026-10-12 21:39:45,122  gsv3.training             INFO     [random:random_seed6] epoch 0013  count_mse=0.0185  count_rel_err_2q=0.116
+2026-10-12 21:39:45,122  gsv3.training             INFO     [random:random_seed6] epoch 0013  region_bce=0.0973  dist_mse=0.0710  region_overlap=0.907
+2026-10-12 21:39:45,122  gsv3.training             INFO     [random:random_seed6] epoch 0013  train_log_mse=0.00248  val_log_mse=0.05013  val_mse=0.000417  max_grad=3.65  patience=11/100
+2026-10-12 21:42:19,543  gsv3.training             INFO     [random:random_seed6] epoch 0014  delta_mse=0.0099
+2026-10-12 21:42:19,543  gsv3.training             INFO     [random:random_seed6] epoch 0014  delta_corr=0.820
+2026-10-12 21:42:19,544  gsv3.training             INFO     [random:random_seed6] epoch 0014  aug_layout=0.3593  aug_region_overlap=0.829  aug_count_mse=0.0177  aug_count_rel_err_2q=0.114
+2026-10-12 21:42:19,544  gsv3.training             INFO     [random:random_seed6] epoch 0014  ESP placement ce=2.319  exact qubit=0.230
+2026-10-12 21:42:19,544  gsv3.training             INFO     [random:random_seed6] epoch 0014  esp_decay_mse=0.0174  log_duration_mse=0.0018  log_depth_mse=0.0068
+2026-10-12 21:42:19,544  gsv3.training             INFO     [random:random_seed6] epoch 0014  count_mse=0.0186  count_rel_err_2q=0.117
+2026-10-12 21:42:19,544  gsv3.training             INFO     [random:random_seed6] epoch 0014  region_bce=0.0979  dist_mse=0.0710  region_overlap=0.907
+2026-10-12 21:42:19,544  gsv3.training             INFO     [random:random_seed6] epoch 0014  train_log_mse=0.00245  val_log_mse=0.04741  val_mse=0.000454  max_grad=4.65  patience=12/100
+2026-10-12 21:44:53,108  gsv3.training             INFO     [random:random_seed6] epoch 0015  delta_mse=0.0089
+2026-10-12 21:44:53,109  gsv3.training             INFO     [random:random_seed6] epoch 0015  delta_corr=0.841
+2026-10-12 21:44:53,109  gsv3.training             INFO     [random:random_seed6] epoch 0015  aug_layout=0.3582  aug_region_overlap=0.830  aug_count_mse=0.0175  aug_count_rel_err_2q=0.112
+2026-10-12 21:44:53,109  gsv3.training             INFO     [random:random_seed6] epoch 0015  ESP placement ce=2.318  exact qubit=0.230
+2026-10-12 21:44:53,109  gsv3.training             INFO     [random:random_seed6] epoch 0015  esp_decay_mse=0.0168  log_duration_mse=0.0017  log_depth_mse=0.0065
+2026-10-12 21:44:53,109  gsv3.training             INFO     [random:random_seed6] epoch 0015  count_mse=0.0184  count_rel_err_2q=0.115
+2026-10-12 21:44:53,109  gsv3.training             INFO     [random:random_seed6] epoch 0015  region_bce=0.0970  dist_mse=0.0710  region_overlap=0.907
+2026-10-12 21:44:53,109  gsv3.training             INFO     [random:random_seed6] epoch 0015  train_log_mse=0.00249  val_log_mse=0.04948  val_mse=0.000437  max_grad=4.07  patience=13/100
+2026-10-12 21:47:27,083  gsv3.training             INFO     [random:random_seed6] epoch 0016  delta_mse=0.0098
+2026-10-12 21:47:27,084  gsv3.training             INFO     [random:random_seed6] epoch 0016  delta_corr=0.832
+2026-10-12 21:47:27,084  gsv3.training             INFO     [random:random_seed6] epoch 0016  aug_layout=0.3645  aug_region_overlap=0.828  aug_count_mse=0.0176  aug_count_rel_err_2q=0.112
+2026-10-12 21:47:27,084  gsv3.training             INFO     [random:random_seed6] epoch 0016  ESP placement ce=2.317  exact qubit=0.230
+2026-10-12 21:47:27,084  gsv3.training             INFO     [random:random_seed6] epoch 0016  esp_decay_mse=0.0168  log_duration_mse=0.0018  log_depth_mse=0.0064
+2026-10-12 21:47:27,084  gsv3.training             INFO     [random:random_seed6] epoch 0016  count_mse=0.0186  count_rel_err_2q=0.116
+2026-10-12 21:47:27,084  gsv3.training             INFO     [random:random_seed6] epoch 0016  region_bce=0.0972  dist_mse=0.0712  region_overlap=0.907
+2026-10-12 21:47:27,084  gsv3.training             INFO     [random:random_seed6] epoch 0016  train_log_mse=0.00246  val_log_mse=0.05167  val_mse=0.000419  max_grad=4.15  patience=14/100
+2026-10-12 21:50:00,885  gsv3.training             INFO     [random:random_seed6] epoch 0017  delta_mse=0.0095
+2026-10-12 21:50:00,886  gsv3.training             INFO     [random:random_seed6] epoch 0017  delta_corr=0.823
+2026-10-12 21:50:00,886  gsv3.training             INFO     [random:random_seed6] epoch 0017  aug_layout=0.3582  aug_region_overlap=0.829  aug_count_mse=0.0176  aug_count_rel_err_2q=0.114
+2026-10-12 21:50:00,886  gsv3.training             INFO     [random:random_seed6] epoch 0017  ESP placement ce=2.311  exact qubit=0.231
+2026-10-12 21:50:00,886  gsv3.training             INFO     [random:random_seed6] epoch 0017  esp_decay_mse=0.0162  log_duration_mse=0.0017  log_depth_mse=0.0064
+2026-10-12 21:50:00,886  gsv3.training             INFO     [random:random_seed6] epoch 0017  count_mse=0.0184  count_rel_err_2q=0.117
+2026-10-12 21:50:00,886  gsv3.training             INFO     [random:random_seed6] epoch 0017  region_bce=0.0972  dist_mse=0.0711  region_overlap=0.907
+2026-10-12 21:50:00,886  gsv3.training             INFO     [random:random_seed6] epoch 0017  train_log_mse=0.00256  val_log_mse=0.05091  val_mse=0.000424  max_grad=3.73  patience=15/100
+2026-10-12 21:52:34,849  gsv3.training             INFO     [random:random_seed6] epoch 0018  delta_mse=0.0103
+2026-10-12 21:52:34,850  gsv3.training             INFO     [random:random_seed6] epoch 0018  delta_corr=0.833
+2026-10-12 21:52:34,850  gsv3.training             INFO     [random:random_seed6] epoch 0018  aug_layout=0.3632  aug_region_overlap=0.830  aug_count_mse=0.0176  aug_count_rel_err_2q=0.112
+2026-10-12 21:52:34,851  gsv3.training             INFO     [random:random_seed6] epoch 0018  ESP placement ce=2.311  exact qubit=0.231
+2026-10-12 21:52:34,851  gsv3.training             INFO     [random:random_seed6] epoch 0018  esp_decay_mse=0.0165  log_duration_mse=0.0017  log_depth_mse=0.0065
+2026-10-12 21:52:34,851  gsv3.training             INFO     [random:random_seed6] epoch 0018  count_mse=0.0187  count_rel_err_2q=0.115
+2026-10-12 21:52:34,851  gsv3.training             INFO     [random:random_seed6] epoch 0018  region_bce=0.0972  dist_mse=0.0706  region_overlap=0.908
+2026-10-12 21:52:34,851  gsv3.training             INFO     [random:random_seed6] epoch 0018  train_log_mse=0.00256  val_log_mse=0.05527  val_mse=0.000456  max_grad=5.62  patience=16/100
+2026-10-12 21:55:08,499  gsv3.training             INFO     [random:random_seed6] epoch 0019  delta_mse=0.0102
+2026-10-12 21:55:08,500  gsv3.training             INFO     [random:random_seed6] epoch 0019  delta_corr=0.830
+2026-10-12 21:55:08,500  gsv3.training             INFO     [random:random_seed6] epoch 0019  aug_layout=0.3556  aug_region_overlap=0.831  aug_count_mse=0.0176  aug_count_rel_err_2q=0.113
+2026-10-12 21:55:08,500  gsv3.training             INFO     [random:random_seed6] epoch 0019  ESP placement ce=2.311  exact qubit=0.231
+2026-10-12 21:55:08,500  gsv3.training             INFO     [random:random_seed6] epoch 0019  esp_decay_mse=0.0168  log_duration_mse=0.0017  log_depth_mse=0.0064
+2026-10-12 21:55:08,500  gsv3.training             INFO     [random:random_seed6] epoch 0019  count_mse=0.0186  count_rel_err_2q=0.117
+2026-10-12 21:55:08,500  gsv3.training             INFO     [random:random_seed6] epoch 0019  region_bce=0.0974  dist_mse=0.0707  region_overlap=0.907
+2026-10-12 21:55:08,500  gsv3.training             INFO     [random:random_seed6] epoch 0019  train_log_mse=0.00250  val_log_mse=0.04708  val_mse=0.000436  max_grad=3.29  patience=17/100
+2026-10-12 21:57:42,814  gsv3.training             INFO     [random:random_seed6] epoch 0020  delta_mse=0.0089
+2026-10-12 21:57:42,815  gsv3.training             INFO     [random:random_seed6] epoch 0020  delta_corr=0.840
+2026-10-12 21:57:42,815  gsv3.training             INFO     [random:random_seed6] epoch 0020  aug_layout=0.3571  aug_region_overlap=0.830  aug_count_mse=0.0175  aug_count_rel_err_2q=0.112
+2026-10-12 21:57:42,815  gsv3.training             INFO     [random:random_seed6] epoch 0020  ESP placement ce=2.304  exact qubit=0.233
+2026-10-12 21:57:42,815  gsv3.training             INFO     [random:random_seed6] epoch 0020  esp_decay_mse=0.0161  log_duration_mse=0.0017  log_depth_mse=0.0064
+2026-10-12 21:57:42,815  gsv3.training             INFO     [random:random_seed6] epoch 0020  count_mse=0.0185  count_rel_err_2q=0.116
+2026-10-12 21:57:42,815  gsv3.training             INFO     [random:random_seed6] epoch 0020  region_bce=0.0974  dist_mse=0.0707  region_overlap=0.907
+2026-10-12 21:57:42,815  gsv3.training             INFO     [random:random_seed6] epoch 0020  train_log_mse=0.00242  val_log_mse=0.05275  val_mse=0.000486  max_grad=2.46  patience=18/100
+2026-10-12 21:58:07,235  gsv3.experiment           INFO     [random_seed6] TEST  n=5117  MAE=0.0130  R2=0.9950  device-acc=0.783  regret=0.0032
+2026-10-12 21:58:07,240  genstudy.io               INFO     Wrote evaluations/generalization_v10/results/v8kdp10_s6/random_control/random_seed6/metrics.json
+2026-10-12 21:58:07,271  genstudy.io               INFO     Wrote evaluations/generalization_v10/results/v8kdp10_s6/random_control/random_seed6/predictions.json
+2026-10-12 21:58:07,285  genstudy.io               INFO     Wrote evaluations/generalization_v10/results/v8kdp10_s6/random_control/random_seed6/history.json
+2026-10-12 21:58:07,352  run_experiment            INFO     random_control finished: 1 complete, 0 skipped

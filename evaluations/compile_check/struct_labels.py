@@ -6,9 +6,10 @@ Per (circuit, device), over the active physical qubits of the compiled circuit (
   mmax  largest number of measurements on a qubit
   omax  largest number of operations on a qubit (1q, CZ, measurements)
   active number of qubits with at least one operation
+  busy_sum  Σ over qubits of gate time + 15 µs per measurement (v2 only; results/struct_labels_v2.pt)
 the quantities the analytic ESP head (``*_espa``) builds from the count head; ``--struct-lambda`` supervises them.
     python struct_labels.py run --task-id 0 --n-tasks 8
-    python struct_labels.py merge          # -> results/struct_labels.pt {circuit: FloatTensor(3 devices, 4)}
+    python struct_labels.py merge          # -> results/struct_labels_v2.pt {circuit: FloatTensor(3 devices, 5)}
 """
 from __future__ import annotations
 
@@ -21,10 +22,10 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 QPY = HERE / "results/layouts_all/qpy"
-OUT = HERE / "results/struct_labels"
+OUT = HERE / "results/struct_labels_v2"
 DEVICES = ("EQE1_Top", "EQE1_Bottom", "QExa20")
 DYNAMIC = {"iqpe", "dynamic_qft", "ghz_dynamic", "seven_qubit_steane_code", "shors_nine_qubit_code", "grover"}
-KEYS = ("tmax", "mmax", "omax", "active")
+KEYS = ("tmax", "mmax", "omax", "active", "busy_sum")
 T1Q, TCZ = 0.042, 0.130
 
 
@@ -41,7 +42,8 @@ def structure(qc) -> dict:
                 m[q] += 1
             else:
                 t[q] += TCZ if name == "cz" else T1Q
-    return {"tmax": max(t), "mmax": max(m), "omax": max(o), "active": sum(x > 0 for x in o)}
+    return {"tmax": max(t), "mmax": max(m), "omax": max(o), "active": sum(x > 0 for x in o),
+            "busy_sum": sum(t) + 15.0 * sum(m)}         # µs, all qubits, measurements included (the decay's Σ busy_q)
 
 
 def run(args) -> None:
@@ -81,7 +83,7 @@ def merge(args) -> None:
                 err += 1
                 continue
             out[r["circuit"]] = torch.tensor([[float(r[d][k]) for k in KEYS] for d in DEVICES])
-    torch.save(out, HERE / "results/struct_labels.pt")
+    torch.save(out, HERE / "results/struct_labels_v2.pt")
     print(f"{len(out)} circuits, {err} errors")
 
 

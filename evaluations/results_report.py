@@ -29,7 +29,7 @@ import summarize  # noqa: E402
 
 OUT = EVAL / "RESULTS.md"
 FIG = EVAL / "figures"
-MAIN = "v8a_c001"
+MAIN = "v8kdc10"
 
 # config -> (short name, one-line idea, status). Hand-written: the only non-computed text.
 MODELS = {
@@ -39,7 +39,7 @@ MODELS = {
     "v4u_phys": ("phys_uniform", "v4 without placement (diagnostic)", "diagnostic"),
     "v6_l01": ("v6", "v5 + loss on the compiler's exact layout", "discarded"),
     "v7_l01": ("v7", "v5 + loss on used region and qubit distances", "superseded"),
-    "v8a_c001": ("v8a", "v7 + loss on the true gate counts", "**main model**"),
+    "v8a_c001": ("v8a", "v7 + loss on the true gate counts", "earlier main model"),
     "v8b_c001": ("v8b", "v8a + calibration variants in training", "discarded"),
     "v8c_d1": ("v8c", "v8a fine-tuned with a loss on the change of log F", "pilot"),
     "v8c_d1_v4": ("v8c (4 var.)", "v8c with 4 of the 8 calibration variants", "test"),
@@ -65,6 +65,7 @@ MODELS = {
     "v8kdqm40": ("v8kdqm40", "v8kdl40 + both", "running"),
     "v9k": ("v9k", "v8k + relative device features", "running"),
     "v9f": ("v9f", "v8r + the add-ons kept by the v9 decision", "running"),
+    "v8kdc10": ("v8kdc10", "v8kdl40 + correlation change loss (1 − Pearson of Δ, weight 0.1)", "**main model**"),
     "v8kde10": ("v8kde10", "v8kdc10 + ESP / duration / depth heads (v13)", "running"),
     "v8kda10": ("v8kda10", "v8kdc10 + analytic ESP / duration / depth head (v14)", "running"),
     "v8kds10": ("v8kds10", "v8kda10 + per-qubit structure loss (v15)", "running"),

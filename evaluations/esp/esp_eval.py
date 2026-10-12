@@ -51,32 +51,39 @@ def predict(model, data, names, dev):
     return {k: np.concatenate(v) for k, v in out.items()}
 
 
-def evaluate(run, seed, split_dir, params, data, lab, dev, root=ROOT):
+def evaluate(run, seed, split_dir, params, data, lab, dev, root=ROOT, kind="sinkhorn_rf_route_czc_esp"):
     sfx = "" if seed == 5 else f"_s{seed}"
     d = root / f"{run}{sfx}" / split_dir.format(s=seed)
     if not (d / "model.pth").is_file():
         return None
     names = [n for n in json.loads((d / "predictions.json").read_text()) if n in lab and n in data]
-    model = build_model("sinkhorn_rf_route_czc_esp", params, dev, torch.device("cpu"))
+    model = build_model(kind, params, dev, torch.device("cpu"))
     model.load_state_dict(torch.load(d / "model.pth", map_location="cpu")); model.eval()
-    p = predict(model, data, names, dev)
+    return metrics(predict(model, data, names, dev), names, data, lab)
+
+
+def metrics(p, names, data, lab):
+    """``p``: per-circuit arrays (B, D) of logf and, when ESP heads exist, decay / logdur / logdep."""
     t = {k: np.stack([lab[n][k].numpy() for n in names]) for k in ("F", "ESP", "duration", "depth", "decay")}
     y = np.stack([data[n].y.reshape(-1).numpy() for n in names])
     f_pred = np.exp(np.minimum(p["logf"], 0))
-    esp_pred = f_pred * np.exp(p["decay"])
+    heads = "decay" in p
+    esp_pred = f_pred * np.exp(p["decay"]) if heads else f_pred
     dur_t, dep_t = np.log(t["duration"] * 1e6), np.log(np.maximum(t["depth"], 1))
     ok = np.isfinite(t["decay"])
     big = ok & (t["ESP"] > 1e-3)
-    m = {"n": len(names), "R² F": r2(f_pred[y >= 0], y[y >= 0]),
-         "R² log duration": r2(p["logdur"].ravel(), dur_t.ravel()),
-         "duration error (median)": float(np.median(np.abs(np.exp(p["logdur"] - dur_t) - 1))),
-         "R² log depth": r2(p["logdep"].ravel(), dep_t.ravel()),
-         "depth error (median)": float(np.median(np.abs(np.exp(p["logdep"] - dep_t) - 1))),
-         "R² ESP": r2(esp_pred[ok], t["ESP"][ok]), "R² ESP, baseline F": r2(f_pred[ok], t["ESP"][ok]),
-         "R² log ESP (ESP > 1e-3)": r2(np.log(np.maximum(esp_pred[big], 1e-12)), np.log(t["ESP"][big]))}
+    m = {"n": len(names), "R² F": r2(f_pred[y >= 0], y[y >= 0])}
+    if heads:
+        m.update({"R² log duration": r2(p["logdur"].ravel(), dur_t.ravel()),
+                  "duration error (median)": float(np.median(np.abs(np.exp(p["logdur"] - dur_t) - 1))),
+                  "R² log depth": r2(p["logdep"].ravel(), dep_t.ravel()),
+                  "depth error (median)": float(np.median(np.abs(np.exp(p["logdep"] - dep_t) - 1))),
+                  "R² ESP": r2(esp_pred[ok], t["ESP"][ok])})
+    m.update({"R² ESP, baseline F": r2(f_pred[ok], t["ESP"][ok]),
+              "R² log ESP (ESP > 1e-3)": r2(np.log(np.maximum(esp_pred[big], 1e-12)), np.log(t["ESP"][big]))})
     rows = ok.all(1)
     true_best = t["ESP"][rows].argmax(1)
-    for lab_, score in (("model", esp_pred[rows]), ("baseline F", f_pred[rows])):
+    for lab_, score in ((("model", esp_pred[rows]),) if heads else ()) + (("baseline F", f_pred[rows]),):
         pick = score.argmax(1)
         m[f"right device by ESP, {lab_}"] = float((pick == true_best).mean())
         m[f"ESP regret, {lab_}"] = float((t["ESP"][rows].max(1) - t["ESP"][rows][np.arange(rows.sum()), pick]).mean())
@@ -87,6 +94,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", default="v8kde10")
     ap.add_argument("--root", type=Path, default=ROOT, help="results root of the run")
+    ap.add_argument("--kind", default="sinkhorn_rf_route_czc_esp", help="model kind (…_esp or …_espa)")
     args = ap.parse_args()
     torch.set_num_threads(8)
     params = load_hparams()
@@ -97,7 +105,7 @@ def main():
     res = {}
     for name, sd in SPLITS.items():
         for seed in (5, 6, 7):
-            m = evaluate(args.run, seed, sd, params, data, lab, dev, args.root)
+            m = evaluate(args.run, seed, sd, params, data, lab, dev, args.root, args.kind)
             if m is not None:
                 res.setdefault(name, []).append(m)
                 print(name, seed, {k: round(v, 4) for k, v in m.items()}, flush=True)

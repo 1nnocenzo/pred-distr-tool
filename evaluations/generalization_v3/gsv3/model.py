@@ -63,7 +63,7 @@ XATTN_DEFAULTS: dict[str, Any] = {
     "cost_bias_init": -6.0,   # softplus(-6) ≈ 2.5e-3 per gate at initialisation
 }
 
-MODEL_KINDS = ("pooled", "xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_pgnn_usage")
+MODEL_KINDS = ("pooled", "xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_czc_espa", "sinkhorn_rf_route_pgnn_usage")
 
 
 def load_hparams(params_path: Path | str | None = None) -> dict[str, Any]:
@@ -491,13 +491,12 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         # idle_q = duration − busy_q.  busy_q = the count head's gates on q × the gate durations; the head
         # predicts the duration as busiest qubit × (1 + softplus(·)) (never below it) and log depth.
         # Inputs: circuit embedding, device embedding, log1p of the total counts, busiest qubit, active qubits.
-        self.esp_head = esp_head
-        if esp_head:
-            self.esp_mlp = nn.Sequential(nn.Linear(2 * d + 5, 128), nn.LeakyReLU(), nn.Linear(128, 64),
-                                         nn.LeakyReLU(), nn.Linear(64, 2))
-            nn.init.zeros_(self.esp_mlp[-1].weight)
-            with torch.no_grad():
-                self.esp_mlp[-1].bias.copy_(torch.tensor([0.0, 4.0]))   # duration ≈ 1.7 × busiest qubit, depth ≈ 55
+        # ``*_espa`` (v14, analytic): the same three targets from the circuit's structure alone, no circuit or
+        # device embedding (see ``esp_features``), so an unseen family gets the rule learned on the others.
+        self.esp_head = {False: False, True: "v13"}.get(esp_head, esp_head)
+        if self.esp_head:
+            n_in = 2 * d + 5 if self.esp_head == "v13" else self.N_ESPA_IN
+            self.esp_mlp = self.new_esp_mlp(n_in, self.esp_head)
         # Hop-distance matrices of the (fixed) devices, padded to (D, P, P).
         sizes = torch.bincount(devices.batch).tolist()
         p_max, offset, mats = max(sizes), 0, []
@@ -627,38 +626,85 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
             n_ops = torch.cat([n_ops[..., :2], cz.unsqueeze(-1)], dim=-1)
         self.last_counts = scatter(n_ops, gb, dim=0, dim_size=n_circ, reduce="sum")   # v8
         if self.esp_head and hasattr(devices, "coh"):     # device batches built elsewhere may lack T1/T2
-            self._esp(devices, g, gb, n_circ, n_ops, valid, local, assign, dev_glob)
+            self.last_esp_feats = self.esp_features(circuits, devices, g, gb, n_circ, n_ops, valid, local, assign, dev_glob)
+            self.last_esp = self.esp_from_features(self.esp_mlp, self.last_esp_feats, self.esp_head)
         if self.usage_head:
             return self._usage_log_f(circuits, devices, assign, n_ops, valid, local, gb, n_circ)
         cost = (n_ops * g_eps * self.log_scale.exp()).sum(-1)
         return -scatter(cost, gb, dim=0, dim_size=n_circ, reduce="sum")
 
-    def _esp(self, devices, g, gb, n_circ, n_ops, valid, local, assign, dev_glob):
-        """v13: ``last_esp`` = (ESP decay = log ESP − log F, log duration in µs, log depth), each (B, D)."""
+    N_ESPA_IN = 10
+
+    @staticmethod
+    def new_esp_mlp(n_in: int, kind: str) -> nn.Sequential:
+        mlp = nn.Sequential(nn.Linear(n_in, 128), nn.LeakyReLU(), nn.Linear(128, 64), nn.LeakyReLU(), nn.Linear(64, 2))
+        nn.init.zeros_(mlp[-1].weight)
+        with torch.no_grad():   # v13: duration ≈ 1.7 × busiest qubit, depth ≈ 55; espa: 1.7 × gate time, 2 × operations
+            mlp[-1].bias.copy_(torch.tensor([0.0, 4.0]) if kind == "v13" else torch.tensor([0.0, 0.0]))
+        return mlp
+
+    def esp_features(self, circuits, devices, g, gb, n_circ, n_ops, valid, local, assign, dev_glob) -> dict:
+        """Everything the ESP heads read except their MLP (fixed for a frozen backbone, so probes can cache it).
+
+        Per logical qubit q, the count head's gates spread over their operands (1-qubit gates and measurements
+        split over the operands, every CZ occupies two): busy_q (µs, measurements included), gate time t_q
+        (µs, no measurements), measurements m_q, operations o_q.  inv_t = 1 / min(T1, T2) through the placement."""
         from .devices import GATE_US
         b, n_dev, q_max, _ = assign.shape
         cnt = valid.sum(1).clamp(min=1).float().unsqueeze(1)                      # operands per gate
-        per = n_ops * n_ops.new_tensor(GATE_US)                                    # (G, D, 3) µs
-        # busy time of each operand: 1-qubit gates and measurements split over the operands, every
-        # CZ occupies two of them
-        share = per[..., 0] / cnt + per[..., 1] / cnt + per[..., 2] * torch.where(cnt > 1, 2.0 / cnt, torch.zeros_like(cnt))
-        busy = torch.zeros(b * q_max, n_dev, device=g.device)
+        two = torch.where(cnt > 1, 2.0 / cnt, torch.zeros_like(cnt))
+        t_us = n_ops.new_tensor(GATE_US)
+        per = torch.stack([n_ops[..., 0] * t_us[0] / cnt + n_ops[..., 2] * t_us[2] * two,
+                           n_ops[..., 1] / cnt,
+                           (n_ops[..., 0] + n_ops[..., 1]) / cnt + n_ops[..., 2] * two], -1)   # (G, D, 3)
+        acc = torch.zeros(b * q_max, n_dev, 3, device=g.device)
         for k in range(local.size(1)):
             m = valid[:, k]
-            busy = busy.index_add(0, (gb * q_max + local[:, k])[m], share[m])
-        busy = busy.view(b, q_max, n_dev).permute(0, 2, 1)                          # (B, D, Qm)
+            acc = acc.index_add(0, (gb * q_max + local[:, k])[m], per[m])
+        t_q, m_q, o_q = acc.view(b, q_max, n_dev, 3).permute(0, 2, 1, 3).unbind(-1)   # (B, D, Qm)
+        busy = t_q + m_q * t_us[1]
         active = (busy > 0).float()
-        bmax = busy.amax(-1)
-        g_pool = scatter(g, gb, dim=0, dim_size=n_circ, reduce="mean")
-        z = torch.cat([g_pool.unsqueeze(1).expand(-1, n_dev, -1), dev_glob.unsqueeze(0).expand(n_circ, -1, -1),
-                       torch.log1p(self.last_counts), torch.log1p(bmax).unsqueeze(-1),
-                       torch.log1p(active.sum(-1)).unsqueeze(-1)], dim=-1)
-        out = self.esp_mlp(z)                                                       # (B, D, 2)
-        dur = bmax * (1 + F.softplus(out[..., 0])) + 1e-3                           # µs
         coh, _ = to_dense_batch(devices.coh, devices.batch)                          # (D, P) 1/µs
-        inv_t = torch.einsum("bdqp,dp->bdq", assign, coh)                           # through the placement
-        decay = -(((dur.unsqueeze(-1) - busy).clamp(min=0) * active) * inv_t).sum(-1)
-        self.last_esp = (decay, torch.log(dur), out[..., 1])
+        f = {"busy": busy, "active": active, "inv_t": torch.einsum("bdqp,dp->bdq", assign, coh),
+             "counts": self.last_counts, "tmax": t_q.amax(-1), "mmax": m_q.amax(-1), "omax": o_q.amax(-1)}
+        if self.esp_head == "v13" or getattr(self, "esp_all_features", False):   # probes cache both heads' inputs
+            g_pool = scatter(g, gb, dim=0, dim_size=n_circ, reduce="mean")
+            f["emb"] = torch.cat([g_pool.unsqueeze(1).expand(-1, n_dev, -1),
+                                  dev_glob.unsqueeze(0).expand(n_circ, -1, -1)], -1)
+        if self.esp_head == "a" or getattr(self, "esp_all_features", False):
+            f["rf"] = routing_free(circuits, devices, self._rf_cache).to(g.device)
+            f["re"] = routing_estimate(circuits, devices, self._re_cache).to(g.device)
+            f["n_phys"] = torch.bincount(devices.batch).float().to(g.device).expand(n_circ, -1)
+        return f
+
+    @staticmethod
+    def esp_from_features(mlp, f: dict, kind: str):
+        """(ESP decay = log ESP − log F, log duration in µs, log depth), each (B, D).
+
+        v13:  duration = busiest qubit (measurements included) × (1 + softplus(a)); log depth = b; the MLP reads the
+              circuit and device embeddings, the totals, the busiest qubit and the active qubits.
+        espa: duration = T_meas · max_q m_q + max_q t_q · (1 + softplus(a))  (measurement layers + gate critical path);
+              depth = max(1, max_q o_q) · exp(softplus(b))  (never below the busiest qubit's operations);
+              the MLP reads only log1p of the totals, max t_q, max m_q, max o_q, active qubits, the routing-free flag,
+              the routing estimate and the device size."""
+        from .devices import GATE_US
+        busy, active = f["busy"], f["active"]
+        if kind == "v13":
+            bmax = busy.amax(-1)
+            z = torch.cat([f["emb"], torch.log1p(f["counts"]), torch.log1p(bmax).unsqueeze(-1),
+                           torch.log1p(active.sum(-1)).unsqueeze(-1)], -1)
+            out = mlp(z)
+            dur = bmax * (1 + F.softplus(out[..., 0])) + 1e-3
+            logdep = out[..., 1]
+        else:
+            st = torch.stack([f["tmax"], f["mmax"], f["omax"], active.sum(-1)], -1)
+            z = torch.cat([torch.log1p(f["counts"]), torch.log1p(st), f["rf"].unsqueeze(-1), f["re"].unsqueeze(-1),
+                           torch.log(f["n_phys"]).unsqueeze(-1)], -1)
+            out = mlp(z)
+            dur = GATE_US[1] * f["mmax"] + f["tmax"] * (1 + F.softplus(out[..., 0])) + 1e-3
+            logdep = torch.log(f["omax"].clamp(min=1)) + F.softplus(out[..., 1])
+        decay = -(((dur.unsqueeze(-1) - busy).clamp(min=0) * active) * f["inv_t"]).sum(-1)
+        return decay, torch.log(dur), logdep
 
     def _vf2_cost(self, circuits, devices, g, q_max, n_circ, valid):
         """(B, D, Qm, P) β · estimated log-fidelity lost by putting logical q on physical p."""
@@ -969,10 +1015,26 @@ def routing_free(circuits, devices, cache: dict | None = None) -> torch.Tensor:
     return out
 
 
+SINKHORN_KINDS = ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_pgnn_usage")
+
+
+def split_esp_kind(kind: str) -> tuple[str, str | bool]:
+    """``<sinkhorn kind>_esp`` (v13 ESP head) / ``<sinkhorn kind>_espa`` (v14 analytic head) -> (base kind, head)."""
+    for sfx, head in (("_espa", "a"), ("_esp", "v13")):
+        if kind.endswith(sfx) and kind[: -len(sfx)] in SINKHORN_KINDS:
+            return kind[: -len(sfx)], head
+    return kind, False
+
+
+def is_sinkhorn_kind(kind: str) -> bool:
+    return split_esp_kind(kind)[0] in SINKHORN_KINDS
+
+
 def build_model(kind: str, params: dict[str, Any], devices, device: torch.device) -> nn.Module:
+    kind, esp = split_esp_kind(kind)
     if kind == "pooled":
         return build_v2_model(params, devices, device)
-    if kind in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_pgnn_usage"):
+    if kind in SINKHORN_KINDS:
         rel = kind in ("sinkhorn_rf_rel", "sinkhorn_rf_rel_route", "sinkhorn_rf_rel_route_czc")
         model = SinkhornPlacementPredictor(
             params, dev_node_dim=devices.x.size(1) + (N_RELATIVE if rel else 0),
@@ -984,7 +1046,7 @@ def build_model(kind: str, params: dict[str, Any], devices, device: torch.device
             usage_head=kind.endswith("_usage"),
             err_prior=3 if "_ep3" in kind else (1 if kind.endswith("_ep") else 0),
             mlp_scorer="_mlps" in kind, vf2_prior=kind.endswith("_vf2"), placed_gnn="_pgnn" in kind,
-            esp_head=kind.endswith("_esp"),
+            esp_head=esp,
         )
         model.relative_dev = rel
         return model.to(device)

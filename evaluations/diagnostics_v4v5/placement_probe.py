@@ -45,7 +45,8 @@ LOCAL_KINDS = {0, 1, 2, 3, 4, 5, 6, 9}
 MODELS = {"v8k (no fine-tuning)": ("sinkhorn_rf_route_czc", "v8k"), "v8kd40": ("sinkhorn_rf_route_czc", "v8kd40"),
           "v11d40": ("sinkhorn_rf_route_usage", "v11d40"), "v8kdl40": ("sinkhorn_rf_route_czc", "v8kdl40"),
           "v8kdr40": ("sinkhorn_rf_route_czc", "v8kdr40"), "v8kdp40": ("sinkhorn_rf_route_czc_ep", "v8kdp40"),
-          "v8kdrp40": ("sinkhorn_rf_route_czc_ep", "v8kdrp40"), "v8kdc10": ("sinkhorn_rf_route_czc", "v8kdc10")}
+          "v8kdrp40": ("sinkhorn_rf_route_czc_ep", "v8kdrp40"), "v8kdc10": ("sinkhorn_rf_route_czc", "v8kdc10"),
+          "v8kde10": ("sinkhorn_rf_route_czc_esp", "v8kde10"), "v8kda10": ("sinkhorn_rf_route_czc_espa", "v8kda10")}
 TAUS = (0.3, 0.15, 0.07, 0.03)
 
 

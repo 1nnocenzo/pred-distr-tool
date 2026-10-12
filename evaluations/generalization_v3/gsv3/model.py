@@ -63,7 +63,7 @@ XATTN_DEFAULTS: dict[str, Any] = {
     "cost_bias_init": -6.0,   # softplus(-6) ≈ 2.5e-3 per gate at initialisation
 }
 
-MODEL_KINDS = ("pooled", "xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_czc_espa", "sinkhorn_rf_route_pgnn_usage")
+MODEL_KINDS = ("pooled", "xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_czc_espa", "sinkhorn_rf_route_czc_espi", "sinkhorn_rf_route_pgnn_usage")
 
 
 def load_hparams(params_path: Path | str | None = None) -> dict[str, Any]:
@@ -495,7 +495,7 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         # device embedding (see ``esp_features``), so an unseen family gets the rule learned on the others.
         self.esp_head = {False: False, True: "v13"}.get(esp_head, esp_head)
         if self.esp_head:
-            n_in = 2 * d + 5 if self.esp_head == "v13" else self.N_ESPA_IN
+            n_in = 2 * d + 5 if self.esp_head == "v13" else (self.N_ESPA_IN + 1 if self.esp_head == "i" else self.N_ESPA_IN)
             self.esp_mlp = self.new_esp_mlp(n_in, self.esp_head)
         # Hop-distance matrices of the (fixed) devices, padded to (D, P, P).
         sizes = torch.bincount(devices.batch).tolist()
@@ -624,6 +624,10 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
             extra = torch.expm1(re_)[gb] * (1 - rf[gb])              # (G, D) extra hops per 2q gate
             cz = base * (1 + n_ops[..., 2] * extra)
             n_ops = torch.cat([n_ops[..., :2], cz.unsqueeze(-1)], dim=-1)
+        if self.esp_head == "i":
+            # ``*_espi`` (v16): compilation never adds or removes a measurement -> one per logical measure gate
+            meas = (circuits.x[:, GATE2IDX_MEASURE] > 0.5).float().view(-1, 1).expand(-1, n_dev)
+            n_ops = torch.cat([n_ops[..., :1], meas.unsqueeze(-1), n_ops[..., 2:]], dim=-1)
         self.last_counts = scatter(n_ops, gb, dim=0, dim_size=n_circ, reduce="sum")   # v8
         if self.esp_head and hasattr(devices, "coh"):     # device batches built elsewhere may lack T1/T2
             self.last_esp_feats = self.esp_features(circuits, devices, g, gb, n_circ, n_ops, valid, local, assign, dev_glob)
@@ -637,10 +641,11 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
 
     @staticmethod
     def new_esp_mlp(n_in: int, kind: str) -> nn.Sequential:
-        mlp = nn.Sequential(nn.Linear(n_in, 128), nn.LeakyReLU(), nn.Linear(128, 64), nn.LeakyReLU(), nn.Linear(64, 2))
+        n_out = 3 if kind == "i" else 2      # espi: + log factor on the structural idle time
+        mlp = nn.Sequential(nn.Linear(n_in, 128), nn.LeakyReLU(), nn.Linear(128, 64), nn.LeakyReLU(), nn.Linear(64, n_out))
         nn.init.zeros_(mlp[-1].weight)
-        with torch.no_grad():   # v13: duration ≈ 1.7 × busiest qubit, depth ≈ 55; espa: 1.7 × gate time, 2 × operations
-            mlp[-1].bias.copy_(torch.tensor([0.0, 4.0]) if kind == "v13" else torch.tensor([0.0, 0.0]))
+        with torch.no_grad():   # v13: duration ≈ 1.7 × busiest qubit, depth ≈ 55; espa/espi: 1.7 × gate time, 2 × operations
+            mlp[-1].bias.copy_(torch.tensor([0.0, 4.0]) if kind == "v13" else torch.zeros(n_out))
         return mlp
 
     def esp_features(self, circuits, devices, g, gb, n_circ, n_ops, valid, local, assign, dev_glob) -> dict:
@@ -671,7 +676,7 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
             g_pool = scatter(g, gb, dim=0, dim_size=n_circ, reduce="mean")
             f["emb"] = torch.cat([g_pool.unsqueeze(1).expand(-1, n_dev, -1),
                                   dev_glob.unsqueeze(0).expand(n_circ, -1, -1)], -1)
-        if self.esp_head == "a" or getattr(self, "esp_all_features", False):
+        if self.esp_head in ("a", "i") or getattr(self, "esp_all_features", False):
             f["rf"] = routing_free(circuits, devices, self._rf_cache).to(g.device)
             f["re"] = routing_estimate(circuits, devices, self._re_cache).to(g.device)
             f["n_phys"] = torch.bincount(devices.batch).float().to(g.device).expand(n_circ, -1)
@@ -698,11 +703,21 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
             logdep = out[..., 1]
         else:
             st = torch.stack([f["tmax"], f["mmax"], f["omax"], active.sum(-1)], -1)
-            z = torch.cat([torch.log1p(f["counts"]), torch.log1p(st), f["rf"].unsqueeze(-1), f["re"].unsqueeze(-1),
-                           torch.log(f["n_phys"]).unsqueeze(-1)], -1)
-            out = mlp(z)
+            z = [torch.log1p(f["counts"]), torch.log1p(st), f["rf"].unsqueeze(-1), f["re"].unsqueeze(-1),
+                 torch.log(f["n_phys"]).unsqueeze(-1)]
+            if kind == "i":
+                # structural idle time: every active qubit waits for the busiest gate chain and the most measurements
+                base = (((f["tmax"] + GATE_US[1] * f["mmax"]).unsqueeze(-1) - busy).clamp(min=0) * active).sum(-1)
+                z.append(torch.log1p(base).unsqueeze(-1))
+            out = mlp(torch.cat(z, -1))
             dur = GATE_US[1] * f["mmax"] + f["tmax"] * (1 + F.softplus(out[..., 0])) + 1e-3
             logdep = torch.log(f["omax"].clamp(min=1)) + F.softplus(out[..., 1])
+            if kind == "i":
+                # v16: total idle time predicted directly (not as duration − busy, a small difference of large
+                # numbers) times the mean 1 / min(T1, T2) of the placed active qubits
+                idle = (base + 1e-3) * torch.exp(out[..., 2])
+                inv_m = (active * f["inv_t"]).sum(-1) / active.sum(-1).clamp(min=1)
+                return -idle * inv_m, torch.log(dur), logdep
         decay = -(((dur.unsqueeze(-1) - busy).clamp(min=0) * active) * f["inv_t"]).sum(-1)
         return decay, torch.log(dur), logdep
 
@@ -1020,7 +1035,7 @@ SINKHORN_KINDS = ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_rou
 
 def split_esp_kind(kind: str) -> tuple[str, str | bool]:
     """``<sinkhorn kind>_esp`` (v13 ESP head) / ``<sinkhorn kind>_espa`` (v14 analytic head) -> (base kind, head)."""
-    for sfx, head in (("_espa", "a"), ("_esp", "v13")):
+    for sfx, head in (("_espa", "a"), ("_espi", "i"), ("_esp", "v13")):
         if kind.endswith(sfx) and kind[: -len(sfx)] in SINKHORN_KINDS:
             return kind[: -len(sfx)], head
     return kind, False

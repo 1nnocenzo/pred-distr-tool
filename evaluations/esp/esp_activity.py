@@ -41,7 +41,7 @@ def collect(model, data, lab, st, dev, names):
     rows = defaultdict(list)
     for f in feats:
         nm = f["names"]
-        dec, ldur, _ = model.esp_from_features(model.esp_mlp, f, "a")
+        dec, ldur, _ = model.esp_from_features(model.esp_mlp, f, model.esp_head)
         b = next(iter(DataLoader([data[n] for n in nm], batch_size=len(nm))))
         rows["rf"].append(routing_free(b, dev, model._rf_cache).numpy())
         rows["act"].append(f["active"].sum(-1).numpy())

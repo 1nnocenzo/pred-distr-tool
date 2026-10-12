@@ -36,7 +36,7 @@ from gsv3.model import SinkhornPlacementPredictor, build_model, load_hparams  # 
 
 STRUCT = EVAL / "compile_check/results/struct_labels.pt"
 ROOT = EVAL / "generalization_v9/results"
-KINDS = {"v5_espa": "sinkhorn_espa", "v8a_espa": "sinkhorn_espa"}
+KINDS = {"v5_espa": "sinkhorn_espa", "v8a_espa": "sinkhorn_espa", "v8kdi10": "sinkhorn_rf_route_czc_espi"}
 
 
 def choice(score, esp):
@@ -52,12 +52,12 @@ def run_split(model, data, lab, st, dev, names):
     out = defaultdict(list)
     for f in feats:
         nm = f["names"]
-        dec, ldur, ldep = model.esp_from_features(model.esp_mlp, f, "a")
+        dec, ldur, ldep = model.esp_from_features(model.esp_mlp, f, model.esp_head)
         tS = torch.stack([st[n] if n in st else torch.full((len(DEVS), 4), math.nan) for n in nm])   # (B, D, 4)
         f2 = dict(f)
         for i, k in enumerate(("tmax", "mmax", "omax")):
             f2[k] = torch.where(torch.isfinite(tS[..., i]), tS[..., i], f[k])
-        dec_s, ldur_s, ldep_s = model.esp_from_features(model.esp_mlp, f2, "a")
+        dec_s, ldur_s, ldep_s = model.esp_from_features(model.esp_mlp, f2, model.esp_head)
         dur_t = torch.stack([lab[n]["duration"].float() * 1e6 for n in nm])
         dec_d = -(((dur_t.unsqueeze(-1) - f["busy"]).clamp(min=0) * f["active"]) * f["inv_t"]).sum(-1)
         # device-average 1 / min(T1, T2) instead of the placed qubits' (what a uniform placement reads)

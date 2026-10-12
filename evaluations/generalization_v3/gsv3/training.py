@@ -87,6 +87,19 @@ def esp_loss(model, batch, weights=None) -> tuple[torch.Tensor, list[float]]:
     return (w * mse).sum(), mse.tolist()
 
 
+def struct_loss(model, batch) -> tuple[torch.Tensor, list[float]]:
+    """v15: the analytic ESP head's per-qubit structure (busiest qubit's gate time in µs, measurements, operations;
+    ``model.last_esp_feats``) vs the stored compilation's (``batch.struct``, NaN = unknown), MSE of log1p each;
+    also returns the three MSEs.  The gradient reaches the count head, which the structure is built from."""
+    f = model.last_esp_feats
+    pred = torch.stack([f["tmax"], f["mmax"], f["omax"]], -1)              # (B, D, 3)
+    true = batch.struct.view(pred.shape[0], pred.shape[1], -1)[..., :3]
+    known = torch.isfinite(true)
+    err = torch.where(known, (torch.log1p(pred) - torch.log1p(torch.nan_to_num(true))) ** 2, torch.zeros_like(pred))
+    mse = err.sum((0, 1)) / known.sum((0, 1)).clamp(min=1)
+    return mse.sum(), mse.tolist()
+
+
 def usage_loss(model, batch, true_maps=None) -> tuple[torch.Tensor, float]:
     """v11: predicted usage maps vs the compiled circuit's (``batch.usage_r/m/cz``, -1 = no maps),
     or vs ``true_maps`` = (r, m, cz) given explicitly (calibration variants).
@@ -322,6 +335,8 @@ def train_model(
     # v13 (opt-in): ESP decay / duration / depth of the stored compilation; needs ``esp`` on the graphs
     esp_lambda = float(protocol.get("esp_lambda", 0) or 0)
     esp_w = [float(x) for x in str(protocol.get("esp_weights") or "1,1,1").split(",")]
+    # v15 (opt-in): per-qubit structure of the stored compilation; needs ``struct`` on the graphs and an *_espa model
+    struct_lambda = float(protocol.get("struct_lambda", 0) or 0)
     usage_lambda = float(protocol.get("usage_lambda", 0) or 0)
     # usage maps on the calibration variants (change-loss pass), indexed by ``batch.usage_id``
     usage_aug_lambda = float(protocol.get("usage_aug_lambda", 0) or 0)
@@ -409,6 +424,7 @@ def train_model(
         v7_stats: dict[str, float] = {}
         cnt_loss, cnt_rel2, cnt_n = 0.0, 0.0, 0
         esp_acc, esp_n = [0.0, 0.0, 0.0], 0
+        st_acc, st_n = [0.0, 0.0, 0.0], 0
         dl_sum, dl_n = 0.0, 0
         dc_sum, dc_n = 0.0, 0
         us_loss, us_corr, us_n = 0.0, 0.0, 0
@@ -453,6 +469,11 @@ def train_model(
                 loss = loss + esp_lambda * eloss
                 esp_acc = [a + b for a, b in zip(esp_acc, emse)]
                 esp_n += 1
+            if struct_lambda and batch_devices is devices:
+                sloss, smse = struct_loss(model, batch)
+                loss = loss + struct_lambda * sloss
+                st_acc = [a + b for a, b in zip(st_acc, smse)]
+                st_n += 1
             if usage_lambda and batch_devices is devices:   # maps exist for the original devices
                 uloss, ucorr = usage_loss(model, batch)
                 loss = loss + usage_lambda * uloss
@@ -562,6 +583,11 @@ def train_model(
                 history[-1][k] = v / max(1, esp_n)
             logger.info("[%s] epoch %04d  esp_decay_mse=%.4f  log_duration_mse=%.4f  log_depth_mse=%.4f", tag, epoch,
                         *(history[-1][k] for k in ("train_esp_decay_mse", "train_log_duration_mse", "train_log_depth_mse")))
+        if struct_lambda:
+            for k, v in zip(("train_struct_tmax_mse", "train_struct_mmax_mse", "train_struct_omax_mse"), st_acc):
+                history[-1][k] = v / max(1, st_n)
+            logger.info("[%s] epoch %04d  struct_mse tmax=%.4f  mmax=%.4f  omax=%.4f", tag, epoch,
+                        *(history[-1][k] for k in ("train_struct_tmax_mse", "train_struct_mmax_mse", "train_struct_omax_mse")))
         if count_lambda:
             history[-1]["train_count_mse"] = cnt_loss / max(1, cnt_n)
             history[-1]["train_count_rel_err_2q"] = cnt_rel2 / max(1, cnt_n)

@@ -34,7 +34,7 @@ from gsv3 import paths
 from gsv3.devices import load_devices
 from gsv3.experiment import run_split
 from gsv3.groups import GROUPS, group_holdout_split
-from gsv3.model import MODEL_KINDS, load_hparams
+from gsv3.model import MODEL_KINDS, SINKHORN_KINDS, load_hparams, split_esp_kind
 from gsv3.training import TRAIN_PROTOCOL
 
 paths.ensure_imports()
@@ -57,7 +57,7 @@ EXPERIMENTS = {
 
 #: ``v1`` = the original v1 predictor (genstudy: linear target, 3 fixed outputs,
 #: random validation split), run unchanged through ``genstudy.experiment.run_split``.
-ALL_MODELS = (*MODEL_KINDS, "v1")
+ALL_MODELS = (*MODEL_KINDS, *(k + s for k in SINKHORN_KINDS for s in ("_esp", "_espa") if k + s not in MODEL_KINDS), "v1")
 
 
 def attach_layouts(dataset, path: Path) -> None:
@@ -105,6 +105,20 @@ def attach_esp(dataset, path: Path) -> None:
         else:
             d.esp = torch.full((1, len(DEVICE_NAMES), 3), math.nan)
     logger.info("ESP / duration / depth labels (%s): %d/%d circuits", path, found, len(dataset.data))
+
+
+def attach_struct(dataset, path: Path) -> None:
+    """v15: ``d.struct`` = (tmax µs, mmax, omax, active) per device ``(1, n_devices, 4)`` of the stored seed-0
+    compilation (compile_check/struct_labels.py); NaN if missing."""
+    import math
+    import torch
+    labels = torch.load(path, weights_only=False)
+    found = 0
+    for d, name in zip(dataset.data, dataset.names):
+        r = labels.get(name)
+        d.struct = r.float().unsqueeze(0) if r is not None else torch.full((1, len(DEVICE_NAMES), 4), math.nan)
+        found += r is not None
+    logger.info("Per-qubit structure labels (%s): %d/%d circuits", path, found, len(dataset.data))
 
 
 def attach_usage(dataset, path: Path) -> None:
@@ -220,6 +234,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--esp-path", type=Path, default=None,
                    help="v13: ESP / duration / depth labels (compile_check/results/esp_labels.pt)")
     p.add_argument("--esp-lambda", type=float, default=None, help="v13: weight of the ESP / duration / depth loss")
+    p.add_argument("--struct-path", type=Path, default=None,
+                   help="v15: per-qubit structure labels (compile_check/results/struct_labels.pt)")
+    p.add_argument("--struct-lambda", type=float, default=None, help="v15: weight of the per-qubit structure loss (*_espa)")
     p.add_argument("--esp-weights", default=None,
                    help="v13: per-target weights 'decay,duration,depth' of the ESP loss (default 1,1,1)")
     p.add_argument("--count-weights", default=None,
@@ -292,7 +309,7 @@ def main() -> int:
     # Opt-in v5b keys: only present when requested, so older configurations (and
     # their checkpoints) are unchanged.
     for key in ("epoch_budget", "swa_frac", "tau_start", "layout_lambda", "layout_loss", "count_lambda",
-                "aug_p_orig", "delta_lambda", "aug_variants", "count_weights", "usage_lambda", "usage_aug_lambda", "react_lambda", "placement_lr_mult", "delta_corr_lambda", "esp_lambda", "esp_weights"):
+                "aug_p_orig", "delta_lambda", "aug_variants", "count_weights", "usage_lambda", "usage_aug_lambda", "react_lambda", "placement_lr_mult", "delta_corr_lambda", "esp_lambda", "esp_weights", "struct_lambda"):
         if getattr(args, key) is not None:
             protocol[key] = getattr(args, key)
     if args.model == "v1":
@@ -308,17 +325,17 @@ def main() -> int:
             params["err_prior_init"] = args.err_prior_init
         if args.vf2_beta_init is not None:
             params["vf2_beta_init"] = args.vf2_beta_init
-        qubit_aware = args.model in ("xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_czc_espa", "sinkhorn_rf_route_pgnn_usage")
+        qubit_aware = split_esp_kind(args.model)[0] in ("xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_czc_espa", "sinkhorn_rf_route_pgnn_usage")
         devices = load_devices(args.device_graphs, DEVICE_NAMES,
                                lap_pe=params["lap_pe"] if qubit_aware else 0,
-                               physical_errors=args.model in ("phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_czc_espa", "sinkhorn_rf_route_pgnn_usage"))
+                               physical_errors=split_esp_kind(args.model)[0] in ("phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_czc_espa", "sinkhorn_rf_route_pgnn_usage"))
 
-    if args.dataset_dir is None and args.model in ("xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_czc_espa", "sinkhorn_rf_route_pgnn_usage"):
+    if args.dataset_dir is None and split_esp_kind(args.model)[0] in ("xattn", "phys", "sinkhorn", "phys_uniform", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_czc_espa", "sinkhorn_rf_route_pgnn_usage"):
         args.dataset_dir = paths.DATA_DIR
     dataset_dir = v1_paths.find_dataset_dir(args.dataset_dir, FIGURE_OF_MERIT)
     dataset = GraphDataset.load(dataset_dir, FIGURE_OF_MERIT)
     if args.layout_lambda:
-        if args.model not in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_czc_espa", "sinkhorn_rf_route_pgnn_usage") or args.layouts_path is None:
+        if split_esp_kind(args.model)[0] not in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_czc_espa", "sinkhorn_rf_route_pgnn_usage") or args.layouts_path is None:
             raise SystemExit("--layout-lambda needs --model sinkhorn and --layouts-path")
         attach_layouts(dataset, args.layouts_path)
     if args.calib_aug is not None:
@@ -345,15 +362,19 @@ def main() -> int:
             found += r is not None
         logger.info("Original-calibration best-of-K labels (%s): %d/%d circuits", args.orig_best, found, len(dataset.data))
     if args.count_lambda:
-        if args.model not in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_czc_espa", "sinkhorn_rf_route_pgnn_usage", "phys", "phys_uniform") or args.counts_path is None:
+        if split_esp_kind(args.model)[0] not in ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_czc_esp", "sinkhorn_rf_route_czc_espa", "sinkhorn_rf_route_pgnn_usage", "phys", "phys_uniform") or args.counts_path is None:
             raise SystemExit("--count-lambda needs a physics-head model and --counts-path")
         attach_counts(dataset, args.counts_path)
     if args.esp_lambda:
         if not args.model.endswith(("_esp", "_espa")) or args.esp_path is None:
             raise SystemExit("--esp-lambda needs a *_esp / *_espa model and --esp-path")
         attach_esp(dataset, args.esp_path)
+    if args.struct_lambda:
+        if not args.model.endswith("_espa") or args.struct_path is None:
+            raise SystemExit("--struct-lambda needs a *_espa model and --struct-path")
+        attach_struct(dataset, args.struct_path)
     if args.usage_lambda:
-        if not args.model.endswith("_usage") or args.usage_path is None:
+        if not split_esp_kind(args.model)[0].endswith("_usage") or args.usage_path is None:
             raise SystemExit("--usage-lambda needs a *_usage model and --usage-path")
         attach_usage(dataset, args.usage_path)
     if args.usage_aug_lambda:

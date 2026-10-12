@@ -123,6 +123,7 @@ def main():
     L.append(f"| seeds | " + " | ".join(str(len(res[n])) for n in res) + " |")
     (HERE / "results").mkdir(exist_ok=True)
     (HERE / "results" / f"report_esp_{args.run}.md").write_text("\n".join(L))
+    (HERE / "results" / f"esp_eval_{args.run}.json").write_text(json.dumps({"run": args.run, "kind": args.kind, "res": res}))
     print("\n".join(L))
 
 

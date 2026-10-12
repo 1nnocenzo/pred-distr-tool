@@ -67,6 +67,7 @@ MODELS = {
     "v9f": ("v9f", "v8r + the add-ons kept by the v9 decision", "running"),
     "v8kde10": ("v8kde10", "v8kdc10 + ESP / duration / depth heads (v13)", "running"),
     "v8kda10": ("v8kda10", "v8kdc10 + analytic ESP / duration / depth head (v14)", "running"),
+    "v8kds10": ("v8kds10", "v8kda10 + per-qubit structure loss (v15)", "running"),
 }
 COMPARE = ["v4_phys", "v5_sinkhorn", MAIN]           # the 3-seed comparison
 SPLITS = [("lofo", "qaoa", None), ("lofo", "qnn", None), ("logo", "variational", None),

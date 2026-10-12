@@ -62,6 +62,8 @@ h1 { font-size: clamp(1.7rem, 3.2vw, 2.4rem); margin: 0; line-height: 1.1; }
 .best .was { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-3); white-space: nowrap; }
 .best .was b { color: var(--good); font-weight: 500; }
 .best .was b.neg { color: var(--bad); }
+.viewtabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.viewtabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .bestcap { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-2); margin-top: 6px; text-align: right; }
 @media (max-width: 860px) { .bestcap { text-align: left; } }
 
@@ -196,6 +198,11 @@ table.matrix { width: 100%; min-width: 760px; border-collapse: collapse; font-va
       <div class="kicker">Generalization study · expected-fidelity predictor · 3 IQM-style devices</div>
       <h1>Fidelity Predictor Explorer</h1>
       <p class="sub">How a graph network turns one quantum circuit and three calibrated chips into a fidelity per chip, and how each version changed it. Pick a version in the lineage, then open any block of the model.</p>
+      <div class="viewtabs" role="tablist" aria-label="What to compare">
+        <button type="button" role="tab" data-view="F" aria-selected="true">Fidelity F</button>
+        <button type="button" role="tab" data-view="ESP" aria-selected="false">ESP · duration · depth</button>
+        <button type="button" role="tab" data-view="TIME" aria-selected="false">Execution time</button>
+      </div>
     </div>
     <div>
       <div class="best" id="best" aria-label="Current main model against v1 and v8a"></div>
@@ -319,10 +326,10 @@ table.matrix { width: 100%; min-width: 760px; border-collapse: collapse; font-va
   <section class="card" aria-labelledby="h-res">
     <div class="sechead">
       <h2 id="h-res">All results</h2>
-      <span class="kicker">R² of F on held-out splits · tracking = correlation (not R²) of predicted vs true Δlog F under local calibration changes</span>
+      <span class="kicker" id="res-kicker"></span>
     </div>
     <div class="matrix-wrap"><table class="matrix" id="matrix"></table></div>
-    <p class="note"><b>Reading tracking.</b> Local calibration changes move F by 0.006 (median) to 0.048 (90th percentile), so tracking is a correlation of small changes while R² of F after the change stays 0.99. In practice: re-predicting after a local change cuts the fidelity lost to a wrong device choice from 0.0050–0.0068 to 0.0037 with v8kdc10 (21% with v8kd40, 9% with v8a); the best of three devices changes in 29% of the cases. Mean over the seeds listed (5, 6, 7). LOFO = one circuit family held out, LOGO = a group of families held out, control = random split. The best value of each column is in teal. Label noise caps local tracking near 0.85; the oracle study puts the ceiling of the current head near 0.6.</p>
+    <p class="note" id="res-note"></p>
   </section>
 </div>
 
@@ -816,6 +823,53 @@ const VERSIONS = [
     r: [null, null, null, null, null], n: 0 }
 ];
 const MAIN = "v8kdc10", BASE = "v8a", FIRST = "v1";
+const NOTE_F = "<b>Reading tracking.</b> Local calibration changes move F by 0.006 (median) to 0.048 (90th percentile), so tracking is a correlation of small changes while R\u00b2 of F after the change stays 0.99. In practice: re-predicting after a local change cuts the fidelity lost to a wrong device choice from 0.0050\u20130.0068 to 0.0037 with v8kdc10 (21% with v8kd40, 9% with v8a); the best of three devices changes in 29% of the cases. Mean over the seeds listed (5, 6, 7). LOFO = one circuit family held out, LOGO = a group of families held out, control = random split. The best value of each column is in teal. Label noise caps local tracking near 0.85; the oracle study puts the ceiling of the current head near 0.6.";
+/* ESP view: [ESP R² qaoa, qnn, variational, control, duration error unseen (mean of the 3 held-out splits),
+   depth error unseen, ESP regret (mean of the 4 splits)]; 3 seeds, test circuits with ESP labels (esp/esp_eval.py).
+   v8kdc10 has no ESP head: its predicted F used as the ESP estimate. */
+const ESPD = {
+  v8kdc10: [0.748, 0.703, 0.536, 0.670, null, null, 0.0133],
+  v8kde10: [0.902, 0.361, 0.448, 0.978, 0.403, 0.668, 0.0120],
+  v8kda10: [0.885, 0.403, 0.460, 0.978, 0.358, 0.440, 0.0128],
+  v8kds10: [0.896, 0.364, 0.496, 0.976, 0.308, 0.483, 0.0128],
+  v8kdi10: [0.925, 0.968, 0.896, 0.985, 0.150, 0.338, 0.0105]
+};
+/* time view: [predictor per circuit, 3 devices (ms: encoding + one forward pass, batch 1, 1 CPU thread),
+   exhaustive compilation on 3 devices (ms), speed-up 3 devices, speed-up 27 devices,
+   speed-up on the 3 largest circuits of each family (3 devices)]; medians (timing_v8/timing_scaling.py) */
+const TIMED = {
+  v8a: [12.9, 66.7, 5.4, 13.2, null]
+};
+VERSIONS.forEach(v => { v.esp = ESPD[v.k] || null; v.time = TIMED[v.k] || null; });
+const VIEWS = {
+  F: { main: "v8kdc10", cmp: ["v1", "v8a"], get: v => v.r,
+    cols: [{ name: "R² LOFO qaoa", short: "R² qaoa", lo: 0.5, hi: 1, dig: 2 }, { name: "R² LOFO qnn", short: "R² qnn", lo: 0.5, hi: 1, dig: 2 },
+           { name: "R² LOGO variational", short: "R² variational", lo: 0.5, hi: 1, dig: 2 }, { name: "R² control", short: "R² control", lo: 0.99, hi: 1, dig: 3 },
+           { name: "local tracking (corr.)", short: "tracking (corr.)", lo: 0, hi: 0.85, dig: 2 }],
+    kicker: "R² of F on held-out splits · tracking = correlation (not R²) of predicted vs true Δlog F under local calibration changes",
+    note: NOTE_F,
+    cap: m => `main model ${m.k} (${m.n} seeds) vs the first model v1 and the previous main v8a · v1 has no calibration input, so no tracking` },
+  ESP: { main: "v8kdi10", cmp: ["v8kdc10", "v8kde10"], get: v => v.esp,
+    cols: [{ name: "ESP R² LOFO qaoa", short: "R² qaoa", lo: 0, hi: 1, dig: 2 }, { name: "ESP R² LOFO qnn", short: "R² qnn", lo: 0, hi: 1, dig: 2 },
+           { name: "ESP R² LOGO variational", short: "R² var.", lo: 0, hi: 1, dig: 2 }, { name: "ESP R² control", short: "R² control", lo: 0, hi: 1, dig: 2 },
+           { name: "duration error, unseen", short: "duration err.", lo: 0.8, hi: 0, dig: 2, low: true },
+           { name: "depth error, unseen", short: "depth err.", lo: 1, hi: 0, dig: 2, low: true },
+           { name: "ESP regret (mean)", short: "ESP regret", lo: 0.02, hi: 0, dig: 4, low: true }],
+    kicker: "Estimated success probability ESP = F · exp(−Σ idle / min(T1, T2)) (MQT, ASAP schedule) · errors = median |pred/true − 1| on the three held-out splits · regret = ESP lost by the chosen device",
+    note: "<b>Reading ESP.</b> v8kdc10 has no ESP head: its row uses the predicted F as the ESP estimate, the baseline every ESP head has to beat. v8kdi10 reads measurements from the circuit and predicts the total idle time directly; v17 (v8kdg10) schedules the circuit's gate graph and is training. Mean over seeds 5, 6, 7, on the test circuits with ESP labels (no grover or dynamic circuits). Lower is better for the errors and the regret.",
+    cap: m => `best ESP model ${m.k} (3 seeds) vs v8kdc10 using F as the ESP estimate and the first ESP head v8kde10` },
+  TIME: { main: "v8a", cmp: [], get: v => v.time,
+    cols: [{ name: "predictor, 3 devices", short: "predictor", lo: 30, hi: 0, dig: 1, unit: " ms", low: true },
+           { name: "compile all, 3 devices", short: "compile", lo: 0, hi: 300, dig: 1, unit: " ms" },
+           { name: "speed-up, 3 devices", short: "× 3 dev.", lo: 1, hi: 40, dig: 1, unit: "×" },
+           { name: "speed-up, 27 devices", short: "× 27 dev.", lo: 1, hi: 40, dig: 1, unit: "×" },
+           { name: "speed-up, largest circuits", short: "× largest", lo: 1, hi: 40, dig: 1, unit: "×" }],
+    kicker: "Per circuit, medians, 1 CPU thread · predictor = graph encoding + one forward pass over all devices · compile = Qiskit level 2 + expected fidelity on each device",
+    note: "<b>Reading time.</b> The predictor scores every device in one pass, while compilation grows linearly with the number of devices: with 27 devices (3 chips × 9 calibrations) the gap widens. Routing-free circuits compile in about 2 ms, as fast as the predictor; the gain comes from routed and large circuits. v8kdc10 and v17 timings (v17 adds the DAG schedule, about +2 ms) are being measured on a random sample and on the largest circuits of each family.",
+    cap: m => `predictor vs exhaustive compilation · v8kdc10 and v17 being measured` }
+};
+let view = "F";
+
 const METRICS = ["R² LOFO qaoa", "R² LOFO qnn", "R² LOGO variational", "R² control", "local tracking (corr.)"];
 const SHORT = ["R² qaoa", "R² qnn", "R² variational", "R² control", "tracking (corr.)"];
 
@@ -825,21 +879,26 @@ const V = () => VERSIONS.find(v => v.k === cur);
 const byK = k => VERSIONS.find(v => v.k === k);
 const f2 = x => x == null ? "–" : x.toFixed(2);
 const f3 = x => x == null ? "–" : x.toFixed(3);
+const fmt = (x, c) => x == null ? "–" : x.toFixed(c.dig) + (c.unit || "");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-/* masthead: main model vs v8a */
-(function best() {
-  const m = byK(MAIN), b = byK(BASE), a = byK(FIRST);
-  document.getElementById("best").innerHTML = METRICS.map((name, i) => {
-    const d = m.r[i] != null && b.r[i] != null ? m.r[i] - b.r[i] : null;
-    const dd = d == null ? "" : `<b class="${d < 0 ? "neg" : ""}">${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(i === 3 ? 3 : 2)}</b>`;
-    const d1 = m.r[i] != null && a.r[i] != null ? m.r[i] - a.r[i] : null;
-    const dd1 = d1 == null ? "" : `<b class="${d1 < 0 ? "neg" : ""}">${d1 >= 0 ? "+" : "−"}${Math.abs(d1).toFixed(i === 3 ? 3 : 2)}</b>`;
-    const first = a.r[i] == null ? `v1 n/a` : `v1 ${i === 3 ? f3(a.r[i]) : f2(a.r[i])} ${dd1}`;
-    return `<div class="cell"><span class="lab">${esc(name)}</span><span class="val">${i === 3 ? f3(m.r[i]) : f2(m.r[i])}</span><span class="was">${first}</span><span class="was">v8a ${i === 3 ? f3(b.r[i]) : f2(b.r[i])} ${dd}</span></div>`;
+/* masthead: the current view's main model vs its comparison models */
+function renderBest() {
+  const W = VIEWS[view], m = byK(W.main), vals = W.get(m) || [];
+  const el = document.getElementById("best");
+  el.style.gridTemplateColumns = `repeat(${W.cols.length}, minmax(84px, auto))`;
+  el.innerHTML = W.cols.map((c, i) => {
+    const was = W.cmp.map(k => {
+      const o = W.get(byK(k)) || [], x = o[i], y = vals[i];
+      if (x == null) return `<span class="was">${esc(k)} n/a</span>`;
+      const d = y == null ? null : y - x, good = d != null && (c.low ? d <= 0 : d >= 0);
+      const dd = d == null || Math.abs(d) < 1e-9 ? "" : `<b class="${good ? "" : "neg"}">${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(c.dig)}</b>`;
+      return `<span class="was">${esc(k)} ${fmt(x, c)} ${dd}</span>`;
+    }).join("");
+    return `<div class="cell"><span class="lab">${esc(c.name)}</span><span class="val">${fmt(vals[i], c)}</span>${was}</div>`;
   }).join("");
-  document.getElementById("bestcap").textContent = `main model ${MAIN} (${m.n} seed${m.n === 1 ? "" : "s"}) vs the first model v1 and the previous main v8a · v1 has no calibration input, so no tracking`;
-})();
+  document.getElementById("bestcap").textContent = W.cap(m);
+}
 
 /* lineage: main line left to right, branches hang under their parent */
 (function lineage() {
@@ -877,35 +936,39 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
   });
 })();
 
-/* results matrix */
-(function matrix() {
-  const t = document.getElementById("matrix");
-  const bestOf = i => Math.max(...VERSIONS.filter(v => v.r[i] != null).map(v => v.r[i]));
-  const bests = METRICS.map((_, i) => bestOf(i));
-  const lo = [0.5, 0.5, 0.5, 0.99, 0], hi = [1, 1, 1, 1, 0.85];
+/* results matrix: rows = versions with values in the current view */
+function renderMatrix() {
+  const W = VIEWS[view], t = document.getElementById("matrix");
+  const rows = VERSIONS.filter(v => v.s !== "plan" && W.get(v));
+  const bests = W.cols.map((c, i) => { const xs = rows.map(v => W.get(v)[i]).filter(x => x != null); return xs.length ? (c.low ? Math.min(...xs) : Math.max(...xs)) : null; });
   const cell = (v, i) => {
-    const x = v.r[i];
+    const c = W.cols[i], x = W.get(v)[i];
     if (x == null) return `<td><span class="na">–</span></td>`;
-    const w = Math.max(2, Math.min(100, (x - lo[i]) / (hi[i] - lo[i]) * 100));
-    return `<td><div class="mcell"><span class="v">${i === 3 ? f3(x) : f2(x)}</span><span class="track"><span class="fill ${x === bests[i] ? "best" : ""}" style="width:${w}%"></span></span></div></td>`;
+    const w = Math.max(2, Math.min(100, (x - c.lo) / (c.hi - c.lo) * 100));
+    return `<td><div class="mcell"><span class="v">${fmt(x, c)}</span><span class="track"><span class="fill ${x === bests[i] ? "best" : ""}" style="width:${w}%"></span></span></div></td>`;
   };
-  t.innerHTML = `<thead><tr><th>version</th><th>status</th>${METRICS.map(m => `<th>${esc(m)}</th>`).join("")}<th>seeds</th></tr></thead><tbody>` +
-    VERSIONS.filter(v => v.s !== "plan").map(v => `<tr data-v="${v.k}"><td class="k">${esc(v.k)}</td><td class="st">${esc(v.label)}</td>${METRICS.map((_, i) => cell(v, i)).join("")}<td class="num">${v.n}</td></tr>`).join("") + `</tbody>`;
+  t.innerHTML = `<thead><tr><th>version</th><th>status</th>${W.cols.map(c => `<th>${esc(c.name)}</th>`).join("")}<th>seeds</th></tr></thead><tbody>` +
+    rows.map(v => `<tr data-v="${v.k}" class="${v.k === cur ? "sel" : ""}"><td class="k">${esc(v.k)}</td><td class="st">${esc(v.label)}</td>${W.cols.map((_, i) => cell(v, i)).join("")}<td class="num">${v.n}</td></tr>`).join("") + `</tbody>`;
   t.querySelectorAll("tbody tr").forEach(tr => tr.addEventListener("click", () => { stopPlay(); applyVersion(tr.dataset.v); document.getElementById("h-lineage").scrollIntoView({ behavior: "smooth", block: "start" }); }));
-})();
+  document.getElementById("res-kicker").textContent = W.kicker;
+  document.getElementById("res-note").innerHTML = W.note;
+}
 
 function versionCard() {
-  const v = V(), par = v.parent ? byK(v.parent) : null;
-  const delta = (i) => {
-    if (!par || v.r[i] == null || par.r[i] == null) return "";
-    const d = v.r[i] - par.r[i]; if (Math.abs(d) < 0.0005) return "";
-    return ` <span class="${d > 0 ? "d-up" : "d-dn"}">${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(i === 3 ? 3 : 2)}</span>`;
+  const W = VIEWS[view], v = V(), par = v.parent ? byK(v.parent) : null;
+  const vals = W.get(v), pv = par ? W.get(par) : null;
+  const delta = i => {
+    if (!pv || vals[i] == null || pv[i] == null) return "";
+    const c = W.cols[i], d = vals[i] - pv[i]; if (Math.abs(d) < Math.pow(10, -c.dig) / 2) return "";
+    const good = c.low ? d < 0 : d > 0;
+    return ` <span class="${good ? "d-up" : "d-dn"}">${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(c.dig)}</span>`;
   };
-  const row = (x, cls, withDelta) => `<tr class="${cls}"><td>${esc(x.k)}</td>` + x.r.map((c, i) => `<td>${i === 3 ? f3(c) : f2(c)}${withDelta ? delta(i) : ""}</td>`).join("") + `<td>${x.n || "–"}</td></tr>`;
+  const row = (x, xv, cls, withDelta) => `<tr class="${cls}"><td>${esc(x.k)}</td>` + W.cols.map((c, i) => `<td>${fmt(xv[i], c)}${withDelta ? delta(i) : ""}</td>`).join("") + `<td>${x.n || "–"}</td></tr>`;
+  const table = vals ? `<div style="overflow-x:auto"><table class="res"><thead><tr><th>model</th>` + W.cols.map(c => `<th>${esc(c.short)}</th>`).join("") +
+    `<th>seeds</th></tr></thead><tbody>${row(v, vals, "cur", true)}${pv ? row(par, pv, "", false) : ""}</tbody></table></div>`
+    : `<p class="why">No ${view === "ESP" ? "ESP" : view === "TIME" ? "timing" : ""} numbers for this version.</p>`;
   return `<div class="vcard"><div class="vtop"><span class="vname">${esc(v.k)}</span><span class="status s-${v.s}">${esc(v.label)}</span>${par ? `<span class="src">builds on ${esc(par.k)}</span>` : ""}</div>` +
-    `<p><b>Changes:</b> ${esc(v.what)}</p><p class="why"><b>Why:</b> ${esc(v.why)}</p>` +
-    (v.s === "plan" ? "" : `<div style="overflow-x:auto"><table class="res"><thead><tr><th>model</th>` + SHORT.map(c => `<th>${c}</th>`).join("") +
-    `<th>seeds</th></tr></thead><tbody>${row(v, "cur", true)}${par ? row(par, "", false) : ""}</tbody></table></div>`) + `</div>`;
+    `<p><b>Changes:</b> ${esc(v.what)}</p><p class="why"><b>Why:</b> ${esc(v.why)}</p>` + (v.s === "plan" ? "" : table) + `</div>`;
 }
 function render(key) {
   curBlock = key;
@@ -999,5 +1062,12 @@ function play() {
 }
 playBtn.addEventListener("click", () => (playing ? stopPlay() : play()));
 
+function setView(k) {
+  view = k;
+  document.querySelectorAll(".viewtabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.view === k)));
+  renderBest(); renderMatrix(); render(curBlock);
+}
+document.querySelectorAll(".viewtabs button").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
+renderBest(); renderMatrix();
 applyVersion(MAIN);
 </script>

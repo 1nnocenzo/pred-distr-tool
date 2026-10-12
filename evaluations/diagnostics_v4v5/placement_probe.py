@@ -105,6 +105,9 @@ def main():
     rows1, rows3, rows4 = [], [], []
     comp_stats = None
     for name, (kind, run) in MODELS.items():
+        if not (ROOT / run / "random_control/random_seed5/model.pth").is_file():
+            print(f"skip {name}: no seed-5 control model", flush=True)
+            continue
         model = build_model(kind, params, dev_o, torch.device("cpu"))
         model.load_state_dict(torch.load(ROOT / run / "random_control/random_seed5/model.pth", map_location="cpu"))
         model.eval()

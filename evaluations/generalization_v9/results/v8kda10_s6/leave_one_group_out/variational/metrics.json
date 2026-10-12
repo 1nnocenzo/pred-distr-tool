@@ -1,0 +1,243 @@
+{
+  "experiment": "group_holdout",
+  "split": "variational",
+  "description": "Leave-one-group-out: test = all 9928 circuits of group 'variational' (qnn, vqe_real_amp, vqe_su2, vqe_two_local), train = 7128 circuits from the other 31 families.",
+  "n_train": 5702,
+  "n_val": 1426,
+  "n_test": 9928,
+  "validation": {
+    "mode": "random"
+  },
+  "training": {
+    "best_epoch": 39,
+    "epochs_run": 40,
+    "best_val_score": 0.0005748486146330833,
+    "select_metric": "mse",
+    "resumed": false
+  },
+  "test": {
+    "n_circuits": 9928,
+    "mae": 0.055368905331420366,
+    "rmse": 0.074750637138422,
+    "r2": 0.9314256453258102,
+    "target_std": 0.2889506689311753,
+    "device_choice_accuracy": 0.6681103948428686,
+    "fidelity_regret_mean": 0.007481952066889232,
+    "mean_true_best_fidelity": 0.4529797886633123,
+    "best_fixed_device": "EQE1_Bottom",
+    "regret_best_fixed_device": 0.008301252202772018,
+    "regret_random_device": 0.04047107474172205,
+    "per_device": {
+      "EQE1_Top": {
+        "mae": 0.053040442842993134,
+        "rmse": 0.06871015599727914,
+        "r2": 0.9436565141516037,
+        "target_std": 0.2894670121392127
+      },
+      "EQE1_Bottom": {
+        "mae": 0.04896193050962009,
+        "rmse": 0.06927070448364377,
+        "r2": 0.9448215885646303,
+        "target_std": 0.2948933695325578
+      },
+      "QExa20": {
+        "mae": 0.0641043426416479,
+        "rmse": 0.08510850263616064,
+        "r2": 0.9057988332611826,
+        "target_std": 0.2772967687229095
+      }
+    },
+    "log_mse": 0.6834428674271747
+  },
+  "provenance": {
+    "model": "gsv3:sinkhorn_rf_route_czc_espa",
+    "hyperparameters": {
+      "device_hidden": 64,
+      "device_layers": 3,
+      "fusion_dim": 128,
+      "qubit_layers": 2,
+      "attn_heads": 4,
+      "lap_pe": 8,
+      "cost_bias_init": -6.0,
+      "hidden_dim": 142,
+      "num_conv_wo_resnet": 3,
+      "num_resnet_layers": 1,
+      "dropout": 0.0,
+      "bidirectional": true,
+      "mlp": [
+        512,
+        256,
+        128
+      ],
+      "lr": 0.001,
+      "readout": "meanmaxsum"
+    },
+    "train_protocol": {
+      "optimizer": "adam",
+      "loss": "mse_log_fidelity",
+      "log_eps": 0.001,
+      "batch_size": 32,
+      "num_epochs": 40,
+      "patience": 100,
+      "val_fraction": 0.2,
+      "balance_alpha": 0.0,
+      "seed": 6,
+      "lr": 0.0001,
+      "grad_clip": 1.0,
+      "model": "sinkhorn_rf_route_czc_espa",
+      "select_metric": "mse",
+      "loss_kind": "mixed",
+      "mix_lambda": 0.1,
+      "layout_lambda": 0.1,
+      "layout_loss": "region_dist",
+      "count_lambda": 0.1,
+      "delta_lambda": 1.0,
+      "count_weights": "0.1,0.1,1",
+      "delta_corr_lambda": 0.1,
+      "esp_lambda": 0.1,
+      "calib_aug": "evaluations/compile_check/results/v8d",
+      "aug_circuit_mod": 0,
+      "init_from": "evaluations/generalization_v9/results/v8k_s6/leave_one_group_out/variational/model.pth",
+      "keep_last": true,
+      "aug_aux": true
+    },
+    "torch_version": "2.11.0+cu128",
+    "cuda_device": "NVIDIA A100 80GB PCIe",
+    "python": "3.11.15",
+    "host": "compute-3-16.cluster.lan"
+  },
+  "test_by_family": {
+    "qnn": {
+      "n_circuits": 760,
+      "mae": 0.051880856176936316,
+      "rmse": 0.06727320350377317,
+      "r2": 0.8894118484580137,
+      "target_std": 0.21612610396907925,
+      "device_choice_accuracy": 0.868421052631579,
+      "fidelity_regret_mean": 0.0021795352038584256,
+      "mean_true_best_fidelity": 0.6544561452771488,
+      "best_fixed_device": "EQE1_Bottom",
+      "regret_best_fixed_device": 0.0021418454615693343,
+      "regret_random_device": 0.061163485623700053,
+      "per_device": {
+        "EQE1_Top": {
+          "mae": 0.04664829667461546,
+          "rmse": 0.056806152410916716,
+          "r2": 0.904727606053297,
+          "target_std": 0.18403983518229702
+        },
+        "EQE1_Bottom": {
+          "mae": 0.050169222174506437,
+          "rmse": 0.07162636304102343,
+          "r2": 0.8554347605109689,
+          "target_std": 0.18838267504942302
+        },
+        "QExa20": {
+          "mae": 0.058825049681687044,
+          "rmse": 0.07224802346613673,
+          "r2": 0.9080731788097749,
+          "target_std": 0.23828946875263615
+        }
+      }
+    },
+    "vqe_real_amp": {
+      "n_circuits": 2861,
+      "mae": 0.07529901259694456,
+      "rmse": 0.09488321423122133,
+      "r2": 0.8885729274836361,
+      "target_std": 0.28831017965434397,
+      "device_choice_accuracy": 0.6057322614470465,
+      "fidelity_regret_mean": 0.009450273487699983,
+      "mean_true_best_fidelity": 0.4382716002204294,
+      "best_fixed_device": "EQE1_Bottom",
+      "regret_best_fixed_device": 0.008319218111066642,
+      "regret_random_device": 0.03737062661797581,
+      "per_device": {
+        "EQE1_Top": {
+          "mae": 0.06966691791817568,
+          "rmse": 0.0844741717382051,
+          "r2": 0.914673300912289,
+          "target_std": 0.2891888003920484
+        },
+        "EQE1_Bottom": {
+          "mae": 0.06142521378816437,
+          "rmse": 0.08309672127124897,
+          "r2": 0.9206840387453787,
+          "target_std": 0.295055416940536
+        },
+        "QExa20": {
+          "mae": 0.09480490608449363,
+          "rmse": 0.11387502909618122,
+          "r2": 0.8303614427932366,
+          "target_std": 0.27648158843608367
+        }
+      }
+    },
+    "vqe_su2": {
+      "n_circuits": 2858,
+      "mae": 0.03577975048651013,
+      "rmse": 0.048932272546375465,
+      "r2": 0.9711053101932312,
+      "target_std": 0.2885055959135667,
+      "device_choice_accuracy": 0.7718684394681595,
+      "fidelity_regret_mean": 0.004793183305724553,
+      "mean_true_best_fidelity": 0.42312667182988933,
+      "best_fixed_device": "EQE1_Bottom",
+      "regret_best_fixed_device": 0.006577896269875514,
+      "regret_random_device": 0.04586173898645275,
+      "per_device": {
+        "EQE1_Top": {
+          "mae": 0.04229146359654768,
+          "rmse": 0.0534073045804734,
+          "r2": 0.9656084053552585,
+          "target_std": 0.2879880740121853
+        },
+        "EQE1_Bottom": {
+          "mae": 0.03614255300486946,
+          "rmse": 0.05361205101058715,
+          "r2": 0.9669490181246927,
+          "target_std": 0.29489692168547077
+        },
+        "QExa20": {
+          "mae": 0.028905234858113266,
+          "rmse": 0.038164246272461046,
+          "r2": 0.9807585070997423,
+          "target_std": 0.2751295939709854
+        }
+      }
+    },
+    "vqe_two_local": {
+      "n_circuits": 3449,
+      "mae": 0.05583764555104828,
+      "rmse": 0.0750655733793196,
+      "r2": 0.931268693595189,
+      "target_std": 0.28943628928718623,
+      "device_choice_accuracy": 0.5897361554073645,
+      "fidelity_regret_mean": 0.009245643093381698,
+      "mean_true_best_fidelity": 0.4455220629510753,
+      "best_fixed_device": "EQE1_Bottom",
+      "regret_best_fixed_device": 0.011071649394973045,
+      "regret_random_device": 0.034016343341401474,
+      "per_device": {
+        "EQE1_Top": {
+          "mae": 0.04956415075375303,
+          "rmse": 0.06779188559495816,
+          "r2": 0.945880507933629,
+          "target_std": 0.29140758904515524
+        },
+        "EQE1_Bottom": {
+          "mae": 0.04898013456393975,
+          "rmse": 0.06761856261316443,
+          "r2": 0.9479141504585821,
+          "target_std": 0.2962825395990762
+        },
+        "QExa20": {
+          "mae": 0.06896865133545205,
+          "rmse": 0.08795743946880054,
+          "r2": 0.9000114223933547,
+          "target_std": 0.27816173269511246
+        }
+      }
+    }
+  }
+}

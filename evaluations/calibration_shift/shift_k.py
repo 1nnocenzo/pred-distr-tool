@@ -105,6 +105,15 @@ def cmd_truth(args):
     raw = {k: dict(zip(("nodes", "edges", "edge_feats"), _backend_graph(be))) for k, be in variants.items()}
     (OUT / "variants_raw.json").write_text(json.dumps(raw))
     truth, t0 = {}, time.time()
+    if args.families:        # recompute only these families (e.g. qaoa after adding its final measurements)
+        fams = set(args.families.split(","))
+        old = json.loads((OUT / "truth.json").read_text())
+        bak = OUT / "truth_nomeas.json"
+        if not bak.exists():
+            bak.write_text(json.dumps(old))
+        truth = {k: v for k, v in old.items() if k.split("/")[0] not in fams}
+        sample = [n for n in sample if n.split("/")[0] in fams]
+        print(f"recomputing {len(sample)} circuits of {sorted(fams)}; keeping {len(truth)}", flush=True)
     with Pool(args.workers, initializer=_init) as pool:
         for i, (name, res) in enumerate(pool.imap_unordered(_score, sample, chunksize=1), 1):
             truth[name] = res
@@ -211,6 +220,7 @@ def main():
     ap.add_argument("cmd", choices=["truth", "predict", "report"])
     ap.add_argument("--k", type=int, default=5)
     ap.add_argument("--workers", type=int, default=32)
+    ap.add_argument("--families", default="", help="recompute only these families, keep the rest of truth.json")
     args = ap.parse_args()
     {"truth": cmd_truth, "predict": cmd_predict, "report": cmd_report}[args.cmd](args)
 

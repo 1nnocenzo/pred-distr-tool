@@ -159,6 +159,9 @@ def run(args) -> None:
     node = {k: {q: i for i, q in enumerate(getattr(be, "active_qubits", None) or range(be.num_qubits))}
             for k, be in vs.items()}
     names = sorted(n for n in json.loads(LABELS.read_text()) if not n.startswith("grover/"))
+    if args.families:        # e.g. regenerate one family (qaoa with its final measurements)
+        fams = set(args.families.split(","))
+        names = [n for n in names if n.split("/")[0] in fams]
     if args.subset_mod:      # pilot subset: ~1/subset_mod of the circuits, independent of the task split
         names = [n for n in names if zlib.crc32(b"subset" + n.encode()) % args.subset_mod == 0]
     names = [n for n in names if zlib.crc32(n.encode()) % args.n_tasks == args.task_id]
@@ -238,6 +241,7 @@ def main() -> None:
     ap.add_argument("--n-tasks", type=int, default=1)
     ap.add_argument("--k", type=int, default=3, help="compiler seeds per (circuit, variant)")
     ap.add_argument("--usage", action="store_true", help="also save per-coupler / per-qubit usage maps")
+    ap.add_argument("--families", default="", help="comma-separated families only (default: all but grover)")
     ap.add_argument("--subset-mod", type=int, default=0, help="keep ~1/N of the circuits (pilot)")
     ap.add_argument("--n-aug", type=int, default=N_AUG, help="variants per device (8: v8b, 100: v8d)")
     ap.add_argument("--orig", action="store_true", help="the unchanged devices instead of the variants")

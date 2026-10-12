@@ -49,6 +49,8 @@ def structure(qc) -> dict:
 def run(args) -> None:
     from qiskit import qpy
     files = sorted(f for f in QPY.rglob("*.qpy") if f.parent.name not in DYNAMIC)
+    if args.families:
+        files = [f for f in files if f.parent.name in set(args.families.split(","))]
     files = [f for f in files if zlib.crc32(str(f.relative_to(QPY)).encode()) % args.n_tasks == args.task_id]
     OUT.mkdir(parents=True, exist_ok=True)
     out_file = OUT / f"task{args.task_id:03d}.jsonl"
@@ -83,7 +85,7 @@ def merge(args) -> None:
                 err += 1
                 continue
             out[r["circuit"]] = torch.tensor([[float(r[d][k]) for k in KEYS] for d in DEVICES])
-    torch.save(out, HERE / "results/struct_labels_v2.pt")
+    torch.save(out, OUT.parent / f"{OUT.name}.pt")
     print(f"{len(out)} circuits, {err} errors")
 
 
@@ -92,5 +94,12 @@ if __name__ == "__main__":
     ap.add_argument("mode", choices=["run", "merge"])
     ap.add_argument("--task-id", type=int, default=0)
     ap.add_argument("--n-tasks", type=int, default=1)
+    ap.add_argument("--families", default="")
+    ap.add_argument("--qpy-dir", type=Path, default=None, help="stored compilations (default results/layouts_all/qpy)")
+    ap.add_argument("--out-dir", type=Path, default=None, help="task files and merged labels (default as before)")
     a = ap.parse_args()
+    if a.qpy_dir:
+        globals()['QPY'] = a.qpy_dir
+    if a.out_dir:
+        globals()['OUT'] = a.out_dir
     run(a) if a.mode == "run" else merge(a)

@@ -68,6 +68,8 @@ def run(args) -> None:
         tg[k.split("/")[0]] = t
     files = sorted(QPY.rglob("*.qpy"))
     files = [f for f in files if f.parent.name not in DYNAMIC]
+    if args.families:
+        files = [f for f in files if f.parent.name in set(args.families.split(","))]
     files = [f for f in files if zlib.crc32(str(f.relative_to(QPY)).encode()) % args.n_tasks == args.task_id]
     if args.limit:
         files = files[: args.limit]
@@ -108,7 +110,7 @@ def merge(args) -> None:
             rec["decay"] = rec["decay"] / fix
             rec["ESP"] = rec["F"] * torch.exp(rec["decay"])      # with the corrected decay (F as the labels)
             out[r["circuit"]] = rec
-    torch.save(out, HERE / "results/esp_labels.pt")
+    torch.save(out, OUT.parent / f"{OUT.name}.pt")
     print(f"{len(out)} circuits ({err} failed) -> {HERE / 'results/esp_labels.pt'}")
 
 
@@ -117,6 +119,13 @@ if __name__ == "__main__":
     ap.add_argument("mode", choices=["run", "merge"])
     ap.add_argument("--task-id", type=int, default=0)
     ap.add_argument("--n-tasks", type=int, default=1)
+    ap.add_argument("--families", default="")
+    ap.add_argument("--qpy-dir", type=Path, default=None, help="stored compilations (default results/layouts_all/qpy)")
+    ap.add_argument("--out-dir", type=Path, default=None, help="task files and merged labels (default as before)")
     ap.add_argument("--limit", type=int, default=0)
     a = ap.parse_args()
+    if a.qpy_dir:
+        globals()['QPY'] = a.qpy_dir
+    if a.out_dir:
+        globals()['OUT'] = a.out_dir
     run(a) if a.mode == "run" else merge(a)

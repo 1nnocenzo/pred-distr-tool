@@ -629,6 +629,7 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
             meas = (circuits.x[:, GATE2IDX_MEASURE] > 0.5).float().view(-1, 1).expand(-1, n_dev)
             n_ops = torch.cat([n_ops[..., :1], meas.unsqueeze(-1), n_ops[..., 2:]], dim=-1)
         self.last_counts = scatter(n_ops, gb, dim=0, dim_size=n_circ, reduce="sum")   # v8
+        self.last_n_ops = n_ops                                      # (G, D, 3) per gate: r, measure, cz
         if self.esp_head and hasattr(devices, "coh"):     # device batches built elsewhere may lack T1/T2
             self.last_esp_feats = self.esp_features(circuits, devices, g, gb, n_circ, n_ops, valid, local, assign, dev_glob)
             self.last_esp = self.esp_from_features(self.esp_mlp, self.last_esp_feats, self.esp_head)

@@ -22,13 +22,14 @@ Random baseline: compile on k random backends (k = the same mean cost).
 from __future__ import annotations
 
 import argparse
+import os
 import json
 from pathlib import Path
 
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-RK = HERE / "results_k"
+RK = HERE / os.environ.get("GS_CALIB_DIR", "results_k")
 DEVS = ("EQE1_Top", "EQE1_Bottom", "QExa20")
 KINDS = {"local": ("shuffle", "jitterA", "jitterB", "jitterS"), "moderate": ("x0.7", "x0.8", "x1.2", "x1.3"),
          "large": ("x0.5", "x2")}

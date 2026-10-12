@@ -19,6 +19,7 @@ compare how the model's placement and the compiler's layout react to the calibra
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import sys
 import time
@@ -37,7 +38,7 @@ paths.ensure_imports()
 from gsv3.devices import variant_batch  # noqa: E402
 from gsv3.model import build_model, load_hparams  # noqa: E402
 
-ROOT = EVAL / "generalization_v9/results"
+ROOT = EVAL / os.environ.get("GS_RESULTS_ROOT", "generalization_v9") / "results"
 V8D = EVAL / "compile_check/results/v8d"
 ORIG = EVAL / "compile_check/results/v8b_orig"
 DEVS = ("EQE1_Top", "EQE1_Bottom", "QExa20")
@@ -185,7 +186,7 @@ def main():
           "| model | embedding change when errors are flattened (1 − cos) | mean row max of A | row entropy / log P |", "| --- | --- | --- | --- |"] + rows3 + [
           "", "## 4. Local tracking with a lower Sinkhorn temperature at inference (no retraining)", "",
           "| model | " + " | ".join(f"τ = {t}" for t in TAUS) + " |", "| --- | " + " | ".join("---" for _ in TAUS) + " |"] + rows4
-    out = HERE / "results" / "report_placement_probe.md"
+    out = HERE / "results" / f"report_placement_probe{os.environ.get('GS_TAG', '')}.md"
     out.write_text("\n".join(L))
     print("\n".join(L))
 

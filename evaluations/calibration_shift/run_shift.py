@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import sys
 import time
@@ -37,6 +38,8 @@ RESULTS = HERE / "results"
 EXCLUDE = {"iqpe", "dynamic_qft", "ghz_dynamic", "seven_qubit_steane_code",
            "shors_nine_qubit_code"}           # dynamic circuits: see generalization_v4 README
 def _control(root: str, run: str, seed: int) -> Path:
+    # GS_RESULTS_ROOT=generalization_v10: the retrained models (qaoa with measurements) instead of each run's own root
+    root = os.environ.get("GS_RESULTS_ROOT") or root
     name = run if seed == 5 else f"{run}_s{seed}"
     return EVAL / root / "results" / name / "random_control" / f"random_seed{seed}" / "model.pth"
 

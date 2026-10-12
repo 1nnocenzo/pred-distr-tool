@@ -16,6 +16,7 @@ plus duration / depth with the true structure, the structure error per family, a
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import math
 import sys
@@ -35,7 +36,7 @@ from gsv3.devices import GATE_US, variant_batch  # noqa: E402
 from gsv3.model import SinkhornPlacementPredictor, build_model, load_hparams  # noqa: E402
 
 STRUCT = EVAL / "compile_check/results/struct_labels.pt"
-ROOT = EVAL / "generalization_v9/results"
+ROOT = EVAL / os.environ.get("GS_RESULTS_ROOT", "generalization_v9") / "results"
 KINDS = {"v5_espa": "sinkhorn_espa", "v8a_espa": "sinkhorn_espa", "v8kdi10": "sinkhorn_rf_route_czc_espi", "v8kdg10": "sinkhorn_rf_route_czc_esps"}
 
 
@@ -142,7 +143,7 @@ def main():
             res[split].append(m)
             print(args.run, seed, split, {k: round(m[k]["regret"], 4) for k in ("model", "true F", "true decay", "true duration", "true structure", "device-average T", "true duration + device-average T", "F only", "true F only")},
                   m["duration"], flush=True)
-    (HERE / f"results/report_esp_budget_{args.run}.json").write_text(json.dumps(res))
+    (HERE / f"results/report_esp_budget_{args.run}{os.environ.get('GS_TAG', '')}.json").write_text(json.dumps(res))
     mean = lambda xs: float(np.mean(xs))
     L = [f"# ESP error budget: {args.run}", "", "Mean over seeds. Each row swaps one link for the truth; regret = mean ESP lost by the chosen device.", ""]
     for metric in ("regret", "right device", "R² ESP", "R² log ESP"):
@@ -173,7 +174,7 @@ def main():
         g = lambda k: mean([v[k] for v in vs])
         L.append(f"| {f_} ({s}) | {int(g('n'))} | {g('tmax err'):.2f} | {g('mmax err'):.2f} ({g('pred mmax'):.2f} / {g('true mmax'):.2f}) | "
                  f"{g('omax err'):.2f} | {g('duration err'):.2f} | {g('duration err, true structure'):.2f} |")
-    (HERE / f"results/report_esp_budget_{args.run}.md").write_text("\n".join(L))
+    (HERE / f"results/report_esp_budget_{args.run}{os.environ.get('GS_TAG', '')}.md").write_text("\n".join(L))
     print("\n".join(L))
 
 

@@ -8,12 +8,13 @@ circuits with F > 0.01 on both calibrations, truth = best of 5 compilations.
 from __future__ import annotations
 
 import argparse
+import os
 import json
 from pathlib import Path
 
 import numpy as np
 
-RK = Path(__file__).resolve().parent / "results_k"
+RK = Path(__file__).resolve().parent / os.environ.get("GS_CALIB_DIR", "results_k")
 DEVS = ("EQE1_Top", "EQE1_Bottom", "QExa20")
 LOCAL = ("shuffle", "jitterA", "jitterB", "jitterS")
 

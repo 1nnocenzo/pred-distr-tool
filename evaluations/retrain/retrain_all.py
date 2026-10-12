@@ -30,6 +30,15 @@ EXP_DIR = {"lofo": "leave_one_family_out", "logo": "leave_one_group_out", "contr
 TIER1 = {"v1", "v1_s5", "v4_phys", "v5_sinkhorn", "v8a_c001", "v8k", "v8kd40", "v8kdl40", "v8kdc10",
          "v8kde10", "v8kda10", "v8kdi10", "v8kdg10", "v8kds10",
          "v5_espa", "v8a_espa", "v8kd40_espa", "v8kdl40_espa", "v8kdc10_espa"}
+RANK0 = {"v8k", "v8kdc10", "v8kdg10", "v8kdi10"}            # best F model chain and the ESP candidates first
+RANK1 = {"v8kd40", "v8kdl40", "v8kde10", "v8kda10", "v8kds10", "v5_espa", "v8a_espa", "v8kd40_espa", "v8kdl40_espa", "v8kdc10_espa"}
+
+
+def rank(run: str) -> int:
+    b = base_run(run)
+    return 0 if b in RANK0 else 1 if b in RANK1 else 2
+
+
 TS = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)")
 
 
@@ -214,12 +223,14 @@ def submit(args):
     cpu_tiers = {int(t) for t in args.cpu_tiers.split(",") if t}
     for tier in sorted({r["tier"] for r in rows}):
         for lvl in sorted({r["level"] for r in rows}):
-            sel = [r for r in rows if r["tier"] == tier and r["level"] == lvl]
+            sel = sorted([r for r in rows if r["tier"] == tier and r["level"] == lvl],
+                         key=lambda r: (rank(r["run"]), r["run"], r["split"]))
+            after = args.after if lvl == 0 else args.after_ft
             if tier in cpu_tiers:          # one CPU job per training
                 for r in sel:
                     name = f"t{tier}_l{lvl}_{r['run']}_{r['split']}"
                     deps = {job_of_out[r["init"]]} if r["init"] in job_of_out else set()
-                    dep = depstr(args.after, deps)
+                    dep = depstr(after, deps)
                     inner = " ".join(shlex.quote(a) for a in ["python3", "-u"] + r["argv"])
                     t = "12:00:00" if r["init"] is None else "06:00:00"
                     wrap = f"export CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=8 MKL_NUM_THREADS=8; bash evaluations/retrain/run_one.sh {inner}"
@@ -241,7 +252,7 @@ def submit(args):
                 f = packs_dir / f"{name}.txt"
                 f.write_text("\n".join(lines) + "\n")
                 deps = {job_of_out[r["init"]] for r in chunk if r["init"] in job_of_out}
-                dep = depstr(args.after, deps)
+                dep = depstr(after, deps)
                 big = any(r["init"] is None for r in chunk)
                 t = "08:00:00" if big else "04:00:00"
                 cmd = (f"sbatch --parsable {dep} -p {args.partition} --gres=gpu:{args.gpus} -c {2 * len(chunk)} "
@@ -261,7 +272,8 @@ def submit(args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["plan", "submit"])
-    ap.add_argument("--after", default="")
+    ap.add_argument("--after", default="", help="data jobs from-scratch trainings wait for (after-ok)")
+    ap.add_argument("--after-ft", default="", help="data jobs fine-tunings wait for (after-ok)")
     ap.add_argument("--tier", default="all")
     ap.add_argument("--per-pack", type=int, default=12)
     ap.add_argument("--partition", default="gpu_h200")

@@ -11,6 +11,7 @@ For each seed and standard split of a run (default v8kde10), on that split's tes
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import sys
 from pathlib import Path
@@ -27,7 +28,7 @@ from torch_geometric.loader import DataLoader  # noqa: E402
 from gsv3.devices import variant_batch  # noqa: E402
 from gsv3.model import build_model, load_hparams  # noqa: E402
 
-ROOT = EVAL / "generalization_v9/results"
+ROOT = EVAL / os.environ.get("GS_RESULTS_ROOT", "generalization_v9") / "results"
 LABELS = EVAL / "compile_check/results/esp_labels.pt"
 DEVS = ("EQE1_Top", "EQE1_Bottom", "QExa20")
 SPLITS = {"LOFO qaoa": "leave_one_family_out/qaoa", "LOFO qnn": "leave_one_family_out/qnn",
@@ -122,8 +123,8 @@ def main():
         L.append(f"| {k} | " + " | ".join(cells) + " |")
     L.append(f"| seeds | " + " | ".join(str(len(res[n])) for n in res) + " |")
     (HERE / "results").mkdir(exist_ok=True)
-    (HERE / "results" / f"report_esp_{args.run}.md").write_text("\n".join(L))
-    (HERE / "results" / f"esp_eval_{args.run}.json").write_text(json.dumps({"run": args.run, "kind": args.kind, "res": res}))
+    (HERE / "results" / f"report_esp_{args.run}{os.environ.get('GS_TAG', '')}.md").write_text("\n".join(L))
+    (HERE / "results" / f"esp_eval_{args.run}{os.environ.get('GS_TAG', '')}.json").write_text(json.dumps({"run": args.run, "kind": args.kind, "res": res}))
     print("\n".join(L))
 
 

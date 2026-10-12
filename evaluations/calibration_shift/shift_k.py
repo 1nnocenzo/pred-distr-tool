@@ -23,6 +23,7 @@ model can reach with a single estimate (Spearman–Brown for the best of all K i
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import sys
 import time
@@ -36,7 +37,7 @@ sys.path.insert(0, str(HERE))
 import cshift  # noqa: E402
 import run_shift  # noqa: E402
 
-OUT = HERE / "results_k"
+OUT = HERE / os.environ.get("GS_CALIB_DIR", "results_k")      # results_k_v10: the retrained models
 EXTRA = {"x0.7": 0.7, "x0.8": 0.8, "x1.2": 1.2, "x1.3": 1.3}
 GROUPS = {"large scale (x0.5, x2)": ("x0.5", "x2"),
           "moderate scale (x0.7-x1.3)": ("x0.7", "x0.8", "x1.2", "x1.3"),

@@ -84,10 +84,19 @@ def new_graph(old, F):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["check", "apply"])
+    ap.add_argument("--stage", choices=["A", "B", "all"], default="all",
+                    help="A: everything from-scratch training needs (dataset, layouts, counts, orig labels, ESP, structure, "
+                         "orig usage); B: the calibration variants (v8d, v8b, variant usage maps)")
     args = ap.parse_args()
+    VARIANT_FILES = {"v8d_labels.pt"}
+    def in_stage(tgt):
+        var = tgt.name in VARIANT_FILES or (tgt.name == "usage_labels.pt" and tgt.parent.name == "v8u")
+        return args.stage == "all" or (args.stage == "B") == var
     apply = args.cmd == "apply"
     # label files
     for tgt, src in TARGETS.items():
+        if not in_stage(tgt):
+            continue
         if not src.is_file():
             print(f"MISSING new file {src.relative_to(HERE)} -> {tgt.name} not updated")
             continue
@@ -107,7 +116,7 @@ def main():
             out.update({k: new[k] for k in q_new})
             torch.save(out, tgt)
     # v8b labels = first 8 v8d variants
-    d = torch.load(R / "v8d/v8d_labels.pt", weights_only=False) if (R / "v8d/v8d_labels.pt").is_file() else None
+    d = torch.load(R / "v8d/v8d_labels.pt", weights_only=False) if (R / "v8d/v8d_labels.pt").is_file() and args.stage != "A" else None
     if d is not None:
         old = torch.load(V8B, weights_only=False)
         print(f"v8b/v8b_labels.pt: qaoa old {sum(map(is_qaoa, old))} new {sum(map(is_qaoa, d))} (first 8 v8d variants)")
@@ -117,6 +126,8 @@ def main():
             out.update({k: {"F": v["F"][:8], "layout": v["layout"][:, :8], "counts": v["counts"][:8]} for k, v in d.items() if is_qaoa(k)})
             torch.save(out, V8B)
     # graph dataset
+    if args.stage == "B":
+        return
     lay = {}
     for f in sorted((R / "layouts").glob("*_task*.jsonl")):
         for line in f.read_text().splitlines():

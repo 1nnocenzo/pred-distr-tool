@@ -25,6 +25,7 @@ run it after the candidate's calibration test, with the current main model in --
 """
 from __future__ import annotations
 
+import os
 import json
 import re
 import sys
@@ -46,8 +47,8 @@ paths.ensure_imports()
 from gsv3.devices import variant_batch  # noqa: E402
 from gsv3.model import build_model, load_hparams  # noqa: E402
 
-ROOT = EVAL / "generalization_v9/results"
-RK = EVAL / "calibration_shift/results_k"
+ROOT = EVAL / os.environ.get("GS_RESULTS_ROOT", "generalization_v9") / "results"
+RK = EVAL / "calibration_shift" / os.environ.get("GS_CALIB_DIR", "results_k")
 V8D = EVAL / "compile_check/results/v8d"
 ORIG = EVAL / "compile_check/results/v8b_orig"
 DEVS = ("EQE1_Top", "EQE1_Bottom", "QExa20")
@@ -333,7 +334,7 @@ def main():
     model.run_name = run
     part2(L, model, params, data, raw, lab, orig); log("part 2 done")
     part3(L, model, params, data, raw); log("part 3 done")
-    out = HERE / "results" / f"report_tracking_anatomy_{run}.md"
+    out = HERE / "results" / f"report_tracking_anatomy_{run}{os.environ.get('GS_TAG', '')}.md"
     out.write_text("\n".join(L))
     print("\n".join(L))
 

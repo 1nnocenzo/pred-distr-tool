@@ -575,6 +575,14 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         if self.vf2_prior:
             scores = scores - self._vf2_cost(circuits, devices, g, q_dense.size(1), n_circ, valid)
         assign = self._sinkhorn(scores, n_q, mask.sum(1))           # (B, D, Qm, P)
+        if getattr(self, "esp_place", False):
+            # v20: the ESP head's own placement, trained on the compiler's exact qubit (esp_place_loss); it starts
+            # from F's scores, detached, so neither its loss nor the ESP loss moves F's placement
+            dq, dp = q_dense.detach(), phys.detach()
+            s2 = scores.detach() + torch.einsum("bqk,dpk->bdqp", self.ep_q(dq), self.ep_p(dp)) / phys.size(-1) ** 0.5
+            s2 = s2.masked_fill(~mask.view(1, n_dev, 1, p_max), -1e4)
+            self.last_esp_logits = torch.log_softmax(s2, -1)
+            self.last_esp_assign = self.last_esp_logits.exp() * q_mask.view(n_circ, 1, -1, 1).float()
         # Kept for the v6 layout loss (training.layout_loss); not used by the head.
         self.last_assign, self.last_q_mask = assign, q_mask
 
@@ -644,6 +652,14 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
 
     N_ESPA_IN = 10
 
+    def add_esp_place(self) -> None:
+        """v20: bilinear correction of the placement scores for the ESP head only (``*_espp``)."""
+        d = self.w_q.in_features
+        self.ep_q, self.ep_p = nn.Linear(d, d), nn.Linear(d, d)
+        for m in (self.ep_q, self.ep_p):
+            nn.init.normal_(m.weight, std=0.02); nn.init.zeros_(m.bias)
+        self.esp_place = True
+
     @staticmethod
     def new_esp_mlp(n_in: int, kind: str) -> nn.Sequential:
         n_out = {"i": 3, "s": 4, "f": 4}.get(kind, 2)      # espi: + idle factor; esps: + idle factor, ancilla idle
@@ -662,7 +678,7 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         (µs, no measurements), measurements m_q, operations o_q.  inv_t = 1 / min(T1, T2) through the placement."""
         from .devices import GATE_US
         if self.esp_head == "f":
-            assign = hard_placement(assign)
+            assign = hard_placement(self.last_esp_assign if getattr(self, "esp_place", False) else assign)
             orc = getattr(self, "esp_oracle", None)     # diagnostics: {circuit: (n_qubits, D) compiler's node}
             if orc is not None:
                 assign = oracle_placement(assign, circuits, orc)
@@ -1252,7 +1268,7 @@ SINKHORN_KINDS = ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_rou
 
 def split_esp_kind(kind: str) -> tuple[str, str | bool]:
     """``<sinkhorn kind>_esp`` (v13 ESP head) / ``<sinkhorn kind>_espa`` (v14 analytic head) -> (base kind, head)."""
-    for sfx, head in (("_espa", "a"), ("_espi", "i"), ("_esps", "s"), ("_espf", "f"), ("_esp", "v13")):
+    for sfx, head in (("_espa", "a"), ("_espi", "i"), ("_esps", "s"), ("_espf", "f"), ("_espp", "p"), ("_esp", "v13")):
         if kind.endswith(sfx) and kind[: -len(sfx)] in SINKHORN_KINDS:
             return kind[: -len(sfx)], head
     return kind, False
@@ -1264,6 +1280,9 @@ def is_sinkhorn_kind(kind: str) -> bool:
 
 def build_model(kind: str, params: dict[str, Any], devices, device: torch.device) -> nn.Module:
     kind, esp = split_esp_kind(kind)
+    esp_place = esp == "p"              # v20: the formula head (f) with its own placement
+    if esp_place:
+        esp = "f"
     if kind == "pooled":
         return build_v2_model(params, devices, device)
     if kind in SINKHORN_KINDS:
@@ -1281,6 +1300,8 @@ def build_model(kind: str, params: dict[str, Any], devices, device: torch.device
             esp_head=esp,
         )
         model.relative_dev = rel
+        if esp_place:
+            model.add_esp_place()
         return model.to(device)
     if kind == "phys_uniform":
         return PhysicsHeadPredictor(

@@ -35,7 +35,7 @@ def split_stats(model, data, names, lay, hops):
         chunk = names[s: s + 64]
         b = next(iter(DataLoader([data[n] for n in chunk], batch_size=len(chunk))))
         model(b, model._dev)
-        soft = model.last_assign                       # (B, D, Qm, P)
+        soft = model.last_esp_assign if getattr(model, "esp_place", False) else model.last_assign   # (B, D, Qm, P)
         hard = hard_placement(soft).argmax(-1)         # (B, D, Qm)
         arg = soft.argmax(-1)
         for i, n in enumerate(chunk):

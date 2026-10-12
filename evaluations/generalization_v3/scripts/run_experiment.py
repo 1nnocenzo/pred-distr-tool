@@ -57,7 +57,7 @@ EXPERIMENTS = {
 
 #: ``v1`` = the original v1 predictor (genstudy: linear target, 3 fixed outputs,
 #: random validation split), run unchanged through ``genstudy.experiment.run_split``.
-ALL_MODELS = (*MODEL_KINDS, *(k + s for k in SINKHORN_KINDS for s in ("_esp", "_espa", "_espi", "_esps", "_espf") if k + s not in MODEL_KINDS), "v1")
+ALL_MODELS = (*MODEL_KINDS, *(k + s for k in SINKHORN_KINDS for s in ("_esp", "_espa", "_espi", "_esps", "_espf", "_espp") if k + s not in MODEL_KINDS), "v1")
 
 
 def attach_layouts(dataset, path: Path) -> None:
@@ -253,6 +253,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--esp-path", type=Path, default=None,
                    help="v13: ESP / duration / depth labels (compile_check/results/esp_labels.pt)")
     p.add_argument("--esp-lambda", type=float, default=None, help="v13: weight of the ESP / duration / depth loss")
+    p.add_argument("--esp-place-lambda", type=float, default=None,
+                   help="v20 (*_espp): weight of the cross-entropy of the ESP head's own placement on the compiler's exact layout")
     p.add_argument("--tvar-path", type=Path, default=None,
                    help="v18: directory with esp_tvar_labels.pt and tvar_raw.json (compile_check/esp_tvar_train.py)")
     p.add_argument("--tvar-lambda", type=float, default=None,
@@ -334,7 +336,7 @@ def main() -> int:
     # Opt-in v5b keys: only present when requested, so older configurations (and
     # their checkpoints) are unchanged.
     for key in ("epoch_budget", "swa_frac", "tau_start", "layout_lambda", "layout_loss", "count_lambda",
-                "aug_p_orig", "delta_lambda", "aug_variants", "count_weights", "usage_lambda", "usage_aug_lambda", "react_lambda", "placement_lr_mult", "delta_corr_lambda", "esp_lambda", "esp_weights", "struct_lambda", "tvar_lambda", "tvar_f_lambda"):
+                "aug_p_orig", "delta_lambda", "aug_variants", "count_weights", "usage_lambda", "usage_aug_lambda", "react_lambda", "placement_lr_mult", "delta_corr_lambda", "esp_lambda", "esp_weights", "struct_lambda", "tvar_lambda", "tvar_f_lambda", "esp_place_lambda"):
         if getattr(args, key) is not None:
             protocol[key] = getattr(args, key)
     if args.model == "v1":
@@ -391,16 +393,16 @@ def main() -> int:
             raise SystemExit("--count-lambda needs a physics-head model and --counts-path")
         attach_counts(dataset, args.counts_path)
     if args.esp_lambda:
-        if not args.model.endswith(("_esp", "_espa", "_espi", "_esps", "_espf")) or args.esp_path is None:
+        if not args.model.endswith(("_esp", "_espa", "_espi", "_esps", "_espf", "_espp")) or args.esp_path is None:
             raise SystemExit("--esp-lambda needs a *_esp / *_espa model and --esp-path")
         attach_esp(dataset, args.esp_path)
     if args.tvar_lambda:
-        if not args.model.endswith(("_espa", "_espi", "_esps", "_espf")) or args.tvar_path is None:
+        if not args.model.endswith(("_espa", "_espi", "_esps", "_espf", "_espp")) or args.tvar_path is None:
             raise SystemExit("--tvar-lambda needs an *_espa / *_espi / *_esps model and --tvar-path")
         attach_tvar(dataset, args.tvar_path)
         protocol["tvar_path"] = str(args.tvar_path)
     if args.struct_lambda:
-        if not args.model.endswith(("_espa", "_espi", "_esps", "_espf")) or args.struct_path is None:
+        if not args.model.endswith(("_espa", "_espi", "_esps", "_espf", "_espp")) or args.struct_path is None:
             raise SystemExit("--struct-lambda needs a *_espa model and --struct-path")
         attach_struct(dataset, args.struct_path)
     if args.usage_lambda:

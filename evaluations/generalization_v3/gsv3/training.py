@@ -186,6 +186,23 @@ def layout_loss(model, batch) -> tuple[torch.Tensor, torch.Tensor]:
     return (ce * known).sum() / n, acc
 
 
+def esp_place_loss(model, batch) -> tuple[torch.Tensor, float]:
+    """v20: cross-entropy of the ESP head's own placement (row softmax) on the compiler's exact qubit; returns the
+    loss and the share of known (qubit, device) pairs whose argmax is the compiler's qubit."""
+    from torch_geometric.utils import to_dense_batch
+
+    logits, q_mask = model.last_esp_logits, model.last_q_mask              # (B, D, Qm, P), (B, Qm)
+    n_q = batch.n_qubits.view(-1).long()
+    q_batch = torch.repeat_interleave(torch.arange(n_q.numel(), device=n_q.device), n_q)
+    target, _ = to_dense_batch(batch.layout, q_batch, fill_value=-1, max_num_nodes=logits.size(2))
+    target = target.permute(0, 2, 1)                                        # (B, D, Qm)
+    known = (target >= 0) & q_mask.unsqueeze(1)
+    picked = logits.gather(-1, target.clamp(min=0).unsqueeze(-1)).squeeze(-1)
+    n = known.sum().clamp(min=1)
+    acc = ((logits.argmax(-1) == target) & known).sum() / n
+    return -(picked * known).sum() / n, float(acc)
+
+
 def region_distance_loss(model, batch) -> tuple[torch.Tensor, dict[str, float]]:
     """v7: supervise the parts of the compiler's layout that do not depend on the family.
 
@@ -309,6 +326,12 @@ def train_model(
         logger.info("[%s] placement learning rate x%g on %d tensors", tag, plr, len(place))
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=protocol["lr"])
+    if getattr(model, "esp_place", False):     # v20: the new ESP placement starts from scratch: lr x10
+        ep = [p_ for n_, p_ in model.named_parameters() if n_.startswith(("ep_q.", "ep_p."))]
+        ids = {id(p_) for p_ in ep}
+        groups = [{**g_, "params": [p_ for p_ in g_["params"] if id(p_) not in ids]} for g_ in optimizer.param_groups]
+        optimizer = torch.optim.Adam(groups + [{"params": ep, "lr": protocol["lr"] * 10}])
+        logger.info("[%s] ESP placement: %d tensors at lr x10", tag, len(ep))
 
     sampler = balanced_sampler(train_families, protocol["balance_alpha"], seed)
     loader = DataLoader(list(train_graphs), batch_size=protocol["batch_size"],
@@ -334,6 +357,8 @@ def train_model(
     count_lambda = float(protocol.get("count_lambda", 0) or 0)
     # v13 (opt-in): ESP decay / duration / depth of the stored compilation; needs ``esp`` on the graphs
     esp_lambda = float(protocol.get("esp_lambda", 0) or 0)
+    esp_place_lambda = float(protocol.get("esp_place_lambda", 0) or 0)
+    ep_acc = [0.0, 0.0, 0]
     esp_w = [float(x) for x in str(protocol.get("esp_weights") or "1,1,1").split(",")]
     # v15 (opt-in): per-qubit structure of the stored compilation; needs ``struct`` on the graphs and an *_espa model
     struct_lambda = float(protocol.get("struct_lambda", 0) or 0)
@@ -478,6 +503,10 @@ def train_model(
                 ce, acc = layout_loss(model, batch)
                 loss = loss + layout_lambda * ce
                 lay_ce, lay_acc, lay_n = lay_ce + float(ce), lay_acc + float(acc), lay_n + 1
+            if esp_place_lambda and batch_devices is devices and hasattr(batch, "layout"):
+                ep_l, ep_a = esp_place_loss(model, batch)
+                loss = loss + esp_place_lambda * ep_l
+                ep_acc = [ep_acc[0] + ep_l.item(), ep_acc[1] + ep_a, ep_acc[2] + 1]
             if count_lambda:
                 closs, rel2 = count_loss(model, batch, count_w)
                 loss = loss + count_lambda * closs
@@ -620,6 +649,12 @@ def train_model(
                 history[-1][k] = v / max(1, tv_n)
             logger.info("[%s] epoch %04d  tvar decay_mse=%.4f  duration_mse=%.4f  f_mse=%.5f", tag, epoch,
                         *(history[-1][k] for k in ("train_tvar_decay_mse", "train_tvar_duration_mse", "train_tvar_f_mse")))
+        if esp_place_lambda:
+            history[-1]["train_esp_place_ce"] = ep_acc[0] / max(1, ep_acc[2])
+            history[-1]["train_esp_place_acc"] = ep_acc[1] / max(1, ep_acc[2])
+            logger.info("[%s] epoch %04d  ESP placement ce=%.3f  exact qubit=%.3f", tag, epoch,
+                        history[-1]["train_esp_place_ce"], history[-1]["train_esp_place_acc"])
+            ep_acc = [0.0, 0.0, 0]
         if esp_lambda:
             for k, v in zip(("train_esp_decay_mse", "train_log_duration_mse", "train_log_depth_mse"), esp_acc):
                 history[-1][k] = v / max(1, esp_n)

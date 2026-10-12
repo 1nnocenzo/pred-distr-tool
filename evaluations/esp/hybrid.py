@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -85,7 +86,7 @@ def main():
          "| | " + " | ".join(res) + " |", "| --- |" + " --- |" * len(res)]
     for k in keys:
         L.append(f"| {k} | " + " | ".join(f"{np.mean([m[k] for m in res[s]]):.4f}" for s in res) + " |")
-    (HERE / "results/report_hybrid.md").write_text("\n".join(L))
+    (HERE / f"results/report_hybrid{os.environ.get('GS_TAG', '')}.md").write_text("\n".join(L))
     print("\n".join(L))
 
 

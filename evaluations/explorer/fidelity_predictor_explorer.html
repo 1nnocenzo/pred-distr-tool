@@ -63,10 +63,13 @@ h1 { font-size: clamp(1.7rem, 3.2vw, 2.4rem); margin: 0; line-height: 1.1; }
 .best .was b { color: var(--good); font-weight: 500; }
 .best .was b.neg { color: var(--bad); }
 .viewtabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
-.datatabs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
-.datatabs .tablab { font-size: 0.9rem; font-weight: 600; color: var(--ink-2); margin-right: 4px; }
-.datatabs button { font-size: 0.88rem; padding: 4px 11px; }
-.datatabs button[aria-selected="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.dtable { border-collapse: collapse; margin: 12px 0 6px; font-size: 0.95rem; font-variant-numeric: tabular-nums; min-width: 640px; }
+.dtable th, .dtable td { padding: 6px 10px; border-bottom: 1px solid var(--rule); text-align: right; }
+.dtable th:first-child, .dtable td:first-child { text-align: left; }
+.dtable th { color: var(--ink-2); font-weight: 600; font-size: 0.85rem; vertical-align: bottom; }
+.dtable td.m { color: var(--ink); font-weight: 600; }
+.dtable .good { color: var(--good); } .dtable .warn { color: var(--bad); }
+.dwrap { overflow-x: auto; }
 .viewtabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .bestcap { font-size: 0.92rem; color: var(--ink-2); margin-top: 8px; }
 @media (max-width: 860px) { .bestcap { text-align: left; } }
@@ -205,12 +208,8 @@ table.matrix { width: 100%; min-width: 760px; border-collapse: collapse; font-va
       <div class="viewtabs" role="tablist" aria-label="What to compare">
         <button type="button" role="tab" data-view="F" aria-selected="true">Fidelity F</button>
         <button type="button" role="tab" data-view="ESP" aria-selected="false">ESP · duration · depth</button>
-        <button type="button" role="tab" data-view="TIME" aria-selected="false">Execution time</button>
-      </div>
-      <div class="datatabs" role="tablist" aria-label="Which data">
-        <span class="tablab">Data</span>
-        <button type="button" role="tab" data-data="v10" aria-selected="true">Retrained · qaoa with measurements</button>
-        <button type="button" role="tab" data-data="old" aria-selected="false">Before the qaoa fix</button>
+        <button type="button" role="tab" data-view="DUR" aria-selected="false">Circuit duration estimate</button>
+        <button type="button" role="tab" data-view="TIME" aria-selected="false">Predictor speed</button>
       </div>
     </div>
     <div>
@@ -338,7 +337,7 @@ table.matrix { width: 100%; min-width: 760px; border-collapse: collapse; font-va
       <span class="kicker" id="res-kicker"></span>
     </div>
     <div class="matrix-wrap"><table class="matrix" id="matrix"></table></div>
-    <p class="note" id="res-note"></p>
+    <div class="note" id="res-note"></div>
   </section>
 </div>
 
@@ -876,6 +875,31 @@ const ESPD10 = {
   v8kdi10: [0.974, 0.940, 0.894, 0.985, 0.074, 0.366, 0.0093],
   v8kdg10: [0.960, 0.959, 0.906, 0.987, 0.097, 0.435, 0.0100]
 };
+/* Duration view: predicted one-shot QPU time (ASAP schedule) vs the compiled circuit's, retrained models, seeds 5–7
+   pooled (esp/esp_duration.py → report_esp_duration_v10.json; R² from esp_eval). Columns: typical (median) relative
+   error on qaoa, qnn, variational, control (%); worst 10% (p90 relative error, mean of the 3 unseen splits, %);
+   share within 25% (unseen, %); R² of log duration (unseen mean). */
+const DURD = {
+  v8kdi10: [10.4, 4.7, 7.0, 2.1, 20.5, 92.0, 0.71],
+  v8kdg10: [14.7, 3.8, 9.8, 2.2, 27.7, 84.2, 0.72]
+};
+/* per split: [typical duration µs, median rel. error, median abs. µs, p90 rel., p90 abs. µs, within 10%, within 25%, median pred/true, R² log duration] */
+const DURS = {
+  v8kdi10: { "qaoa (unseen family)": [40.8, 0.104, 3.9, 0.282, 19.1, 0.485, 0.857, 0.921, 0.905], "qnn (unseen family)": [17.4, 0.047, 0.8, 0.087, 1.6, 0.950, 1.000, 1.047, 0.413],
+             "variational (unseen group)": [18.7, 0.070, 1.4, 0.245, 7.8, 0.636, 0.904, 0.974, 0.808], "control (seen families)": [20.8, 0.021, 0.5, 0.095, 5.3, 0.908, 0.988, 1.003, 0.988] },
+  v8kdg10: { "qaoa (unseen family)": [40.8, 0.147, 6.3, 0.441, 33.3, 0.381, 0.687, 0.896, 0.753], "qnn (unseen family)": [17.4, 0.038, 0.6, 0.073, 1.2, 0.999, 1.000, 1.038, 0.601],
+             "variational (unseen group)": [18.7, 0.098, 2.0, 0.318, 8.4, 0.508, 0.838, 1.087, 0.815], "control (seen families)": [20.8, 0.022, 0.5, 0.080, 4.5, 0.938, 0.998, 1.007, 0.993] }
+};
+const pc = x => Math.round(x * 100) + "%";
+function durTable(k) {
+  const rows = Object.entries(DURS[k]).map(([sp, x]) => {
+    const b = x[7], bias = Math.abs(b - 1) < 0.03 ? "none" : b < 1 ? `under by ${pc(1 - b)}` : `over by ${pc(b - 1)}`;
+    return `<tr><td>${esc(sp)}</td><td>${x[0].toFixed(1)} µs</td><td class="m">${pc(x[1])} · ${x[2].toFixed(1)} µs</td><td>${pc(x[3])} · ${x[4].toFixed(1)} µs</td>` +
+      `<td>${pc(x[5])}</td><td class="${x[6] >= 0.9 ? "good" : x[6] < 0.75 ? "warn" : ""}">${pc(x[6])}</td><td>${bias}</td><td>${x[8].toFixed(2)}</td></tr>`;
+  }).join("");
+  return `<div class="dwrap"><table class="dtable"><thead><tr><th>${esc(k)} · split</th><th>typical duration</th><th>typical error</th><th>worst 10% beyond</th>` +
+    `<th>within 10%</th><th>within 25%</th><th>systematic bias</th><th>R² log duration</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
 let DATA = "v10";
 const isNew = () => DATA === "v10";
 const seedsOf = v => view === "TIME" ? v.n : isNew() ? (v.n10 || "–") : v.n;
@@ -885,7 +909,7 @@ const seedsOf = v => view === "TIME" ? v.n : isNew() ? (v.n10 || "–") : v.n;
 const TIMED = {
   v8a: [12.9, 66.7, 5.4, 13.2, null]
 };
-VERSIONS.forEach(v => { v.esp = ESPD[v.k] || null; v.time = TIMED[v.k] || null; v.esp10 = ESPD10[v.k] || null;
+VERSIONS.forEach(v => { v.esp = ESPD[v.k] || null; v.time = TIMED[v.k] || null; v.esp10 = ESPD10[v.k] || null; v.dur = DURD[v.k] || null;
   const x = R10[v.k]; v.r10 = x ? x[0] : null; v.n10 = x ? x[1] : null; });
 const NOTE_F10 = "<b>Retrained data.</b> Every version is retrained after qaoa was regenerated with its final measurements (labels, calibration variants and the calibration test recomputed). On LOFO qaoa the test circuits themselves changed, so compare that column only within this data set, never with the other one. Versions not listed are still retraining; the seeds column shows how many seeds are in so far. <b>Reading tracking.</b> Tracking is a correlation (not R\u00b2) of predicted vs true \u0394log F when a few qubits or couplers change; R\u00b2 of F after the change stays 0.99. Label noise caps local tracking near 0.85. LOFO = one circuit family held out, LOGO = a group of families held out, control = random split. The best value of each column is in teal.";
 const VIEWS = {
@@ -908,6 +932,22 @@ const VIEWS = {
       ? "<b>Retrained data.</b> v8kdi10 reads measurements from the circuit and predicts the total idle time directly; v17 (v8kdg10) schedules the circuit's gate graph. Using a model's own F as the ESP estimate gives ESP R\u00b2 0.72 / 0.67 / 0.59 / 0.67 (qaoa / qnn / variational / control) and regret 0.010 (v8kdi10's F): the ESP heads lift R\u00b2 to 0.89\u20130.99. Duration error = median |pred/true \u2212 1| of the one-shot QPU time: 10% / 5% / 7% on qaoa / qnn / variational for v8kdi10, 2% on control. The other ESP heads (v8kde10, v8kda10, v8kds10) are still retraining. Mean over seeds 5, 6, 7, on the test circuits with ESP labels (no grover or dynamic circuits). Lower is better for the errors and the regret."
       : "<b>Reading ESP.</b> v8kdc10 has no ESP head: its row uses the predicted F as the ESP estimate, the baseline every ESP head has to beat. v8kdi10 reads measurements from the circuit and predicts the total idle time directly; v17 (v8kdg10) schedules the circuit's gate graph. Mean over seeds 5, 6, 7, on the test circuits with ESP labels (no grover or dynamic circuits). Lower is better for the errors and the regret."; },
     cap: m => isNew() ? `best ESP model ${m.k} (3 seeds, retrained) vs v17 (v8kdg10)` : `best ESP model ${m.k} (3 seeds) vs v8kdc10 using F as the ESP estimate and the first ESP head v8kde10` },
+  DUR: { main: "v8kdi10", cmp: ["v8kdg10"], get: v => v.dur,
+    cols: [{ name: "typical error, qaoa", short: "qaoa", lo: 40, hi: 0, dig: 0, unit: "%", low: true },
+           { name: "typical error, qnn", short: "qnn", lo: 40, hi: 0, dig: 0, unit: "%", low: true },
+           { name: "typical error, variational", short: "variational", lo: 40, hi: 0, dig: 0, unit: "%", low: true },
+           { name: "typical error, control", short: "control", lo: 40, hi: 0, dig: 0, unit: "%", low: true },
+           { name: "worst 10% beyond, unseen", short: "worst 10%", lo: 60, hi: 0, dig: 0, unit: "%", low: true },
+           { name: "within 25%, unseen", short: "within 25%", lo: 50, hi: 100, dig: 0, unit: "%" },
+           { name: "R² log duration, unseen", short: "R² log dur.", lo: 0, hi: 1, dig: 2 }],
+    kicker: "Predicted QPU time of one shot (compiled circuit, ASAP schedule with the chip's gate times) vs the true one · typical error = median |pred/true − 1| · seeds 5–7 pooled",
+    get note() { return "<b>Reading the duration estimate.</b> <b>Typical error</b>: half of the (circuit, chip) cases are closer than this. " +
+      "<b>Worst 10% beyond</b>: one case in ten is off by more. <b>Within 25%</b>: share of cases a scheduler could use without a margin. " +
+      "<b>Systematic bias</b>: whether the model under- or over-estimates on the median case. " +
+      "<b>R² log duration</b>: how much of the difference in duration between circuits the model explains (1 = all of it, 0 = no better than one fixed guess); it is the test of whether the model understands what makes a circuit long. " +
+      "On qnn it is low (0.41) while the error is 5% because qnn circuits all last about the same: there is little to explain." + durTable("v8kdi10") + durTable("v8kdg10") +
+      "A job takes about shots × duration plus overheads (reset, transfer, queue) that the model does not see. Green: at least 90% of cases within 25%; red: fewer than 75%."; },
+    cap: m => `best duration model ${m.k} (3 seeds, retrained) vs v17 (v8kdg10) · error = |predicted / true − 1| of the one-shot QPU time` },
   TIME: { main: "v8a", cmp: [], get: v => v.time,
     cols: [{ name: "predictor, 3 devices", short: "predictor", lo: 30, hi: 0, dig: 1, unit: " ms", low: true },
            { name: "compile all, 3 devices", short: "compile", lo: 0, hi: 300, dig: 1, unit: " ms" },
@@ -1015,7 +1055,7 @@ function versionCard() {
   const row = (x, xv, cls, withDelta) => `<tr class="${cls}"><td>${esc(x.k)}</td>` + W.cols.map((c, i) => `<td>${fmt(xv[i], c)}${withDelta ? delta(i) : ""}</td>`).join("") + `<td>${seedsOf(x) || "–"}</td></tr>`;
   const table = vals ? `<div style="overflow-x:auto"><table class="res"><thead><tr><th>model</th>` + W.cols.map(c => `<th>${esc(c.short)}</th>`).join("") +
     `<th>seeds</th></tr></thead><tbody>${row(v, vals, "cur", true)}${pv ? row(par, pv, "", false) : ""}</tbody></table></div>`
-    : `<p class="why">${isNew() && view !== "TIME" ? "Still retraining on the corrected data: no numbers yet (switch Data to see the earlier ones)." : `No ${view === "ESP" ? "ESP" : view === "TIME" ? "timing" : ""} numbers for this version.`}</p>`;
+    : `<p class="why">${isNew() && view !== "TIME" && view !== "DUR" ? "Still retraining on the corrected data (qaoa with measurements): numbers arrive with the full evaluation." : `No ${view === "ESP" ? "ESP" : view === "DUR" ? "duration" : view === "TIME" ? "timing" : ""} numbers for this version.`}</p>`;
   return `<div class="vcard"><div class="vtop"><span class="vname">${esc(v.k)}</span><span class="status s-${v.s}">${esc(v.label)}</span>${par ? `<span class="src">builds on ${esc(par.k)}</span>` : ""}</div>` +
     `<p><b>Changes:</b> ${esc(v.what)}</p><p class="why"><b>Why:</b> ${esc(v.why)}</p>` + (v.s === "plan" ? "" : table) + `</div>`;
 }
@@ -1117,12 +1157,6 @@ function setView(k) {
   renderBest(); renderMatrix(); render(curBlock);
 }
 document.querySelectorAll(".viewtabs button").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
-function setData(k) {
-  DATA = k;
-  document.querySelectorAll(".datatabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.data === k)));
-  renderBest(); renderMatrix(); render(curBlock);
-}
-document.querySelectorAll(".datatabs button").forEach(b => b.addEventListener("click", () => setData(b.dataset.data)));
 renderBest(); renderMatrix();
 applyVersion(MAIN);
 </script>

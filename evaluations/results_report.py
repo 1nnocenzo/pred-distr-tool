@@ -71,6 +71,9 @@ MODELS = {
     "v8kds10": ("v8kds10", "v8kda10 + per-qubit structure loss (v15)", "running"),
     "v8kdi10": ("v8kdi10", "v8kdc10 + exact measurement counts + idle-time ESP head (v16)", "running"),
     "v8kdg10": ("v8kdg10", "v8kdc10 + ESP from the ASAP schedule of the circuit DAG (v17)", "running"),
+    "v8kdt10": ("v8kdt10", "v17 fine-tuned on T1 / T2 / gate-time variants (v18)", "dropped"),
+    "v8kdt10b": ("v8kdt10b", "v18 with change loss 0.1 and F invariance 3 (v18b)", "dropped"),
+    "v8kdf10": ("v8kdf10", "v17 with the formula ESP head: real gate times, per-qubit decay, hard placement (v19)", "running"),
 }
 COMPARE = ["v4_phys", "v5_sinkhorn", MAIN]           # the 3-seed comparison
 SPLITS = [("lofo", "qaoa", None), ("lofo", "qnn", None), ("logo", "variational", None),

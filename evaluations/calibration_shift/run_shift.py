@@ -89,6 +89,10 @@ for _s in (5, 6, 7):
     MODELS[f"v8kds10@s{_s}"] = ("sinkhorn_rf_route_czc_espa", _control("generalization_v9", "v8kds10", _s))  # v8kda10 + per-qubit structure loss
     MODELS[f"v8kdi10@s{_s}"] = ("sinkhorn_rf_route_czc_espi", _control("generalization_v9", "v8kdi10", _s))  # exact measurements + idle-time head
     MODELS[f"v8kdg10@s{_s}"] = ("sinkhorn_rf_route_czc_esps", _control("generalization_v9", "v8kdg10", _s))  # ESP from the ASAP schedule of the circuit DAG
+    MODELS[f"v8kdt10@s{_s}"] = ("sinkhorn_rf_route_czc_esps", _control("generalization_v10", "v8kdt10", _s))  # v18: fine-tuned on T / gate-time variants
+    MODELS[f"v8kdf10@s{_s}"] = ("sinkhorn_rf_route_czc_espf", _control("generalization_v10", "v8kdf10", _s))  # v19: formula ESP head
+    MODELS[f"v8kdp10@s{_s}"] = ("sinkhorn_rf_route_czc_espp", _control("generalization_v10", "v8kdp10", _s))  # v20: + ESP-only placement
+    MODELS[f"v8kdfi10@s{_s}"] = ("sinkhorn_rf_route_czc_espfi", _control("generalization_v10", "v8kdfi10", _s))  # v19 head on v8kdi10
 # data scaling (2026-10-11): change-loss fine-tuning on the first k calibration variants per device (c12/25/50)
 # or on all 100 with the variant labels of ~1/4 of the circuits (cq4); v8kdl40 and v11dl40 recipes
 for _s in (5, 6, 7):

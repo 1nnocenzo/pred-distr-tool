@@ -138,8 +138,13 @@ def cmd_predict(args):
     graphs = [data[n] for n in sample]
     params = load_hparams()
     devices = run_shift._variant_batch(raw, keys, params["lap_pe"])
-    preds = {}
+    # GS_MODELS=a,b: predict only these runs (all seeds) and merge them into the existing predictions.json
+    only = [m for m in os.environ.get("GS_MODELS", "").split(",") if m]
+    old = OUT / "predictions.json"
+    preds = json.loads(old.read_text()) if only and old.is_file() else {}
     for mname, (kind, path) in run_shift.MODELS.items():
+        if only and mname.split("@")[0] not in only:
+            continue
         if not path.is_file():
             continue
         model = build_model(kind, params, devices, torch.device("cpu"))

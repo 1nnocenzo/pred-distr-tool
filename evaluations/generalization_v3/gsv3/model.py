@@ -638,7 +638,7 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
             # it for F too; ``*_esps`` (v17) only in the ESP head, so F keeps the counts it was trained with
             meas = (circuits.x[:, GATE2IDX_MEASURE] > 0.5).float().view(-1, 1).expand(-1, n_dev)
             n_ops_esp = torch.cat([n_ops[..., :1], meas.unsqueeze(-1), n_ops[..., 2:]], dim=-1)
-            if self.esp_head == "i":
+            if self.esp_head == "i" or getattr(self, "f_exact_meas", False):
                 n_ops = n_ops_esp
         self.last_counts = scatter(n_ops, gb, dim=0, dim_size=n_circ, reduce="sum")   # v8
         self.last_n_ops = n_ops                                      # (G, D, 3) per gate: r, measure, cz
@@ -1268,7 +1268,7 @@ SINKHORN_KINDS = ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_rou
 
 def split_esp_kind(kind: str) -> tuple[str, str | bool]:
     """``<sinkhorn kind>_esp`` (v13 ESP head) / ``<sinkhorn kind>_espa`` (v14 analytic head) -> (base kind, head)."""
-    for sfx, head in (("_espa", "a"), ("_espi", "i"), ("_esps", "s"), ("_espf", "f"), ("_espp", "p"), ("_esp", "v13")):
+    for sfx, head in (("_espa", "a"), ("_espi", "i"), ("_esps", "s"), ("_espf", "f"), ("_espp", "p"), ("_espfi", "fi"), ("_esp", "v13")):
         if kind.endswith(sfx) and kind[: -len(sfx)] in SINKHORN_KINDS:
             return kind[: -len(sfx)], head
     return kind, False
@@ -1281,7 +1281,8 @@ def is_sinkhorn_kind(kind: str) -> bool:
 def build_model(kind: str, params: dict[str, Any], devices, device: torch.device) -> nn.Module:
     kind, esp = split_esp_kind(kind)
     esp_place = esp == "p"              # v20: the formula head (f) with its own placement
-    if esp_place:
+    f_exact_meas = esp == "fi"          # v19 head on the v8kdi10 recipe: exact measurements in F too (as espi)
+    if esp_place or f_exact_meas:
         esp = "f"
     if kind == "pooled":
         return build_v2_model(params, devices, device)
@@ -1302,6 +1303,7 @@ def build_model(kind: str, params: dict[str, Any], devices, device: torch.device
         model.relative_dev = rel
         if esp_place:
             model.add_esp_place()
+        model.f_exact_meas = f_exact_meas
         return model.to(device)
     if kind == "phys_uniform":
         return PhysicsHeadPredictor(

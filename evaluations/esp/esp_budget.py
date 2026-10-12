@@ -39,7 +39,8 @@ STRUCT = EVAL / "compile_check/results/struct_labels.pt"
 ROOT = EVAL / os.environ.get("GS_RESULTS_ROOT", "generalization_v9") / "results"
 KINDS = {"v5_espa": "sinkhorn_espa", "v8a_espa": "sinkhorn_espa", "v8kdi10": "sinkhorn_rf_route_czc_espi", "v8kdg10": "sinkhorn_rf_route_czc_esps",
          "v8kdt10": "sinkhorn_rf_route_czc_esps", "v8kdt10b": "sinkhorn_rf_route_czc_esps", "v8kdf10": "sinkhorn_rf_route_czc_espf",
-         "v8kdp10": "sinkhorn_rf_route_czc_espp"}
+         "v8kdp10": "sinkhorn_rf_route_czc_espp",
+         "v8kdfi10": "sinkhorn_rf_route_czc_espfi"}
 
 
 def choice(score, esp):

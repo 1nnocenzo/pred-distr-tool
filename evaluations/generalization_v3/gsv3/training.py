@@ -307,7 +307,13 @@ def train_model(
     model = build_model(protocol["model"], params, devices, device)
     if protocol.get("init_from"):     # fine-tuning (e.g. the change loss on a trained v8a)
         tau_wanted = getattr(model, "tau", None)
-        missing, unexpected = model.load_state_dict(torch.load(protocol["init_from"], map_location=device), strict=False)
+        sd = torch.load(protocol["init_from"], map_location=device)
+        own = model.state_dict()
+        reshaped = [k for k, v in sd.items() if k in own and own[k].shape != v.shape]
+        if reshaped:      # e.g. another ESP head's MLP: start it fresh
+            logger.info("[%s] init_from: shapes differ, left at init: %s", tag, reshaped)
+            sd = {k: v for k, v in sd.items() if k not in reshaped}
+        missing, unexpected = model.load_state_dict(sd, strict=False)
         if tau_wanted is not None:          # the fine-tuning's temperature, not the checkpoint's
             model.tau = float(tau_wanted); model.tau_saved.fill_(float(tau_wanted))
         if unexpected:

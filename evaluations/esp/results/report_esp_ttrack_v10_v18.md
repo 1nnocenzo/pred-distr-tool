@@ -46,4 +46,15 @@
 | mslow | 0.85 | 1.41 | 0.000 | 0.98 | 0.97 | 0.335 | 0.0000 | 0.0039 | 0.0045 |
 | mix | 0.73 | 0.39 | 1.698 | 0.71 | 0.41 | 0.152 | 0.0073 | 0.0139 | 0.0087 |
 
+## v8kdt10 (v18): v17 fine-tuned on T1 / T2 / gate-time variants
+
+| kind | ESP tracking | ESP slope | median abs true Δlog ESP | duration tracking | duration slope | median abs true Δlog duration | spurious Δlog F | ESP regret, keep old choice | ESP regret, re-predict |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| tjit | 0.66 | 0.90 | 0.162 | – | 0.00 | 0.000 | 0.0163 | 0.0060 | 0.0053 |
+| tbad | 0.70 | 0.81 | 0.856 | – | 0.00 | 0.000 | 0.0208 | 0.0071 | 0.0117 |
+| djit | 0.55 | 0.48 | 1.693 | 0.64 | 0.55 | 0.171 | 0.0000 | 0.0077 | 0.0098 |
+| czslow | 0.55 | 0.38 | 0.081 | 0.64 | 0.62 | 0.014 | 0.0000 | 0.0059 | 0.0060 |
+| mslow | 0.70 | 2.02 | 0.000 | 0.98 | 1.10 | 0.335 | 0.0000 | 0.0065 | 0.0087 |
+| mix | 0.79 | 0.71 | 1.698 | 0.69 | 0.76 | 0.152 | 0.0125 | 0.0149 | 0.0084 |
+
 Kinds: tjit = T1/T2 × lognormal(0.3) on every qubit; tbad = 2–3 qubits with T × 0.15–0.3; djit = every gate duration × lognormal(0.2); czslow = 3–5 couplers with the CZ 2–3× slower; mslow = readout 1.3–2× slower; mix = tjit + djit. A tracking of – means the model's prediction does not move at all (no input carries that change).

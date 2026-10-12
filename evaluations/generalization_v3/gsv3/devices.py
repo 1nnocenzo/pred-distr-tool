@@ -82,6 +82,14 @@ def _gate_times(raw: dict, g) -> None:
     n = len(raw["nodes"])
     t = raw.get("t")
     g.tg = (torch.tensor(t, dtype=torch.float32) if t is not None else torch.tensor(GATE_US).float().expand(n, 3).clone())
+    # v19: CZ duration of every coupler (``raw["edges"]`` order) from ``raw["tc"]``, else the mean of its two qubits'
+    # incident CZ time (exact for the uniform original devices)
+    tc = raw.get("tc")
+    if tc is not None:
+        g.tcz = torch.tensor(tc, dtype=torch.float32)
+    else:
+        e = torch.tensor(raw["edges"], dtype=torch.long).view(-1, 2)
+        g.tcz = 0.5 * (g.tg[e[:, 0], 2] + g.tg[e[:, 1], 2])
 
 
 def _coupler_errors(raw: dict, g) -> None:

@@ -40,7 +40,10 @@ MODELS = {"v8kdi10 (v16), fixed gate times": ("v8kdi10", "sinkhorn_rf_route_czc_
           "v8kdg10 (v17) + per-qubit gate times, no training (v18 zero-shot)": ("v8kdg10", "sinkhorn_rf_route_czc_esps", True),
           "v8kdt10 (v18): v17 fine-tuned on T1 / T2 / gate-time variants": ("v8kdt10", "sinkhorn_rf_route_czc_esps", True),
           "v8kdt10b (v18b): as v18, change loss × 0.1, F invariance × 3": ("v8kdt10b", "sinkhorn_rf_route_czc_esps", True),
-          "v8kdg10 (v17) weights in the formula head, hard placement (v19 zero-shot)": ("v8kdg10", "sinkhorn_rf_route_czc_espf", True)}
+          "v8kdg10 (v17) weights in the formula head, hard placement, coupler CZ times (v19 zero-shot)": ("v8kdg10", "sinkhorn_rf_route_czc_espf", True),
+          "v8kdg10 (v17) weights in the formula head, compiler's true layout (oracle)": ("v8kdg10", "sinkhorn_rf_route_czc_espf", True, "oracle"),
+          "v8kdf10 (v19): formula head trained, no T / gate-time variants in training": ("v8kdf10", "sinkhorn_rf_route_czc_espf", True),
+          "v8kdf10 (v19), compiler's true layout (oracle)": ("v8kdf10", "sinkhorn_rf_route_czc_espf", True, "oracle")}
 T_FIX = {"QExa20": 10.0}
 
 
@@ -59,6 +62,39 @@ def _times(be, t) -> list:
     return out
 
 
+def _coupler_times(be, t, edges) -> list:
+    """v19: CZ duration in µs of every coupler of the device graph (``edges``: local pairs), mean over directions."""
+    qubits = list(getattr(be, "active_qubits", None) or range(be.num_qubits))
+    pos = {q: i for i, q in enumerate(qubits)}
+    acc = {}
+    for (a, b), p in t["cz"].items():
+        if p is not None and p.duration and a in pos and b in pos:
+            acc.setdefault((min(pos[a], pos[b]), max(pos[a], pos[b])), []).append(p.duration * 1e6)
+    return [float(np.mean(acc[tuple(e)])) if tuple(e) in acc else 0.130 for e in edges]
+
+
+def oracle_layouts(names, recs, keys) -> dict:
+    """{circuit: (n_qubits, len(keys)) device-graph node of each logical qubit in the compiler's layout (seed 0,
+    original calibration; the T / duration variants never move it), -1 where unknown."""
+    from esp_tvariants import tvariants
+    bes = tvariants()
+    pos = {}
+    for d in DEVS:
+        be = bes[f"{d}/orig"]
+        pos[d] = {q: i for i, q in enumerate(list(getattr(be, "active_qubits", None) or range(be.num_qubits)))}
+    out = {}
+    for n in names:
+        r = recs[n]
+        lays = [r.get(f"{k.split('/')[0]}/orig", {}).get("layout") for k in keys]
+        nq = max((len(l) for l in lays if l), default=0)
+        t = torch.full((nq, len(keys)), -1, dtype=torch.long)
+        for c, (k, l) in enumerate(zip(keys, lays)):
+            for q, b in enumerate(l or []):
+                t[q, c] = pos[k.split("/")[0]].get(b, -1)
+        out[n] = t
+    return out
+
+
 def raw_graphs(with_t: bool = False) -> dict:
     """Raw device graphs of every T / duration variant; T1 / T2 read from the target, where the variants change them.
     ``with_t``: also the per-qubit gate durations (v18), else the model uses the uniform GATE_US."""
@@ -73,6 +109,7 @@ def raw_graphs(with_t: bool = False) -> dict:
         out[k] = dict(zip(("nodes", "edges", "edge_feats"), _backend_graph(shim)))
         if with_t:
             out[k]["t"] = _times(be, t)
+            out[k]["tc"] = _coupler_times(be, t, out[k]["edges"])
     return out
 
 
@@ -120,7 +157,8 @@ def main():
     L = [f"# Do the ESP heads follow T1 / T2 and gate-duration changes? {args.tag}", "",
          f"{len(names)} calibration-test circuits × 3 devices; per kind 2 variants per device; control-split models, "
          "mean over seeds 5–7. Δ = variant − original. Only T1 / T2 or durations change, so the true Δlog F is 0.", ""]
-    for mname, (run, kind, use_t) in MODELS.items():
+    oracle = oracle_layouts(names, recs, keys)
+    for mname, (run, kind, use_t, *opt) in MODELS.items():
         dev = devs[use_t]
         res = {}
         for seed in (5, 6, 7):
@@ -131,6 +169,8 @@ def main():
                 continue
             model = build_model(kind, params, dev, torch.device("cpu"))
             model.load_state_dict(torch.load(path, map_location="cpu")); model.eval()
+            if "oracle" in opt:
+                model.esp_oracle = oracle
             p = predict(model, [data[n] for n in names], dev)
             col = {k: i for i, k in enumerate(keys)}
             for kd in kinds:

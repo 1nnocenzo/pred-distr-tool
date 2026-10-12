@@ -663,10 +663,13 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         from .devices import GATE_US
         if self.esp_head == "f":
             assign = hard_placement(assign)
+            orc = getattr(self, "esp_oracle", None)     # diagnostics: {circuit: (n_qubits, D) compiler's node}
+            if orc is not None:
+                assign = oracle_placement(assign, circuits, orc)
         b, n_dev, q_max, _ = assign.shape
         cnt = valid.sum(1).clamp(min=1).float().unsqueeze(1)                      # operands per gate
         two = torch.where(cnt > 1, 2.0 / cnt, torch.zeros_like(cnt))
-        t_g = self.gate_times(devices, assign, valid, local, gb)                   # (G, D, 3) µs: r, measure, cz
+        t_g = self.gate_times(devices, assign, valid, local, gb, coupler=self.esp_head == "f")   # (G, D, 3) µs
         per = torch.stack([n_ops[..., 0] * t_g[..., 0] / cnt + n_ops[..., 2] * t_g[..., 2] * two,
                            n_ops[..., 1] / cnt,
                            (n_ops[..., 0] + n_ops[..., 1]) / cnt + n_ops[..., 2] * two,
@@ -710,7 +713,7 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         return f
 
     @staticmethod
-    def gate_times(devices, assign, valid, local, gb) -> torch.Tensor:
+    def gate_times(devices, assign, valid, local, gb, coupler: bool = False) -> torch.Tensor:
         """v18: (G, D, 3) durations in µs of r, measure and CZ for every logical gate on every device: each physical
         qubit's times (``devices.tg``, uniform GATE_US when absent) through the placement, averaged over the gate's
         operands.  With uniform times this is exactly GATE_US, so models trained before v18 are unchanged."""
@@ -725,7 +728,25 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         acc = assign.new_zeros(n_g, n_dev, 3)
         for k in range(local.size(1)):
             acc = acc + tq[gb * q_max + local[:, k]] * valid[:, k].float().view(-1, 1, 1)
-        return acc / cnt
+        acc = acc / cnt
+        if coupler and hasattr(devices, "tcz") and local.size(1) > 1:
+            # v19 (hard placement): a two-qubit gate on two coupled physical qubits takes that coupler's CZ time;
+            # gates that need routing keep the mean incident CZ time of their operands
+            p_max = tg.size(1)
+            mat = assign.new_zeros(n_dev, p_max, p_max)
+            off = 0
+            for d, n_e in enumerate(devices.n_coupler.view(-1).tolist()):
+                pr, tc = devices.coupler_pairs[off: off + n_e], devices.tcz[off: off + n_e].to(mat)
+                mat[d, pr[:, 0], pr[:, 1]] = tc
+                mat[d, pr[:, 1], pr[:, 0]] = tc
+                off += n_e
+            phys = assign.detach().argmax(-1).permute(0, 2, 1).reshape(b * q_max, n_dev)   # (B·Qm, D)
+            two = valid[:, 0] & valid[:, 1] & (valid.sum(1) == 2)
+            pa, pb = phys[gb * q_max + local[:, 0]], phys[gb * q_max + local[:, 1]]          # (G, D)
+            tc = mat[torch.arange(n_dev, device=mat.device).view(1, -1), pa, pb]             # (G, D)
+            use = two.view(-1, 1) & (tc > 0)
+            acc = torch.cat([acc[..., :2], torch.where(use, tc, acc[..., 2]).unsqueeze(-1)], -1)
+        return acc
 
     @staticmethod
     def esp_from_features(mlp, f: dict, kind: str):
@@ -1140,6 +1161,21 @@ def hard_placement(assign: torch.Tensor) -> torch.Tensor:
             hard[i, d, rows[r], cols[c]] = 1.0
     hard = torch.from_numpy(hard).to(assign)
     return hard + assign - assign.detach()
+
+
+def oracle_placement(assign: torch.Tensor, circuits, layouts: dict) -> torch.Tensor:
+    """Diagnostics (v19 oracle): the compiler's layout in place of the predicted hard placement, where known."""
+    out = assign.detach().clone()
+    for i, name in enumerate(getattr(circuits, "circuit_name", [])):
+        lay = layouts.get(name)
+        if lay is None:
+            continue
+        for d in range(min(lay.shape[1], out.size(1))):
+            for q in range(min(lay.shape[0], out.size(2))):
+                if lay[q, d] >= 0:
+                    out[i, d, q] = 0.0
+                    out[i, d, q, int(lay[q, d])] = 1.0
+    return out
 
 
 def dag_schedule(circuits, n_ops: torch.Tensor, cache: dict | None = None, gate_t: torch.Tensor | None = None) -> dict:

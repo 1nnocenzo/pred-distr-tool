@@ -11,7 +11,7 @@
   --sunk: #eaeef0;
   --ink: #12181c;
   --ink-2: #56626a;
-  --ink-3: #87939a;
+  --ink-3: #66727a;
   --rule: #d5dde1;
   --wire: #9aa7ae;
   --accent: #0b6e8a;      /* deep cryostat teal: the selected / main line */
@@ -29,49 +29,53 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0d1214; --surface: #151c1f; --sunk: #1b2427; --ink: #e7eef1; --ink-2: #a3b0b6; --ink-3: #6f7d84;
+    --bg: #0d1214; --surface: #151c1f; --sunk: #1b2427; --ink: #e7eef1; --ink-2: #b3bfc4; --ink-3: #8d9aa0;
     --rule: #2a3539; --wire: #5f6e75; --accent: #4fb3d1; --accent-ink: #06222b; --accent-soft: #143440;
     --loss: #e3aa52; --loss-soft: #362812; --good: #6cc48f; --bad: #e57d71; --planned: #a99cf0; --planned-soft: #262142;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0d1214; --surface: #151c1f; --sunk: #1b2427; --ink: #e7eef1; --ink-2: #a3b0b6; --ink-3: #6f7d84;
+  --bg: #0d1214; --surface: #151c1f; --sunk: #1b2427; --ink: #e7eef1; --ink-2: #b3bfc4; --ink-3: #8d9aa0;
   --rule: #2a3539; --wire: #5f6e75; --accent: #4fb3d1; --accent-ink: #06222b; --accent-soft: #143440;
   --loss: #e3aa52; --loss-soft: #362812; --good: #6cc48f; --bad: #e57d71; --planned: #a99cf0; --planned-soft: #262142;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15.5px; line-height: 1.5; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 17px; line-height: 1.55; }
 .wrap { max-width: 1260px; margin: 0 auto; padding-inline: 20px; padding-block: 32px 56px; display: grid; gap: 28px; }
 h1, h2, .display { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.015em; text-wrap: balance; }
 h1 { font-size: clamp(1.7rem, 3.2vw, 2.4rem); margin: 0; line-height: 1.1; }
-.kicker { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); }
+.kicker { font-family: var(--font-mono); font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-2); }
 .sub { color: var(--ink-2); margin: 8px 0 0; max-width: 64ch; }
 .num { font-variant-numeric: tabular-nums; }
 
 /* masthead */
-.mast { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px 32px; align-items: end; }
+.mast { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: end; }
 @media (max-width: 860px) { .mast { grid-template-columns: minmax(0, 1fr); } }
-.best { display: grid; grid-template-columns: repeat(5, minmax(84px, auto)); border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+.best { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
 @media (max-width: 560px) { .best { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.best .cell { padding: 10px 14px; border-left: 1px solid var(--rule); display: grid; gap: 2px; }
+.best .cell { padding: 12px 16px; border-left: 1px solid var(--rule); display: grid; gap: 2px; }
 .best .cell:first-child { border-left: 0; }
-.best .lab { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); white-space: nowrap; }
-.best .val { font-family: var(--font-display); font-size: 1.45rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.best .was { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-3); white-space: nowrap; }
+.best .lab { font-size: 0.9rem; font-weight: 600; color: var(--ink-2); line-height: 1.25; }
+.best .val { font-family: var(--font-display); font-size: 1.75rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.best .was { font-family: var(--font-mono); font-size: 0.82rem; color: var(--ink-2); }
 .best .was b { color: var(--good); font-weight: 500; }
 .best .was b.neg { color: var(--bad); }
 .viewtabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.datatabs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.datatabs .tablab { font-size: 0.9rem; font-weight: 600; color: var(--ink-2); margin-right: 4px; }
+.datatabs button { font-size: 0.88rem; padding: 4px 11px; }
+.datatabs button[aria-selected="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-weight: 600; }
 .viewtabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.bestcap { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-2); margin-top: 6px; text-align: right; }
+.bestcap { font-size: 0.92rem; color: var(--ink-2); margin-top: 8px; }
 @media (max-width: 860px) { .bestcap { text-align: left; } }
 
 /* section frames */
 section.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 20px; min-width: 0; }
 .sechead { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
-.sechead h2 { font-size: 1.15rem; margin: 0; }
-.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.82rem; color: var(--ink-2); }
+.sechead h2 { font-size: 1.35rem; margin: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.9rem; color: var(--ink-2); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .sw { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; display: inline-block; }
 
@@ -88,7 +92,7 @@ section.card { background: var(--surface); border: 1px solid var(--rule); border
 .ln-node.s-drop circle { stroke: var(--bad); stroke-dasharray: 3 2; }
 .ln-node.s-diag circle { stroke: var(--ink-3); }
 .ln-node.s-plan circle { stroke: var(--planned); fill: var(--planned-soft); stroke-dasharray: 3 2; }
-.ln-node text { font-family: var(--font-mono); font-size: 12px; fill: var(--ink-2); pointer-events: none; }
+.ln-node text { font-family: var(--font-mono); font-size: 13.5px; fill: var(--ink-2); pointer-events: none; }
 .ln-node.sel text { fill: var(--ink); font-weight: 600; }
 .ln-node.sel circle { stroke-width: 3; }
 .ln-node .halo { fill: none; stroke: var(--accent); stroke-width: 1.5; opacity: 0; }
@@ -103,7 +107,7 @@ section.card { background: var(--surface); border: 1px solid var(--rule); border
 .schematic { overflow-x: auto; }
 .schematic svg { display: block; width: 100%; min-width: 560px; height: auto; }
 .controls { display: flex; gap: 8px; flex-wrap: wrap; }
-button { font: inherit; font-size: 0.88rem; border: 1px solid var(--rule); background: var(--surface); color: var(--ink);
+button { font: inherit; font-size: 0.95rem; border: 1px solid var(--rule); background: var(--surface); color: var(--ink);
   padding: 6px 13px; border-radius: 7px; cursor: pointer; }
 button:hover { border-color: var(--wire); }
 button:focus-visible, .blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -119,76 +123,76 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .blk.on.changed rect.frame { stroke: var(--accent); stroke-dasharray: none; }
 .blk text { fill: var(--ink); font-family: var(--font-body); pointer-events: none; }
 .blk text.t { font-family: var(--font-display); font-size: 15px; font-weight: 700; }
-.blk text.s { font-size: 12px; fill: var(--ink-2); }
-.blk text.dim { font-family: var(--font-mono); font-size: 11px; fill: var(--accent); }
+.blk text.s { font-size: 13px; fill: var(--ink-2); }
+.blk text.dim { font-family: var(--font-mono); font-size: 12px; fill: var(--accent); }
 .tag-loss { fill: var(--loss-soft); stroke: var(--loss); stroke-width: 1; }
 .tag-loss-t { font-family: var(--font-mono); font-size: 10.5px; fill: var(--loss) !important; }
 .wire { fill: none; stroke: var(--wire); stroke-width: 1.4; }
 .wire.lit { stroke: var(--accent); stroke-width: 2.2; }
 .wire-label { font-family: var(--font-mono); font-size: 10.5px; fill: var(--ink-2); }
 .dot { fill: var(--accent); }
-.hint { color: var(--ink-2); font-size: 0.82rem; margin: 10px 2px 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.hint { color: var(--ink-2); font-size: 0.9rem; margin: 10px 2px 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .legend-changed { display: inline-block; width: 18px; height: 10px; border: 2px dashed var(--loss); border-radius: 3px; vertical-align: middle; margin-right: 4px; }
 
 .panel { display: grid; gap: 16px; min-width: 0; }
 .vcard { border-radius: 10px; padding: 14px 16px; display: grid; gap: 8px; background: var(--sunk); }
 .vtop { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .vname { font-family: var(--font-display); font-size: 1.35rem; font-weight: 700; }
-.status { font-size: 0.74rem; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink-2); background: var(--surface); }
+.status { font-size: 0.85rem; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--rule); color: var(--ink-2); background: var(--surface); }
 .status.s-main { border-color: var(--accent); color: var(--accent); }
 .status.s-drop { border-color: var(--bad); color: var(--bad); }
 .status.s-plan { border-color: var(--planned); color: var(--planned); }
 .vcard p { margin: 0; max-width: 62ch; }
 .vcard .why { color: var(--ink-2); }
-.res { width: 100%; border-collapse: collapse; font-size: 0.84rem; font-variant-numeric: tabular-nums; }
+.res { width: 100%; border-collapse: collapse; font-size: 0.92rem; font-variant-numeric: tabular-nums; }
 .res th, .res td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
 .res th:first-child, .res td:first-child { text-align: left; }
-.res th { font-weight: 500; color: var(--ink-2); font-size: 0.74rem; }
+.res th { font-weight: 600; color: var(--ink-2); font-size: 0.82rem; }
 .res .cur td { font-weight: 600; }
-.d-up { color: var(--good); font-size: 0.74rem; }
-.d-dn { color: var(--bad); font-size: 0.74rem; }
-.eyebrow { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); }
+.d-up { color: var(--good); font-size: 0.82rem; }
+.d-dn { color: var(--bad); font-size: 0.82rem; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); }
 .panel h3.ttl { margin: 2px 0 0; font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; }
 .panel p { margin: 0; max-width: 62ch; }
-.panel h4 { margin: 0 0 8px; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.panel h4 { margin: 0 0 8px; font-size: 0.82rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
 .feat { display: grid; gap: 6px; }
 .feat .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 7px 10px; border: 1px solid var(--rule); border-radius: 7px; }
 .feat .bar { height: 4px; border-radius: 2px; background: var(--accent); margin-top: 5px; opacity: 0.75; }
 .feat .n { font-family: var(--font-mono); font-size: 0.84rem; font-variant-numeric: tabular-nums; color: var(--accent); }
-.feat .d { color: var(--ink-2); font-size: 0.82rem; }
+.feat .d { color: var(--ink-2); font-size: 0.9rem; }
 .stack { display: grid; }
 .layer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 12px; border: 1px solid var(--rule); border-radius: 7px; background: var(--bg); }
 .layer .ln { font-weight: 600; }
-.layer .ld { color: var(--ink-2); font-size: 0.82rem; }
+.layer .ld { color: var(--ink-2); font-size: 0.9rem; }
 .layer .shape { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .arrow { text-align: center; color: var(--wire); font-size: 0.8rem; line-height: 1.1; padding-block: 2px; }
 .formula { font-family: var(--font-mono); font-size: 0.85rem; background: var(--bg); border: 1px solid var(--rule); border-radius: 7px; padding: 10px 12px; overflow-x: auto; white-space: pre; }
 .loss { border: 1px solid var(--loss); background: var(--loss-soft); border-radius: 7px; padding: 10px 12px; }
 .loss b { color: var(--loss); font-weight: 600; }
 .facts { display: flex; flex-wrap: wrap; gap: 6px; }
-.fact { font-size: 0.82rem; border: 1px solid var(--rule); border-radius: 999px; padding: 2px 10px; color: var(--ink-2); background: var(--surface); }
+.fact { font-size: 0.9rem; border: 1px solid var(--rule); border-radius: 999px; padding: 2px 10px; color: var(--ink-2); background: var(--surface); }
 .fact b { color: var(--ink); font-weight: 600; }
-.src { font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-3); }
+.src { font-family: var(--font-mono); font-size: 0.82rem; color: var(--ink-3); }
 .fade { animation: fade 0.25s ease-out; }
 @keyframes fade { from { opacity: 0.4; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
 /* results matrix */
 .matrix-wrap { overflow-x: auto; }
-table.matrix { width: 100%; min-width: 760px; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.86rem; }
-.matrix th { text-align: left; font-weight: 500; color: var(--ink-2); font-size: 0.74rem; padding: 6px 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
-.matrix td { padding: 5px 8px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+table.matrix { width: 100%; min-width: 760px; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.95rem; }
+.matrix th { text-align: left; font-weight: 600; color: var(--ink-2); font-size: 0.85rem; padding: 8px; border-bottom: 1px solid var(--rule); vertical-align: bottom; line-height: 1.25; }
+.matrix td { padding: 7px 8px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
 .matrix tr { cursor: pointer; }
 .matrix tr:hover td { background: var(--sunk); }
 .matrix tr.sel td { background: var(--accent-soft); }
 .matrix td.k { font-family: var(--font-mono); font-weight: 500; white-space: nowrap; }
-.matrix td.st { font-size: 0.78rem; color: var(--ink-2); white-space: nowrap; }
-.mcell { display: grid; grid-template-columns: 3.2em minmax(40px, 1fr); gap: 8px; align-items: center; min-width: 110px; }
-.mcell .v { text-align: right; font-family: var(--font-mono); font-size: 0.8rem; }
+.matrix td.st { font-size: 0.88rem; color: var(--ink-2); white-space: nowrap; }
+.mcell { display: grid; grid-template-columns: 3.6em minmax(40px, 1fr); gap: 8px; align-items: center; min-width: 110px; }
+.mcell .v { text-align: right; font-family: var(--font-mono); font-size: 0.9rem; }
 .mcell .track { height: 6px; background: var(--sunk); border-radius: 3px; position: relative; overflow: hidden; }
 .mcell .fill { position: absolute; inset: 0 auto 0 0; background: var(--wire); border-radius: 3px; }
 .mcell .fill.best { background: var(--accent); }
-.mcell .na { color: var(--ink-3); font-family: var(--font-mono); font-size: 0.8rem; }
-.note { color: var(--ink-2); font-size: 0.82rem; margin: 10px 0 0; max-width: 90ch; }
+.mcell .na { color: var(--ink-3); font-family: var(--font-mono); font-size: 0.9rem; }
+.note { color: var(--ink-2); font-size: 0.95rem; line-height: 1.6; margin: 14px 0 0; max-width: 95ch; }
 @media (prefers-reduced-motion: reduce) { .fade { animation: none; } .blk rect.frame, .wire, .ln-node circle { transition: none; } }
 </style>
 
@@ -202,6 +206,11 @@ table.matrix { width: 100%; min-width: 760px; border-collapse: collapse; font-va
         <button type="button" role="tab" data-view="F" aria-selected="true">Fidelity F</button>
         <button type="button" role="tab" data-view="ESP" aria-selected="false">ESP · duration · depth</button>
         <button type="button" role="tab" data-view="TIME" aria-selected="false">Execution time</button>
+      </div>
+      <div class="datatabs" role="tablist" aria-label="Which data">
+        <span class="tablab">Data</span>
+        <button type="button" role="tab" data-data="v10" aria-selected="true">Retrained · qaoa with measurements</button>
+        <button type="button" role="tab" data-data="old" aria-selected="false">Before the qaoa fix</button>
       </div>
     </div>
     <div>
@@ -790,7 +799,7 @@ const VERSIONS = [
     why: "Qiskit picks where the circuit goes by an average-error score: give the placement that score directly.",
     changed: ["place"], o: { place: PLACE_PROBE, head: HEAD_V8KDL, gate: GATE_V8S, mlp: MLP_CZC },
     diag: { din: "+ 100 variants each", place: ["Sinkhorn placement", "score − β · VF2 cost", "one to one, per device", "τ = 0.3 · 20 iterations", "layout loss on variants too"], gate: G_RE, mlp: M_CZC, head: "fidelity + change loss" },
-    r: [null, null, null, null, null], n: 1 },
+    r: [0.986, 0.924, 0.934, 0.996, 0.62], n: 1 },
   { k: "v8kdc10", parent: "v8kdl40", path: true, s: "main", label: "main model", what: "v8kdl40 + a correlation term in the change loss.",
     why: "The change loss fitted the size of calibration changes; device choice needs their direction and ranking.",
     changed: ["head"], o: { head: HEAD_V8KDC, place: PLACE_PROBE, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D, train: TRAIN_K },
@@ -815,12 +824,12 @@ const VERSIONS = [
     why: "Error budget: almost all of the ESP error is in the decay, mostly from invented measurements and from idle = duration − busy.",
     changed: ["mlp", "head"], o: { head: HEAD_ESPI, place: PLACE_PROBE, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D },
     diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: [M_CZC[0], "measurements exact"], head: "F + idle-time head", headText: "decay = −idle · ⟨1/T⟩" },
-    r: [0.926, 0.895, 0.952, 0.993, null], n: 3 },
-  { k: "v8kdg10", parent: "v8kdi10", path: true, s: "plan", label: "running", what: "ESP from the ASAP schedule of the circuit's gate DAG (v17).",
+    r: [0.926, 0.895, 0.952, 0.993, 0.64], n: 3 },
+  { k: "v8kdg10", parent: "v8kdi10", path: true, s: "diag", label: "ESP, v17", what: "ESP from the ASAP schedule of the circuit's gate DAG (v17).",
     why: "The learned duration ratios are family-specific; the schedule of the circuit's own DAG is not.",
     changed: ["head"], o: { head: HEAD_ESPS, place: PLACE_PROBE, gate: GATE_V8S, mlp: MLP_CZC, din: DIN_V8D },
     diag: { din: "+ 100 variants each", place: P7, gate: G_RE, mlp: [M_CZC[0], "measurements exact (ESP only)"], head: "F + DAG-schedule ESP", headText: "ASAP on the gate DAG" },
-    r: [null, null, null, null, null], n: 0 }
+    r: [0.970, 0.819, 0.942, 0.995, 0.66], n: 3 }
 ];
 const MAIN = "v8kdc10", BASE = "v8a", FIRST = "v1";
 const NOTE_F = "<b>Reading tracking.</b> Local calibration changes move F by 0.006 (median) to 0.048 (90th percentile), so tracking is a correlation of small changes while R\u00b2 of F after the change stays 0.99. In practice: re-predicting after a local change cuts the fidelity lost to a wrong device choice from 0.0050\u20130.0068 to 0.0037 with v8kdc10 (21% with v8kd40, 9% with v8a); the best of three devices changes in 29% of the cases. Mean over the seeds listed (5, 6, 7). LOFO = one circuit family held out, LOGO = a group of families held out, control = random split. The best value of each column is in teal. Label noise caps local tracking near 0.85; the oracle study puts the ceiling of the current head near 0.6.";
@@ -832,32 +841,73 @@ const ESPD = {
   v8kde10: [0.902, 0.361, 0.448, 0.978, 0.403, 0.668, 0.0120],
   v8kda10: [0.885, 0.403, 0.460, 0.978, 0.358, 0.440, 0.0128],
   v8kds10: [0.896, 0.364, 0.496, 0.976, 0.308, 0.483, 0.0128],
-  v8kdi10: [0.925, 0.968, 0.896, 0.985, 0.150, 0.338, 0.0105]
+  v8kdi10: [0.925, 0.968, 0.896, 0.985, 0.150, 0.338, 0.0105],
+  v8kdg10: [0.969, 0.956, 0.917, 0.986, 0.151, 0.394, 0.0100]
 };
+/* Retrained data (generalization_v10: qaoa regenerated with final measurements, every label and calibration
+   variant recomputed). Same columns as r / ESPD; n10 = seeds available so far (retraining still running for
+   the versions not listed, and for the seeds missing here). retrain/compare_v10.py, esp/esp_eval.py --root v10. */
+const R10 = {
+  v1: [[0.916, 0.397, 0.632, null, null], "2–3"],
+  v4: [[0.822, 0.752, 0.867, 0.994, 0.08], 3],
+  phys_uniform: [[0.839, null, 0.418, 0.994, -0.11], 1],
+  v5: [[0.635, 0.950, 0.812, 0.997, 0.02], 3],
+  v5b: [[0.683, 0.889, 0.793, 0.997, 0.01], "2–3"],
+  v6: [[null, 0.644, 0.776, 0.995, 0.28], 1],
+  v7: [[0.772, 0.704, 0.826, 0.996, 0.38], 1],
+  v8a: [[0.777, 0.781, 0.900, 0.996, 0.51], "1–2"],
+  v8b: [[null, 0.627, 0.848, 0.996, null], 1],
+  v8r: [[0.828, 0.865, 0.921, 0.997, 0.44], "2–3"],
+  v9: [[0.955, 0.847, 0.922, 0.997, 0.49], 1],
+  v8r_cz: [[0.778, 0.916, 0.938, 0.997, 0.46], 1],
+  v8s: [[null, 0.855, 0.918, 0.997, 0.49], 1],
+  v9c: [[0.841, 0.949, 0.905, 0.997, 0.38], 1],
+  v8k: [[0.941, 0.874, 0.867, 0.996, 0.42], 3],
+  v9k: [[0.904, null, 0.887, 0.997, 0.37], 1],
+  v8kd8: [[null, null, null, 0.996, 0.48], 1],
+  v8kd: [[null, null, null, 0.996, 0.56], 1],
+  v11: [[0.942, null, 0.949, 0.996, 0.49], 1],
+  v11d40: [[null, null, 0.941, null, null], 1],
+  v8kdc10: [[0.955, 0.905, 0.916, 0.995, 0.68], 3],
+  v8kdi10: [[0.965, 0.905, 0.953, 0.994, 0.66], 3],
+  v8kdg10: [[0.945, 0.875, 0.915, 0.996, 0.69], 3]
+};
+const ESPD10 = {
+  v8kdi10: [0.974, 0.940, 0.894, 0.985, 0.074, 0.366, 0.0093],
+  v8kdg10: [0.960, 0.959, 0.906, 0.987, 0.097, 0.435, 0.0100]
+};
+let DATA = "v10";
+const isNew = () => DATA === "v10";
+const seedsOf = v => view === "TIME" ? v.n : isNew() ? (v.n10 || "–") : v.n;
 /* time view: [predictor per circuit, 3 devices (ms: encoding + one forward pass, batch 1, 1 CPU thread),
    exhaustive compilation on 3 devices (ms), speed-up 3 devices, speed-up 27 devices,
    speed-up on the 3 largest circuits of each family (3 devices)]; medians (timing_v8/timing_scaling.py) */
 const TIMED = {
   v8a: [12.9, 66.7, 5.4, 13.2, null]
 };
-VERSIONS.forEach(v => { v.esp = ESPD[v.k] || null; v.time = TIMED[v.k] || null; });
+VERSIONS.forEach(v => { v.esp = ESPD[v.k] || null; v.time = TIMED[v.k] || null; v.esp10 = ESPD10[v.k] || null;
+  const x = R10[v.k]; v.r10 = x ? x[0] : null; v.n10 = x ? x[1] : null; });
+const NOTE_F10 = "<b>Retrained data.</b> Every version is retrained after qaoa was regenerated with its final measurements (labels, calibration variants and the calibration test recomputed). On LOFO qaoa the test circuits themselves changed, so compare that column only within this data set, never with the other one. Versions not listed are still retraining; the seeds column shows how many seeds are in so far. <b>Reading tracking.</b> Tracking is a correlation (not R\u00b2) of predicted vs true \u0394log F when a few qubits or couplers change; R\u00b2 of F after the change stays 0.99. Label noise caps local tracking near 0.85. LOFO = one circuit family held out, LOGO = a group of families held out, control = random split. The best value of each column is in teal.";
 const VIEWS = {
-  F: { main: "v8kdc10", cmp: ["v1", "v8a"], get: v => v.r,
+  F: { main: "v8kdc10", get cmp() { return isNew() ? ["v1", "v8k"] : ["v1", "v8a"]; }, get: v => isNew() ? v.r10 : v.r,
     cols: [{ name: "R² LOFO qaoa", short: "R² qaoa", lo: 0.5, hi: 1, dig: 2 }, { name: "R² LOFO qnn", short: "R² qnn", lo: 0.5, hi: 1, dig: 2 },
            { name: "R² LOGO variational", short: "R² variational", lo: 0.5, hi: 1, dig: 2 }, { name: "R² control", short: "R² control", lo: 0.99, hi: 1, dig: 3 },
            { name: "local tracking (corr.)", short: "tracking (corr.)", lo: 0, hi: 0.85, dig: 2 }],
     kicker: "R² of F on held-out splits · tracking = correlation (not R²) of predicted vs true Δlog F under local calibration changes",
-    note: NOTE_F,
-    cap: m => `main model ${m.k} (${m.n} seeds) vs the first model v1 and the previous main v8a · v1 has no calibration input, so no tracking` },
-  ESP: { main: "v8kdi10", cmp: ["v8kdc10", "v8kde10"], get: v => v.esp,
+    get note() { return isNew() ? NOTE_F10 : NOTE_F; },
+    cap: m => isNew() ? `main model ${m.k} (3 seeds) vs the first model v1 and its base v8k, all retrained · v1 has no calibration input, so no tracking`
+                      : `main model ${m.k} (${m.n} seeds) vs the first model v1 and the previous main v8a · v1 has no calibration input, so no tracking` },
+  ESP: { main: "v8kdi10", get cmp() { return isNew() ? ["v8kdg10"] : ["v8kdc10", "v8kde10"]; }, get: v => isNew() ? v.esp10 : v.esp,
     cols: [{ name: "ESP R² LOFO qaoa", short: "R² qaoa", lo: 0, hi: 1, dig: 2 }, { name: "ESP R² LOFO qnn", short: "R² qnn", lo: 0, hi: 1, dig: 2 },
            { name: "ESP R² LOGO variational", short: "R² var.", lo: 0, hi: 1, dig: 2 }, { name: "ESP R² control", short: "R² control", lo: 0, hi: 1, dig: 2 },
            { name: "duration error, unseen", short: "duration err.", lo: 0.8, hi: 0, dig: 2, low: true },
            { name: "depth error, unseen", short: "depth err.", lo: 1, hi: 0, dig: 2, low: true },
            { name: "ESP regret (mean)", short: "ESP regret", lo: 0.02, hi: 0, dig: 4, low: true }],
     kicker: "Estimated success probability ESP = F · exp(−Σ idle / min(T1, T2)) (MQT, ASAP schedule) · errors = median |pred/true − 1| on the three held-out splits · regret = ESP lost by the chosen device",
-    note: "<b>Reading ESP.</b> v8kdc10 has no ESP head: its row uses the predicted F as the ESP estimate, the baseline every ESP head has to beat. v8kdi10 reads measurements from the circuit and predicts the total idle time directly; v17 (v8kdg10) schedules the circuit's gate graph and is training. Mean over seeds 5, 6, 7, on the test circuits with ESP labels (no grover or dynamic circuits). Lower is better for the errors and the regret.",
-    cap: m => `best ESP model ${m.k} (3 seeds) vs v8kdc10 using F as the ESP estimate and the first ESP head v8kde10` },
+    get note() { return isNew()
+      ? "<b>Retrained data.</b> v8kdi10 reads measurements from the circuit and predicts the total idle time directly; v17 (v8kdg10) schedules the circuit's gate graph. Using a model's own F as the ESP estimate gives ESP R\u00b2 0.72 / 0.67 / 0.59 / 0.67 (qaoa / qnn / variational / control) and regret 0.010 (v8kdi10's F): the ESP heads lift R\u00b2 to 0.89\u20130.99. Duration error = median |pred/true \u2212 1| of the one-shot QPU time: 10% / 5% / 7% on qaoa / qnn / variational for v8kdi10, 2% on control. The other ESP heads (v8kde10, v8kda10, v8kds10) are still retraining. Mean over seeds 5, 6, 7, on the test circuits with ESP labels (no grover or dynamic circuits). Lower is better for the errors and the regret."
+      : "<b>Reading ESP.</b> v8kdc10 has no ESP head: its row uses the predicted F as the ESP estimate, the baseline every ESP head has to beat. v8kdi10 reads measurements from the circuit and predicts the total idle time directly; v17 (v8kdg10) schedules the circuit's gate graph. Mean over seeds 5, 6, 7, on the test circuits with ESP labels (no grover or dynamic circuits). Lower is better for the errors and the regret."; },
+    cap: m => isNew() ? `best ESP model ${m.k} (3 seeds, retrained) vs v17 (v8kdg10)` : `best ESP model ${m.k} (3 seeds) vs v8kdc10 using F as the ESP estimate and the first ESP head v8kde10` },
   TIME: { main: "v8a", cmp: [], get: v => v.time,
     cols: [{ name: "predictor, 3 devices", short: "predictor", lo: 30, hi: 0, dig: 1, unit: " ms", low: true },
            { name: "compile all, 3 devices", short: "compile", lo: 0, hi: 300, dig: 1, unit: " ms" },
@@ -886,13 +936,12 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 function renderBest() {
   const W = VIEWS[view], m = byK(W.main), vals = W.get(m) || [];
   const el = document.getElementById("best");
-  el.style.gridTemplateColumns = `repeat(${W.cols.length}, minmax(84px, auto))`;
   el.innerHTML = W.cols.map((c, i) => {
     const was = W.cmp.map(k => {
       const o = W.get(byK(k)) || [], x = o[i], y = vals[i];
       if (x == null) return `<span class="was">${esc(k)} n/a</span>`;
       const d = y == null ? null : y - x, good = d != null && (c.low ? d <= 0 : d >= 0);
-      const dd = d == null || Math.abs(d) < 1e-9 ? "" : `<b class="${good ? "" : "neg"}">${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(c.dig)}</b>`;
+      const dd = d == null || Math.abs(d) < Math.pow(10, -c.dig) / 2 ? "" : `<b class="${good ? "" : "neg"}">${d >= 0 ? "+" : "−"}${Math.abs(d).toFixed(c.dig)}</b>`;
       return `<span class="was">${esc(k)} ${fmt(x, c)} ${dd}</span>`;
     }).join("");
     return `<div class="cell"><span class="lab">${esc(c.name)}</span><span class="val">${fmt(vals[i], c)}</span>${was}</div>`;
@@ -948,7 +997,7 @@ function renderMatrix() {
     return `<td><div class="mcell"><span class="v">${fmt(x, c)}</span><span class="track"><span class="fill ${x === bests[i] ? "best" : ""}" style="width:${w}%"></span></span></div></td>`;
   };
   t.innerHTML = `<thead><tr><th>version</th><th>status</th>${W.cols.map(c => `<th>${esc(c.name)}</th>`).join("")}<th>seeds</th></tr></thead><tbody>` +
-    rows.map(v => `<tr data-v="${v.k}" class="${v.k === cur ? "sel" : ""}"><td class="k">${esc(v.k)}</td><td class="st">${esc(v.label)}</td>${W.cols.map((_, i) => cell(v, i)).join("")}<td class="num">${v.n}</td></tr>`).join("") + `</tbody>`;
+    rows.map(v => `<tr data-v="${v.k}" class="${v.k === cur ? "sel" : ""}"><td class="k">${esc(v.k)}</td><td class="st">${esc(v.label)}</td>${W.cols.map((_, i) => cell(v, i)).join("")}<td class="num">${seedsOf(v)}</td></tr>`).join("") + `</tbody>`;
   t.querySelectorAll("tbody tr").forEach(tr => tr.addEventListener("click", () => { stopPlay(); applyVersion(tr.dataset.v); document.getElementById("h-lineage").scrollIntoView({ behavior: "smooth", block: "start" }); }));
   document.getElementById("res-kicker").textContent = W.kicker;
   document.getElementById("res-note").innerHTML = W.note;
@@ -963,10 +1012,10 @@ function versionCard() {
     const good = c.low ? d < 0 : d > 0;
     return ` <span class="${good ? "d-up" : "d-dn"}">${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(c.dig)}</span>`;
   };
-  const row = (x, xv, cls, withDelta) => `<tr class="${cls}"><td>${esc(x.k)}</td>` + W.cols.map((c, i) => `<td>${fmt(xv[i], c)}${withDelta ? delta(i) : ""}</td>`).join("") + `<td>${x.n || "–"}</td></tr>`;
+  const row = (x, xv, cls, withDelta) => `<tr class="${cls}"><td>${esc(x.k)}</td>` + W.cols.map((c, i) => `<td>${fmt(xv[i], c)}${withDelta ? delta(i) : ""}</td>`).join("") + `<td>${seedsOf(x) || "–"}</td></tr>`;
   const table = vals ? `<div style="overflow-x:auto"><table class="res"><thead><tr><th>model</th>` + W.cols.map(c => `<th>${esc(c.short)}</th>`).join("") +
     `<th>seeds</th></tr></thead><tbody>${row(v, vals, "cur", true)}${pv ? row(par, pv, "", false) : ""}</tbody></table></div>`
-    : `<p class="why">No ${view === "ESP" ? "ESP" : view === "TIME" ? "timing" : ""} numbers for this version.</p>`;
+    : `<p class="why">${isNew() && view !== "TIME" ? "Still retraining on the corrected data: no numbers yet (switch Data to see the earlier ones)." : `No ${view === "ESP" ? "ESP" : view === "TIME" ? "timing" : ""} numbers for this version.`}</p>`;
   return `<div class="vcard"><div class="vtop"><span class="vname">${esc(v.k)}</span><span class="status s-${v.s}">${esc(v.label)}</span>${par ? `<span class="src">builds on ${esc(par.k)}</span>` : ""}</div>` +
     `<p><b>Changes:</b> ${esc(v.what)}</p><p class="why"><b>Why:</b> ${esc(v.why)}</p>` + (v.s === "plan" ? "" : table) + `</div>`;
 }
@@ -1068,6 +1117,12 @@ function setView(k) {
   renderBest(); renderMatrix(); render(curBlock);
 }
 document.querySelectorAll(".viewtabs button").forEach(b => b.addEventListener("click", () => setView(b.dataset.view)));
+function setData(k) {
+  DATA = k;
+  document.querySelectorAll(".datatabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.data === k)));
+  renderBest(); renderMatrix(); render(curBlock);
+}
+document.querySelectorAll(".datatabs button").forEach(b => b.addEventListener("click", () => setData(b.dataset.data)));
 renderBest(); renderMatrix();
 applyVersion(MAIN);
 </script>

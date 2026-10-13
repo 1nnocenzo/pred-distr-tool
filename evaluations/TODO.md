@@ -138,6 +138,19 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
       calibration), so the placement learns to follow local changes., with seed ensembles (`generalization_v4/scripts/ensemble_seeds.py`).
 
 ## Next
+- [ ] **Priority (2026-10-13): ESP + execution time, routed circuits first.** Routing-free durations are
+      solved by the fixed decomposition table (v21t zero-shot 0.5–1.5% median on new families); routed
+      circuits on new families are ~15% off, biased low, and a 90% bound calibrated on seen families covers
+      only 35% (qaoa) / 53% (variational) — compiler seed floor ~5% (`compile_check/duration_anatomy.py`,
+      `esp/esp_count_oracle.py`, `esp/esp_interval.py`). Running: v21w, v21t, v22 (+15k synthetic routing
+      circuits, `synthetic_routing/`). Then: bounds calibrated on held-out structures, not on seen families.
+- [ ] **More devices and topologies**: generalise ESP and duration to more chips (other coupling maps,
+      sizes, native gates, gate times); new labels for the dataset and the synthetic circuits on them;
+      leave-one-device-out next to LOFO / LOGO.
+- [ ] **Test reuse**: ~30 versions were selected on the same splits. Before the paper: freeze the model,
+      build a final test never used for any choice (a held-out family or newly generated circuits), evaluate
+      the frozen model and 2–3 references on it once; report seed spreads and say when two models are
+      indistinguishable (qnn varies ±0.05–0.08 across seeds).
 - [ ] **Hybrid rule: compile what is cheap, predict the rest** (from the pipeline anatomy, 2026-10-11,
       `compile_check/results/pipeline_anatomy_stage/report.md`): routing-free circuits compile in 2.3 ms
       (median, ≈ the VF2 step alone) and their calibration response is exactly the compiler's VF2Layout

@@ -179,13 +179,35 @@ def schedule_np(gq, t, s, wait, use_wait):
     return end
 
 
+def schedule_k(gq, t, s, wait, use_wait):
+    """schedule_np vectorised over K samples of the SWAPs: s (N, 3, K) -> (K,) durations."""
+    K = s.shape[-1]
+    last = {}
+    end = np.zeros(K)
+    zero = np.zeros(K)
+    for i in range(len(gq)):
+        qs = [int(q) for q in gq[i] if q >= 0]
+        if not qs:
+            continue
+        ready = np.max([last.get(q, zero) + s[i, k] * T_SWAP for k, q in enumerate(qs)], 0)
+        st = ready + (wait[i] if use_wait[i] else 0.0)
+        e = np.maximum(st, np.max([last.get(q, zero) for q in qs], 0)) + t[i]
+        for q in qs:
+            last[q] = e
+        end = np.maximum(end, e)
+    return end
+
+
 @torch.no_grad()
-def evaluate(model, items, bs=32):
+def evaluate(model, items, bs=32, mc=0, ds=None, device="cpu", seed=0):
+    """Per (circuit, device) rows. mc > 0 adds pred_mc / pred1_mc = median over mc schedules of Poisson-sampled SWAPs
+    (the schedule of the mean rates under-estimates the longest path); ds = esp_labels dict -> final_ds (µs)."""
     model.eval()
+    rng = np.random.default_rng(seed)
     rows = []
     for s0 in range(0, len(items), bs):
-        b = next(iter(DataLoader(items[s0: s0 + bs], batch_size=bs)))
-        rate, wait, c2 = model(b)
+        b = next(iter(DataLoader(items[s0: s0 + bs], batch_size=bs))).to(device)
+        rate, wait, c2 = (o.cpu() for o in model(b))
         ptr = b.ptr.tolist()
         for i in range(len(ptr) - 1):
             a, e = ptr[i], ptr[i + 1]
@@ -193,32 +215,51 @@ def evaluate(model, items, bs=32):
             gq = it.gate_qubits.numpy(); t = it.t.numpy()
             meas = it.x[:, GATE2IDX_MEASURE].numpy() > 0.5
             elig = ((gq >= 0).sum(1) >= 2) | meas
+            slot = (gq >= 0) & elig[:, None]                                       # real operand slots that carry SWAPs
+            lab_ds = ds.get(it.name) if ds is not None else None
             for d in range(len(DEVS)):
+                f_ds = {"final_ds": float(lab_ds["duration"][d]) * 1e6} if lab_ds is not None else {}
+                k2 = math.exp(float(c2[i, d]))
                 if bool(it.rf[0, d]):
                     zero = np.zeros((len(gq), 3))
                     p0 = schedule_np(gq, t, zero, np.zeros(len(gq)), elig)
-                    rows.append({"name": it.name, "d": d, "rf": True, "final": float(it.final[0, d]),
-                                 "pred1": p0, "pred": p0 * math.exp(float(c2[i, d]))})
+                    row = {"name": it.name, "d": d, "rf": True, "final": float(it.final[0, d]), "pred1": p0, "pred": p0 * k2}
+                    if mc:
+                        row.update(pred1_mc=p0, pred_mc=p0 * k2)
+                    rows.append({**row, **f_ds})
                     continue
                 if not bool(it.routed[0, d]):
                     continue
-                r = rate[a:e, d].numpy() * elig[:, None]
+                r = rate[a:e, d].numpy() * slot
                 w = wait[a:e, d].numpy() * T_SWAP
-                s_true = it.s[:, d].numpy(); w_true = it.wait[:, d].numpy()
+                s_true = it.s[:, d].numpy() * slot; w_true = it.wait[:, d].numpy()
                 p1 = schedule_np(gq, t, r, w, elig)
-                rows.append({"name": it.name, "d": d, "rf": False, "final": float(it.final[0, d]),
-                             "replay": float(it.replay[0, d]), "prior": float(it.prior_dur[0, d]),
-                             "pred1": p1, "pred": p1 * math.exp(float(c2[i, d])),
-                             "replay_c2": float(it.replay[0, d]) * math.exp(float(c2[i, d])),
-                             "pred_nowait": schedule_np(gq, t, r, w, np.zeros(len(gq), bool)),
-                             "oracle_s": schedule_np(gq, t, s_true, w_true, np.zeros(len(gq), bool)),
-                             "oracle_sw": schedule_np(gq, t, s_true, w_true, elig),
-                             "sw_pred": float(r.sum()), "sw_true": float(s_true.sum())})
+                row = {"name": it.name, "d": d, "rf": False, "final": float(it.final[0, d]),
+                       "replay": float(it.replay[0, d]), "prior": float(it.prior_dur[0, d]),
+                       "pred1": p1, "pred": p1 * k2,
+                       "replay_c2": float(it.replay[0, d]) * k2,
+                       "pred_nowait": schedule_np(gq, t, r, w, np.zeros(len(gq), bool)),
+                       "oracle_s": schedule_np(gq, t, s_true, w_true, np.zeros(len(gq), bool)),
+                       "oracle_sw": schedule_np(gq, t, s_true, w_true, elig),
+                       "sw_pred": float(r.sum()), "sw_true": float(s_true.sum())}
+                if mc:
+                    pk = float(np.median(schedule_k(gq, t, rng.poisson(np.repeat(r[..., None], mc, -1)), w, elig)))
+                    row.update(pred1_mc=pk, pred_mc=pk * k2)
+                rows.append({**row, **f_ds})
     return rows
 
 
+def _err(p, fin):
+    e = np.abs(p / fin - 1)
+    return {"err": float(np.median(e)), "p90": float(np.percentile(e, 90)), "bias": float(np.median(p / fin)),
+            "w10": float((e < 0.1).mean())}
+
+
 def summary(rows):
+    """Errors vs Sabre's final duration (the training target); with final_ds also vs the dataset label (esp_labels.pt),
+    the target of the v19i-v22 scorecard."""
     out = {}
+    mc = rows and "pred_mc" in rows[0]
     rt = [r for r in rows if not r["rf"]]
     for grp, sel in (("routed", rt), ("routing-free", [r for r in rows if r["rf"]])):
         if not sel:
@@ -226,15 +267,19 @@ def summary(rows):
         fin = np.array([r["final"] for r in sel])
         res = {"n": len(sel)}
         keys = ("pred", "pred1", "pred_nowait", "oracle_s", "oracle_sw", "replay", "replay_c2", "prior") if grp == "routed" else ("pred", "pred1")
+        keys += ("pred_mc", "pred1_mc") if mc else ()
         for k in keys:
-            p = np.array([r[k] for r in sel])
-            e = np.abs(p / fin - 1)
-            res[k] = {"err": float(np.median(e)), "p90": float(np.percentile(e, 90)), "bias": float(np.median(p / fin)),
-                      "w10": float((e < 0.1).mean())}
+            res[k] = _err(np.array([r[k] for r in sel]), fin)
         if grp == "routed":
             sp, st = np.array([r["sw_pred"] for r in sel]), np.array([r["sw_true"] for r in sel])
             res["swaps"] = {"err": float(np.median(np.abs(sp / np.maximum(st, 1) - 1))), "bias": float(np.median(sp / np.maximum(st, 1))),
+                            "mean_ratio": float(sp.mean() / max(st.mean(), 1e-9)),
                             "corr_log": float(np.corrcoef(np.log1p(sp), np.log1p(st))[0, 1])}
+        ds = [r for r in sel if r.get("final_ds", 0) > 0]
+        if ds:
+            fd = np.array([r["final_ds"] for r in ds])
+            res["vs_dataset"] = {"n": len(ds), "sabre_final": _err(np.array([r["final"] for r in ds]), fd),
+                                 **{k: _err(np.array([r[k] for r in ds]), fd) for k in ("pred", "pred1") + (("pred_mc", "pred1_mc") if mc else ())}}
         out[grp] = res
     return out
 
@@ -284,18 +329,25 @@ def main():
     ap.add_argument("--out", type=Path, default=HERE / "results/s1")
     ap.add_argument("--ckpt", type=Path, default=None)
     ap.add_argument("--data", type=Path, default=HERE / "results/stage1.pt")
+    ap.add_argument("--mc", type=int, default=0, help="eval: also schedule this many Poisson samples of the SWAPs (median)")
+    ap.add_argument("--esp-labels", type=Path, default=None, help="eval: also score against the dataset durations (esp_labels.pt)")
+    ap.add_argument("--device", default="cpu")
+    ap.add_argument("--tag", default="", help="suffix of the eval / rows file names")
+    ap.add_argument("--max-test", type=int, default=0, help="smoke tests: evaluate only the first N test circuits")
     args = ap.parse_args()
     torch.set_num_threads(args.threads)
     torch.manual_seed(args.seed); np.random.seed(args.seed)
     data = load_all(args.data)
     train_n, test_n = split_names(args.split, sorted(data))
+    if args.max_test:
+        test_n = test_n[:args.max_test]
     rng = np.random.default_rng(args.seed)
     train_n = list(rng.permutation(train_n))
     n_val = max(1, len(train_n) // 20)
     val_n, train_n = train_n[:n_val], train_n[n_val:]
     print(f"split {args.split}: train {len(train_n)}, val {len(val_n)}, test {len(test_n)}", flush=True)
     f_in = data[train_n[0]].x.size(1) + 9 + 12
-    model = Stage1(f_in, args.hidden, args.layers)
+    model = Stage1(f_in, args.hidden, args.layers).to(args.device)
     args.out.mkdir(parents=True, exist_ok=True)
     if args.cmd == "train":
         opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
@@ -306,6 +358,7 @@ def main():
             model.train()
             t0 = time.time(); tot = defaultdict(float); nb = 0
             for b in DataLoader(tr_items, batch_size=args.bs, shuffle=True):
+                b = b.to(args.device)
                 l_s, l_w, l_c = losses(b, *model(b))
                 loss = l_s + args.wait_lambda * l_w + args.c2_lambda * l_c
                 opt.zero_grad(); loss.backward()
@@ -316,6 +369,7 @@ def main():
             with torch.no_grad():
                 vl = []
                 for b in DataLoader([data[n] for n in val_n], batch_size=args.bs):
+                    b = b.to(args.device)
                     l_s, l_w, l_c = losses(b, *model(b)); vl.append((l_s + args.wait_lambda * l_w + args.c2_lambda * l_c).item())
             v = float(np.mean(vl))
             hist.append({"epoch": ep, "train_s": tot["s"] / nb, "train_w": tot["w"] / nb, "train_c": tot["c"] / nb, "val": v,
@@ -326,10 +380,12 @@ def main():
         (args.out / "history.json").write_text(json.dumps(hist))
     ckpt = args.ckpt or args.out / "model.pt"
     model.load_state_dict(torch.load(ckpt, map_location="cpu"))
-    rows = evaluate(model, [data[n] for n in test_n])
-    res = {"split": args.split, "n_test_circuits": len(test_n), **summary(rows)}
-    (args.out / f"eval_{args.split.replace(':', '_').replace(',', '-')}.json").write_text(json.dumps(res, indent=1))
-    torch.save(rows, args.out / f"rows_{args.split.replace(':', '_').replace(',', '-')}.pt")
+    ds = torch.load(args.esp_labels, weights_only=False) if args.esp_labels else None
+    rows = evaluate(model, [data[n] for n in test_n], mc=args.mc, ds=ds, device=args.device, seed=args.seed)
+    res = {"split": args.split, "n_test_circuits": len(test_n), "ckpt": str(ckpt), "mc": args.mc, **summary(rows)}
+    stem = args.split.replace(':', '_').replace(',', '-') + args.tag
+    (args.out / f"eval_{stem}.json").write_text(json.dumps(res, indent=1))
+    torch.save(rows, args.out / f"rows_{stem}.pt")
     print(json.dumps(res, indent=1))
 
 

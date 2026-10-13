@@ -167,8 +167,13 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
       - Sabre labels, full dataset (`compile_check/results/sabre_labels/report.md`): 32,895 circuits, 0 failed,
         71,222 routed cases. Even with Sabre's true SWAPs the wire schedule is 12–22% off, biased low
         (0.78–0.88); replaying the routed circuit is 1–6% → the rest is translation / optimisation (stage 2).
-        **Open:** the final duration matches `esp_labels.pt` within 0.1% in only 58% of cases (median |Δ| 0)
-        → `claude_scratch/label_mismatch.py` queued (1996865).
+        **Open:** the final duration matches `esp_labels.pt` within 0.1% in only 58% of cases (median |Δ| 0).
+        By family (`claude_scratch/label_mismatch.py`, `route_stage/slurm/label_mismatch_in1988088.log`): exact for
+        ae, qft, qftentangled, qnn, vqe_real_amp, vqe_two_local, ghz, wstate, qpe; tiny for vqe_su2 (p90 0.8%);
+        large for **qaoa routed (99% differ, p90 16%)**, randomcircuit routed (p90 9%), bmw_quark (p90 32%).
+        → v24 trains/evaluates on Sabre's own `final`, the v19i–v22 scorecard on `esp_labels.pt`: on qaoa the two
+        targets differ, so compare v24 vs v22 on one target only. Cause to find (different qaoa circuit version
+        or compiler settings/seed in sabre_labels.py vs the stored compilations).
       - Stage 1, seed 5, 20 epochs (val loss still falling), routed duration median error [p90] / bias:
         control 0.084 [0.263] / 0.98, qaoa 0.153 [0.329] / 0.85 (without stage 2: 0.127), variational
         0.094 [0.307] / 0.93, LOSO dense+complete 0.201 / 0.80. Routing-free 0.003–0.022.

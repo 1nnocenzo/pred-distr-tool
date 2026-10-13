@@ -26,25 +26,6 @@ import stage1 as S
 BINS = [0, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3, np.inf]
 
 
-def schedule_k(gq, t, s, wait, use_wait):
-    """stage1.schedule_np vectorised over K samples: s (N, 3, K)."""
-    K = s.shape[-1]
-    last = {}
-    end = np.zeros(K)
-    zero = np.zeros(K)
-    for i in range(len(gq)):
-        qs = [int(q) for q in gq[i] if q >= 0]
-        if not qs:
-            continue
-        ready = np.max([last.get(q, zero) + s[i, k] * S.T_SWAP for k, q in enumerate(qs)], 0)
-        st = ready + (wait[i] if use_wait[i] else 0.0)
-        e = np.maximum(st, np.max([last.get(q, zero) for q in qs], 0)) + t[i]
-        for q in qs:
-            last[q] = e
-        end = np.maximum(end, e)
-    return end
-
-
 def err(p, f):
     e = np.abs(p / f - 1)
     return {"err": float(np.median(e)), "p90": float(np.percentile(e, 90)), "bias": float(np.median(p / f)), "w10": float((e < 0.1).mean())}
@@ -74,7 +55,7 @@ def run(model, items, K, rng, bs=32):
                 s_true = it.s[:, d].numpy() * slot; w_true = it.wait[:, d].numpy()
                 cal_r.append(r[slot]); cal_s.append(s_true[slot])
                 samp = rng.poisson(np.repeat(r[..., None], K, -1))
-                dk = schedule_k(gq, t, samp, w, elig)
+                dk = S.schedule_k(gq, t, samp, w, elig)
                 cases.append({"final": float(it.final[0, d]), "replay": float(it.replay[0, d]),
                               "mean": S.schedule_np(gq, t, r, w, elig),
                               "mc_med": float(np.median(dk)), "mc_mean": float(dk.mean()),

@@ -253,6 +253,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--esp-path", type=Path, default=None,
                    help="v13: ESP / duration / depth labels (compile_check/results/esp_labels.pt)")
     p.add_argument("--esp-lambda", type=float, default=None, help="v13: weight of the ESP / duration / depth loss")
+    p.add_argument("--dur-corr-lambda", type=float, default=None,
+                   help="v21: L2 penalty on the formula head's learned log-duration correction (duration -> schedule)")
     p.add_argument("--esp-place-lambda", type=float, default=None,
                    help="v20 (*_espp): weight of the cross-entropy of the ESP head's own placement on the compiler's exact layout")
     p.add_argument("--tvar-path", type=Path, default=None,
@@ -336,7 +338,7 @@ def main() -> int:
     # Opt-in v5b keys: only present when requested, so older configurations (and
     # their checkpoints) are unchanged.
     for key in ("epoch_budget", "swa_frac", "tau_start", "layout_lambda", "layout_loss", "count_lambda",
-                "aug_p_orig", "delta_lambda", "aug_variants", "count_weights", "usage_lambda", "usage_aug_lambda", "react_lambda", "placement_lr_mult", "delta_corr_lambda", "esp_lambda", "esp_weights", "struct_lambda", "tvar_lambda", "tvar_f_lambda", "esp_place_lambda"):
+                "aug_p_orig", "delta_lambda", "aug_variants", "count_weights", "usage_lambda", "usage_aug_lambda", "react_lambda", "placement_lr_mult", "delta_corr_lambda", "esp_lambda", "esp_weights", "struct_lambda", "tvar_lambda", "tvar_f_lambda", "esp_place_lambda", "dur_corr_lambda"):
         if getattr(args, key) is not None:
             protocol[key] = getattr(args, key)
     if args.model == "v1":

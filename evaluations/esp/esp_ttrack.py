@@ -45,7 +45,10 @@ MODELS = {"v8kdi10 (v16), fixed gate times": ("v8kdi10", "sinkhorn_rf_route_czc_
           "v8kdf10 (v19): formula head trained, no T / gate-time variants in training": ("v8kdf10", "sinkhorn_rf_route_czc_espf", True),
           "v8kdf10 (v19), compiler's true layout (oracle)": ("v8kdf10", "sinkhorn_rf_route_czc_espf", True, "oracle"),
           "v8kdp10 (v20): v19 + ESP-only placement trained on the exact layout": ("v8kdp10", "sinkhorn_rf_route_czc_espp", True),
-          "v8kdfi10 (v19i): the formula head on v8kdi10": ("v8kdfi10", "sinkhorn_rf_route_czc_espfi", True)}
+          "v8kdfi10 (v19i): the formula head on v8kdi10": ("v8kdfi10", "sinkhorn_rf_route_czc_espfi", True),
+          "v8kdfw10 (v21w: v19i + r count weight 1)": ("v8kdfw10", "sinkhorn_rf_route_czc_espfi", True),
+          "v8kdfs10 (v21s: v19i + duration kept on the schedule)": ("v8kdfs10", "sinkhorn_rf_route_czc_espfi", True),
+          "v8kdfr10 (v21: v19i + r count weight 1 + duration on the schedule)": ("v8kdfr10", "sinkhorn_rf_route_czc_espfi", True)}
 T_FIX = {"QExa20": 10.0}
 
 

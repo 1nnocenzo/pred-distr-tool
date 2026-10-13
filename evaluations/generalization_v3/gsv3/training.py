@@ -364,6 +364,8 @@ def train_model(
     # v13 (opt-in): ESP decay / duration / depth of the stored compilation; needs ``esp`` on the graphs
     esp_lambda = float(protocol.get("esp_lambda", 0) or 0)
     esp_place_lambda = float(protocol.get("esp_place_lambda", 0) or 0)
+    # v21 (opt-in): keep the formula head's duration on the count-based schedule (learned correction -> 0)
+    dur_corr_lambda = float(protocol.get("dur_corr_lambda", 0) or 0)
     ep_acc = [0.0, 0.0, 0]
     esp_w = [float(x) for x in str(protocol.get("esp_weights") or "1,1,1").split(",")]
     # v15 (opt-in): per-qubit structure of the stored compilation; needs ``struct`` on the graphs and an *_espa model
@@ -520,6 +522,8 @@ def train_model(
             if esp_lambda and batch_devices is devices:     # labels of the original calibration
                 eloss, emse = esp_loss(model, batch, esp_w)
                 loss = loss + esp_lambda * eloss
+                if dur_corr_lambda and "dur_corr" in model.last_esp_feats:
+                    loss = loss + dur_corr_lambda * model.last_esp_feats["dur_corr"].pow(2).mean()
                 esp_acc = [a + b for a, b in zip(esp_acc, emse)]
                 esp_n += 1
             if struct_lambda and batch_devices is devices:

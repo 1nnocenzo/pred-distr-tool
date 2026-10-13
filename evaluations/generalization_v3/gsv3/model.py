@@ -794,6 +794,7 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
                      torch.log(f["n_phys"]).unsqueeze(-1), torch.log1p(f["dur_s_ref"]).unsqueeze(-1),
                      torch.log1p(f["idle_s_ref"]).unsqueeze(-1), torch.log1p(f["dep_s_ref"]).unsqueeze(-1)]
                 out = mlp(torch.cat(z, -1))
+                f["dur_corr"] = out[..., 0]                    # v21: read by --dur-corr-lambda
                 dur = f["dur_s"] * torch.exp(out[..., 0]) + 1e-3
                 logdep = torch.log(f["dep_s"].clamp(min=1)) + out[..., 1]
                 inv_m = (active * f["inv_t"]).sum(-1) / active.sum(-1).clamp(min=1)

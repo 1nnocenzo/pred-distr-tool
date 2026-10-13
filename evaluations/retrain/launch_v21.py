@@ -22,6 +22,7 @@ ap.add_argument("--exclude", default="compute-3-1,compute-7-5,compute-7-6")
 ap.add_argument("--run", required=True); ap.add_argument("--partition", default="cpu_sapphire")
 ap.add_argument("--r-weight", type=float, default=None); ap.add_argument("--dur-corr", type=float, default=None)
 ap.add_argument("--label", default="v21")
+ap.add_argument("--init-run", default="v8kdfi10", help="run whose split models are the starting point")
 ap.add_argument("--extra-train", default=None, help="v22: synthetic_routing/results (training side only)")
 ap.add_argument("--after", default="", help="sbatch dependency (afterok) for the trainings, e.g. the synthetic merge job")
 ap.add_argument("--nodes", default="", help="comma list: pin the trainings round-robin to these idle nodes (-w)")
@@ -36,7 +37,7 @@ nodes = [n for n in a.nodes.split(",") if n]
 for k, r in enumerate(rows):
     argv = list(r["argv"])
     i = argv.index("--model"); argv[i + 1] = KIND
-    init = r["out"].replace("/v8kdi10", "/v8kdfi10")                          # start from v19i's split model
+    init = r["out"].replace("/v8kdi10", "/" + a.init_run)                     # start from that run's split model
     i = argv.index("--init-from"); argv[i + 1] = init
     i = argv.index("--results-dir"); argv[i + 1] = argv[i + 1].replace("v8kdi10", a.run)
     i = argv.index("--epochs"); argv[i + 1] = "20"
@@ -46,7 +47,7 @@ for k, r in enumerate(rows):
         argv += ["--dur-corr-lambda", str(a.dur_corr)]
     if a.extra_train:
         argv += ["--extra-train", a.extra_train]
-    assert (REPO / init).is_file(), init
+    assert a.after or (REPO / init).is_file(), init
     name = f"{a.label}_{r['run'].replace('v8kdi10', a.run)}_{r['split']}"
     wrap = ("export CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=8 MKL_NUM_THREADS=8; bash evaluations/retrain/run_one.sh "
             + shlex.join(["python3", "-u"] + argv))

@@ -654,6 +654,9 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
             self.last_esp_feats = self.esp_features(circuits, devices, g, gb, n_circ, n_ops_esp, valid, local, assign, dev_glob)
             if tab_rf is not None:
                 self.last_esp_feats["corr_mask"] = (~tab_rf).float()
+            if getattr(self, "route_feats", False):
+                rd, rs, rdec = self.route_features(circuits, devices, n_circ, n_dev, g.device)
+                self.last_esp_feats.update(r_dur=rd, r_swap=rs, r_dec=rdec, route_mlp=self.route_mlp)
             self.last_esp = self.esp_from_features(self.esp_mlp, self.last_esp_feats, self.esp_head)
         if self.usage_head:
             return self._usage_log_f(circuits, devices, assign, n_ops, valid, local, gb, n_circ)
@@ -673,6 +676,50 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         self.register_buffer("tab_r", torch.tensor([float(tab.get(g, {"r": 0})["r"]) for g in u]), persistent=False)
         self.register_buffer("tab_cz", torch.tensor([float(tab.get(g, {"cz": 0})["cz"]) for g in u]), persistent=False)
         self.dur_table = True
+
+    def add_route_feats(self) -> None:
+        """v23: routed circuits get the approximate router's schedule (gsv3/router.py: greedy placement + shortest-path
+        SWAPs, no compiler pass).  A small network, zero at init (so the model starts as its parent), mixes the
+        logical and the router schedule in the duration, and adds the decay of the physical qubits the router keeps
+        idle (their own min(T1, T2)).  Inputs at reference gate times only, as the formula head."""
+        self.route_mlp = nn.Sequential(nn.Linear(4, 32), nn.LeakyReLU(), nn.Linear(32, 3))
+        nn.init.zeros_(self.route_mlp[-1].weight)
+        with torch.no_grad():
+            self.route_mlp[-1].bias.zero_()
+        self.route_feats, self._route_cache, self._chips = True, {}, None
+
+    def route_features(self, circuits, devices, b, n_dev, device):
+        """(B, D) router duration µs, SWAPs, Σ_p idle_p / min(T1, T2)_p over the physical qubits it touches."""
+        from torch_geometric.utils import to_dense_batch
+        from . import fast_encoding as fe
+        from .router import chips, circuit_gates, route
+        if self._chips is None:
+            self._chips = chips(devices)
+        coh, _ = to_dense_batch(devices.coh, devices.batch)                       # (D, P) 1/µs
+        names = getattr(circuits, "circuit_name", None)
+        gb = circuits.batch
+        starts = torch.searchsorted(gb, torch.arange(b + 1, device=gb.device)).tolist()
+        tr, tc = self.tab_r.cpu().numpy(), self.tab_cz.cpu().numpy()
+        dur = torch.zeros(b, n_dev); nsw = torch.zeros(b, n_dev); idle = torch.zeros(b, n_dev, coh.size(1))
+        for i in range(b):
+            g = None
+            for d in range(n_dev):
+                key = (names[i], self._chips[d][0]) if names is not None else None
+                r = self._route_cache.get(key) if key is not None else None
+                if r is None:
+                    if g is None:
+                        sl = slice(starts[i], starts[i + 1])
+                        g = circuit_gates(argparse_ns(x=circuits.x[sl], gate_qubits=circuits.gate_qubits[sl]),
+                                          tr, tc, self.tab_r.numel(), GATE2IDX_MEASURE)
+                    nl = int(circuits.n_qubits.view(-1)[i])
+                    dd, ns, idl = route(g, nl, self._chips[d])
+                    r = (dd, ns, torch.tensor(idl, dtype=torch.float))
+                    if key is not None:
+                        self._route_cache[key] = r
+                dur[i, d], nsw[i, d] = r[0], r[1]
+                idle[i, d, : r[2].numel()] = r[2]
+        dec = (idle.to(device) * coh.unsqueeze(0)).sum(-1)
+        return dur.to(device), nsw.to(device), dec
 
     def add_esp_place(self) -> None:
         """v20: bilinear correction of the placement scores for the ESP head only (``*_espp``)."""
@@ -817,13 +864,22 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
                      torch.log1p(f["idle_s_ref"]).unsqueeze(-1), torch.log1p(f["dep_s_ref"]).unsqueeze(-1)]
                 out = mlp(torch.cat(z, -1))
                 corr = out[..., 0] * f["corr_mask"] if "corr_mask" in f else out[..., 0]   # v21t: none if routing-free
+                extra_dec = 0.0
+                if "r_dur" in f:   # v23: routed circuits mix in the approximate router's schedule and idle qubits
+                    lr = torch.log((f["r_dur"] + 1e-3) / (f["dur_s_ref"] + 1e-3))
+                    z2 = torch.stack([torch.log1p(f["dur_s_ref"]), torch.log1p(f["r_dur"]), torch.log1p(f["r_swap"]), lr], -1)
+                    ro = f["route_mlp"](z2)
+                    m = f.get("corr_mask", torch.ones_like(lr))
+                    corr = corr + m * (ro[..., 0] * lr + ro[..., 1])
+                    # exactly 0 at init (route_mlp's last layer is zero), small slope, bounded below
+                    extra_dec = m * (F.softplus(ro[..., 2] - 6.0) - F.softplus(torch.tensor(-6.0))) * f["r_dec"]
                 f["dur_corr"] = corr                           # v21: read by --dur-corr-lambda
                 dur = f["dur_s"] * torch.exp(corr) + 1e-3
                 logdep = torch.log(f["dep_s"].clamp(min=1)) + out[..., 1]
                 inv_m = (active * f["inv_t"]).sum(-1) / active.sum(-1).clamp(min=1)
                 # Σ_q idle_q / min(T1, T2)_q on the logical qubits' own schedule; routing-only qubits as in v17
                 own = (f["idle_q"] * f["inv_t"]).sum(-1)
-                return -(own * torch.exp(out[..., 2]) + f["dur_s"] * F.softplus(out[..., 3]) * inv_m), torch.log(dur), logdep
+                return -(own * torch.exp(out[..., 2]) + f["dur_s"] * F.softplus(out[..., 3]) * inv_m + extra_dec), torch.log(dur), logdep
             if kind == "s":
                 z += [torch.log1p(f["dur_s"]).unsqueeze(-1), torch.log1p(f["idle_s"]).unsqueeze(-1),
                       torch.log1p(f["dep_s"]).unsqueeze(-1)]
@@ -1290,9 +1346,14 @@ def dag_schedule(circuits, n_ops: torch.Tensor, cache: dict | None = None, gate_
 SINKHORN_KINDS = ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_route", "sinkhorn_rf_rel_route", "sinkhorn_rf_route_czc", "sinkhorn_rf_rel_route_czc", "sinkhorn_rf_route_usage", "sinkhorn_rf_route_czc_ep", "sinkhorn_rf_route_czc_ep3", "sinkhorn_rf_route_czc_mlps", "sinkhorn_rf_route_czc_ep3_mlps", "sinkhorn_rf_route_czc_vf2", "sinkhorn_rf_route_pgnn_usage")
 
 
+def argparse_ns(**kw):
+    import argparse
+    return argparse.Namespace(**kw)
+
+
 def split_esp_kind(kind: str) -> tuple[str, str | bool]:
     """``<sinkhorn kind>_esp`` (v13 ESP head) / ``<sinkhorn kind>_espa`` (v14 analytic head) -> (base kind, head)."""
-    for sfx, head in (("_espa", "a"), ("_espi", "i"), ("_esps", "s"), ("_espf", "f"), ("_espp", "p"), ("_espfi", "fi"), ("_espft", "ft"), ("_esp", "v13")):
+    for sfx, head in (("_espa", "a"), ("_espi", "i"), ("_esps", "s"), ("_espf", "f"), ("_espp", "p"), ("_espfi", "fi"), ("_espft", "ft"), ("_espfr", "fr"), ("_esp", "v13")):
         if kind.endswith(sfx) and kind[: -len(sfx)] in SINKHORN_KINDS:
             return kind[: -len(sfx)], head
     return kind, False
@@ -1305,8 +1366,9 @@ def is_sinkhorn_kind(kind: str) -> bool:
 def build_model(kind: str, params: dict[str, Any], devices, device: torch.device) -> nn.Module:
     kind, esp = split_esp_kind(kind)
     esp_place = esp == "p"              # v20: the formula head (f) with its own placement
-    f_exact_meas = esp in ("fi", "ft")  # v19 head on the v8kdi10 recipe: exact measurements in F too (as espi)
-    dur_table = esp == "ft"             # v21t: + fixed decomposition table for routing-free circuits (see forward)
+    f_exact_meas = esp in ("fi", "ft", "fr")  # v19 head on the v8kdi10 recipe: exact measurements in F too (as espi)
+    dur_table = esp in ("ft", "fr")     # v21t: + fixed decomposition table for routing-free circuits (see forward)
+    route_feats = esp == "fr"           # v23: + approximate-router features for routed circuits (add_route_feats)
     if esp_place or f_exact_meas:
         esp = "f"
     if kind == "pooled":
@@ -1331,6 +1393,8 @@ def build_model(kind: str, params: dict[str, Any], devices, device: torch.device
         model.f_exact_meas = f_exact_meas
         if dur_table:
             model.add_dur_table()
+        if route_feats:
+            model.add_route_feats()
         return model.to(device)
     if kind == "phys_uniform":
         return PhysicsHeadPredictor(

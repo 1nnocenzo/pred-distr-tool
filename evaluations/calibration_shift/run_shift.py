@@ -95,6 +95,7 @@ for _s in (5, 6, 7):
     MODELS[f"v8kdfi10@s{_s}"] = ("sinkhorn_rf_route_czc_espfi", _control("generalization_v10", "v8kdfi10", _s))  # v19 head on v8kdi10
     MODELS[f"v8kdfw10@s{_s}"] = ("sinkhorn_rf_route_czc_espfi", _control("generalization_v10", "v8kdfw10", _s))  # v21w: v19i + r count weight 1
     MODELS[f"v8kdfs10@s{_s}"] = ("sinkhorn_rf_route_czc_espfi", _control("generalization_v10", "v8kdfs10", _s))  # v21s: v19i + duration kept on the schedule
+    MODELS[f"v8kdfy10@s{_s}"] = ("sinkhorn_rf_route_czc_espfr", _control("generalization_v10", "v8kdfy10", _s))  # v23: v22 + router features
     MODELS[f"v8kdfx10@s{_s}"] = ("sinkhorn_rf_route_czc_espft", _control("generalization_v10", "v8kdfx10", _s))  # v22: v21t + synthetic routing circuits
     MODELS[f"v8kdft10@s{_s}"] = ("sinkhorn_rf_route_czc_espft", _control("generalization_v10", "v8kdft10", _s))  # v21t: decomposition table for routing-free circuits
     MODELS[f"v8kdfr10@s{_s}"] = ("sinkhorn_rf_route_czc_espfi", _control("generalization_v10", "v8kdfr10", _s))  # v21: v19i + r count weight 1 + duration on the schedule

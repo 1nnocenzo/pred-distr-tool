@@ -144,6 +144,21 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
       only 35% (qaoa) / 53% (variational) — compiler seed floor ~5% (`compile_check/duration_anatomy.py`,
       `esp/esp_count_oracle.py`, `esp/esp_interval.py`). Running: v21w, v21t, v22 (+15k synthetic routing
       circuits, `synthetic_routing/`). Then: bounds calibrated on held-out structures, not on seen families.
+- [ ] **Routed circuits, plan agreed 2026-10-13 (next session):** (v19i routed breakdown,
+      `esp/results/report_esp_routed_v10_v19i.md`: duration error grows with routing overhead on new
+      families — qaoa 4.6% → 11% → 20%, variational up to 44%, bias down to 0.56 — while control stays 3–8%;
+      ESP of routed circuits off ×1.7–1.9 on new families and ~30% on control.)
+      1. Development benchmark: leave-one-structure-out on `synthetic_routing/` (choose variants there; qaoa /
+         variational = final test only).
+      2. v23 = v22 + router features in the duration correction (logical schedule, `esp/esp_router.py` SWAP
+         schedule, SWAP count, predicted routing overhead).
+      3. ESP of routed circuits from the router's physical schedule: idle per physical qubit touched by SWAPs /
+         its own min(T1, T2), small learned correction.
+      5. Quantile (90%) head + conformal calibrated on held-out synthetic structures; report coverage on LOFO/LOGO.
+      6. Next synthetic batch biased to heavy routing (overhead > 0.75) and 11–20 qubits; up-weight them in the loss.
+      NOT to do: Qiskit's SabreSwap pass as a feature (user does not agree: it is part of the compiler).
+      Results expected from the queue: v21w / v21t / v22 evaluations, intervals (`report_esp_interval_v10_v22.md`),
+      routed breakdowns (`report_esp_routed_v10_v21.md`, `_v22.md`).
 - [ ] **More devices and topologies**: generalise ESP and duration to more chips (other coupling maps,
       sizes, native gates, gate times); new labels for the dataset and the synthetic circuits on them;
       leave-one-device-out next to LOFO / LOGO.

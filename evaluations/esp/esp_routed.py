@@ -100,10 +100,13 @@ def main():
         R = {k: np.array(v) for k, v in rows.items()}
         ok = R["t_esp"] > 1e-3                              # ESP error only where ESP is not ~0 (as esp_eval's log ESP R²)
 
+        fin = np.isfinite(R["p_esp"]) & np.isfinite(R["d_lesp"])
+
         def line(name, s):
             if s.sum() < 30:
                 return None
-            se = s & ok
+            se = s & ok & fin
+            s = s & fin if (s & fin).sum() >= 30 else s
             r2 = 1 - ((R["p_esp"][s] - R["t_esp"][s]) ** 2).sum() / max(((R["t_esp"][s] - R["t_esp"][s].mean()) ** 2).sum(), 1e-12)
             return (f"| {name} | {int(s.sum())} | {np.median(np.abs(R['r_dur'][s] - 1)):.3f} | {np.percentile(np.abs(R['r_dur'][s] - 1), 90):.3f} | "
                     f"{np.median(R['r_dur'][s]):.2f} | {np.median(np.abs(R['d_lesp'][se])) if se.sum() else float('nan'):.3f} | {r2:.3f} |")

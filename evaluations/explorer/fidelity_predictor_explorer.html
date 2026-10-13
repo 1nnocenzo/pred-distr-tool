@@ -982,6 +982,14 @@ function durTable(k) {
   return `<div class="dwrap"><table class="dtable"><thead><tr><th>${esc(k)} · split</th><th>typical duration</th><th>typical error</th><th>worst 10% beyond</th>` +
     `<th>within 10%</th><th>within 25%</th><th>systematic bias</th><th>R² log duration</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
+function routeTables() {
+  const t = (head, rows) => `<div class="dwrap"><table class="dtable"><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>` +
+    rows.map(x => `<tr><td>${esc(x[0])}</td>` + x.slice(1).map(c => `<td>${c}</td>`).join("") + "</tr>").join("") + `</tbody></table></div>`;
+  return t(["routing-free · median error", "v19i", "table schedule (v21t, no training)", "limit: compiler's true counts"],
+           [["LOFO qaoa", "5.4%", "3.7%", "2.3%"], ["LOFO qnn", "4.9%", "1.5%", "0.4%"], ["LOGO variational", "7.2%", "0.5%", "0.4%"], ["control", "1.3%", "0.5%", "0.4%"]]) +
+         t(["routed · median error", "v19i", "logical schedule, true counts", "compiler seed floor", "90% upper bound covers"],
+           [["LOFO qaoa", "15.3%", "20.0%", "5.1%", '<span class="warn">35%</span>'], ["LOGO variational", "15.5%", "6.6%", "2.7%", '<span class="warn">53%</span>'], ["control", "4.2%", "10.2%", "4.6%", "90%"]]);
+}
 function ttTable() {
   const r = [["exact qubit", "9%", "13%", "7%", "16%"], ["in the compiler's region", "75%", "88%", "77%", "93%"], ["distance to its qubit", "2.6 hops", "2.5 hops", "2.9 hops", "2.3 hops"]];
   return `<div class="dwrap"><table class="dtable"><thead><tr><th>hard placement vs the compiler's layout</th><th>qaoa (unseen)</th><th>qnn (unseen)</th><th>variational (unseen)</th><th>control</th></tr></thead><tbody>` +
@@ -1032,7 +1040,11 @@ const VIEWS = {
       "<b>Worst 10% beyond</b>: one case in ten is off by more. <b>Within 25%</b>: share of cases a scheduler could use without a margin. " +
       "<b>Systematic bias</b>: whether the model under- or over-estimates on the median case. " +
       "<b>R² log duration</b>: how much of the difference in duration between circuits the model explains (1 = all of it, 0 = no better than one fixed guess); it is the test of whether the model understands what makes a circuit long. " +
-      "On qnn it is low (0.41) while the error is 5% because qnn circuits all last about the same: there is little to explain." + durTable("v8kdi10") + durTable("v8kdg10") + durTable("v8kdfi10") +
+      "On qnn it is low (0.41) while the error is 5% because qnn circuits all last about the same: there is little to explain." +
+      "<br><br><b>Routed vs routing-free (13 Oct).</b> Routing-free circuits are solved by scheduling each gate's fixed decomposition (v21t, before any training). " +
+      "Routed circuits on new families are the open problem: about 15% off and biased low, while the compiler's own seed noise is about 5%; " +
+      "a 90% bound calibrated on seen families covers only a third to a half of them. A calibration change never moves a compiled circuit's duration; compiling a routed circuit costs about 50 ms per chip. " +
+      "Running: v21t trained and v22 (v21t + 15,000 synthetic routing circuits in training)." + routeTables() + durTable("v8kdi10") + durTable("v8kdg10") + durTable("v8kdfi10") +
       "A job takes about shots × duration plus overheads (reset, transfer, queue) that the model does not see. Green: at least 90% of cases within 25%; red: fewer than 75%."; },
     cap: m => `best duration model ${m.k} (3 seeds, retrained) vs v17 (v8kdg10) · error = |predicted / true − 1| of the one-shot QPU time` },
   BEST: { main: "v8kdfi10", cmp: ["v8kdc10", "v8kdi10"], get: v => v.best,

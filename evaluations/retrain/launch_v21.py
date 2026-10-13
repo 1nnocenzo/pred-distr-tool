@@ -25,6 +25,9 @@ ap.add_argument("--label", default="v21")
 ap.add_argument("--init-run", default="v8kdfi10", help="run whose split models are the starting point")
 ap.add_argument("--extra-train", default=None, help="v22: synthetic_routing/results (training side only)")
 ap.add_argument("--after", default="", help="sbatch dependency (afterok) for the trainings, e.g. the synthetic merge job")
+ap.add_argument("--guard-for", default="", help="colon list of this run's training job ids (launch order): submit one "
+                "resume job per split after it (afterany); a finished split is skipped, a timed-out one resumes from its checkpoint")
+ap.add_argument("--time", default="03:00:00")
 ap.add_argument("--nodes", default="", help="comma list: pin the trainings round-robin to these idle nodes (-w)")
 ap.add_argument("--kind", default="sinkhorn_rf_route_czc_espfi",
                 help="*_espft (v21t): fixed decomposition table for the schedule of routing-free circuits")
@@ -33,6 +36,7 @@ KIND = a.kind
 plan = json.loads((HERE / "plan.json").read_text())
 rows = [r for r in plan if r["run"] in ("v8kdi10", "v8kdi10_s6", "v8kdi10_s7")]
 ids = []
+guard = [x for x in a.guard_for.split(":") if x]
 nodes = [n for n in a.nodes.split(",") if n]
 for k, r in enumerate(rows):
     argv = list(r["argv"])
@@ -52,13 +56,18 @@ for k, r in enumerate(rows):
     wrap = ("export CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=8 MKL_NUM_THREADS=8; bash evaluations/retrain/run_one.sh "
             + shlex.join(["python3", "-u"] + argv))
     where = f"-w {nodes[k % len(nodes)]}" if nodes else f"--exclude={a.exclude}"
-    dep = f"--dependency=afterok:{a.after} " if a.after else ""
-    cmd = (f"sbatch --parsable {dep}-p {a.partition} {where} -c 8 --mem=12G -t 03:00:00 --job-name={name} "
+    dep = f"--dependency=afterany:{guard[k]} " if guard else (f"--dependency=afterok:{a.after} " if a.after else "")
+    if guard:
+        name = "g" + name
+    cmd = (f"sbatch --parsable {dep}-p {a.partition} {where} -c 8 --mem=12G -t {a.time} --job-name={name} "
            f"-o evaluations/retrain/logs/%x_%j.log --wrap={shlex.quote(wrap)}")
     if a.dry_run:
         print(cmd[:900]); continue
     ids.append(subprocess.check_output(cmd, shell=True, cwd=REPO, text=True).strip())
-if ids:
+if ids and guard:
+    line = f"{a.label} {a.run} resume guards {':'.join(ids)} (after {a.guard_for})"
+    print(line); (HERE / "eval_jobs.txt").open("a").write(line + "\n")
+elif ids:
     env = ('eval "$($HOME/miniforge3/bin/conda shell.bash hook)"; conda activate pred-distr; '
            'export PYTHONPATH=$PWD/src OMP_NUM_THREADS=8 CUDA_VISIBLE_DEVICES= GS_RESULTS_ROOT=generalization_v10; ')
     ev = (env + f"python3 -u evaluations/esp/esp_eval.py --run {a.run} --kind {KIND} "

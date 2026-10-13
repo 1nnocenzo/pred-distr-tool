@@ -95,6 +95,7 @@ for _s in (5, 6, 7):
     MODELS[f"v8kdfi10@s{_s}"] = ("sinkhorn_rf_route_czc_espfi", _control("generalization_v10", "v8kdfi10", _s))  # v19 head on v8kdi10
     MODELS[f"v8kdfw10@s{_s}"] = ("sinkhorn_rf_route_czc_espfi", _control("generalization_v10", "v8kdfw10", _s))  # v21w: v19i + r count weight 1
     MODELS[f"v8kdfs10@s{_s}"] = ("sinkhorn_rf_route_czc_espfi", _control("generalization_v10", "v8kdfs10", _s))  # v21s: v19i + duration kept on the schedule
+    MODELS[f"v8kdft10@s{_s}"] = ("sinkhorn_rf_route_czc_espft", _control("generalization_v10", "v8kdft10", _s))  # v21t: decomposition table for routing-free circuits
     MODELS[f"v8kdfr10@s{_s}"] = ("sinkhorn_rf_route_czc_espfi", _control("generalization_v10", "v8kdfr10", _s))  # v21: v19i + r count weight 1 + duration on the schedule
 # data scaling (2026-10-11): change-loss fine-tuning on the first k calibration variants per device (c12/25/50)
 # or on all 100 with the variant labels of ~1/4 of the circuits (cq4); v8kdl40 and v11dl40 recipes

@@ -640,10 +640,20 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
             n_ops_esp = torch.cat([n_ops[..., :1], meas.unsqueeze(-1), n_ops[..., 2:]], dim=-1)
             if self.esp_head == "i" or getattr(self, "f_exact_meas", False):
                 n_ops = n_ops_esp
+        tab_rf = None
+        if getattr(self, "dur_table", False):
+            oh = circuits.x[:, : self.tab_r.numel()].float()
+            is_m = (circuits.x[:, GATE2IDX_MEASURE] > 0.5).float()
+            n_tab = torch.stack([oh @ self.tab_r, is_m, oh @ self.tab_cz], -1) * torch.stack(
+                [1 - is_m, torch.ones_like(is_m), 1 - is_m], -1)                 # (G, 3)
+            tab_rf = routing_free(circuits, devices, self._rf_cache).to(g.device) > 0.5   # (B, D)
+            n_ops_esp = torch.where(tab_rf[gb].unsqueeze(-1), n_tab.unsqueeze(1).expand_as(n_ops_esp), n_ops_esp)
         self.last_counts = scatter(n_ops, gb, dim=0, dim_size=n_circ, reduce="sum")   # v8
         self.last_n_ops = n_ops                                      # (G, D, 3) per gate: r, measure, cz
         if self.esp_head and hasattr(devices, "coh"):     # device batches built elsewhere may lack T1/T2
             self.last_esp_feats = self.esp_features(circuits, devices, g, gb, n_circ, n_ops_esp, valid, local, assign, dev_glob)
+            if tab_rf is not None:
+                self.last_esp_feats["corr_mask"] = (~tab_rf).float()
             self.last_esp = self.esp_from_features(self.esp_mlp, self.last_esp_feats, self.esp_head)
         if self.usage_head:
             return self._usage_log_f(circuits, devices, assign, n_ops, valid, local, gb, n_circ)
@@ -651,6 +661,18 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
         return -scatter(cost, gb, dim=0, dim_size=n_circ, reduce="sum")
 
     N_ESPA_IN = 10
+
+    def add_dur_table(self) -> None:
+        """v21t: r / CZ count of every gate type transpiled alone (esp/results/decomp_table.json, esp_decomp.py).  For
+        routing-free circuits the ESP head's schedule uses these fixed counts (the count oracle: 0.5% median duration
+        error on variational / control, 1.5% on qnn) and no learned duration correction; routed circuits keep the
+        learned counts and correction (the logical schedule misses the SWAPs).  F keeps the learned counts."""
+        from . import fast_encoding as fe
+        tab = json.loads((Path(__file__).resolve().parents[2] / "esp/results/decomp_table.json").read_text())
+        u = list(fe.UNIQUE)
+        self.register_buffer("tab_r", torch.tensor([float(tab.get(g, {"r": 0})["r"]) for g in u]), persistent=False)
+        self.register_buffer("tab_cz", torch.tensor([float(tab.get(g, {"cz": 0})["cz"]) for g in u]), persistent=False)
+        self.dur_table = True
 
     def add_esp_place(self) -> None:
         """v20: bilinear correction of the placement scores for the ESP head only (``*_espp``)."""
@@ -794,8 +816,9 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
                      torch.log(f["n_phys"]).unsqueeze(-1), torch.log1p(f["dur_s_ref"]).unsqueeze(-1),
                      torch.log1p(f["idle_s_ref"]).unsqueeze(-1), torch.log1p(f["dep_s_ref"]).unsqueeze(-1)]
                 out = mlp(torch.cat(z, -1))
-                f["dur_corr"] = out[..., 0]                    # v21: read by --dur-corr-lambda
-                dur = f["dur_s"] * torch.exp(out[..., 0]) + 1e-3
+                corr = out[..., 0] * f["corr_mask"] if "corr_mask" in f else out[..., 0]   # v21t: none if routing-free
+                f["dur_corr"] = corr                           # v21: read by --dur-corr-lambda
+                dur = f["dur_s"] * torch.exp(corr) + 1e-3
                 logdep = torch.log(f["dep_s"].clamp(min=1)) + out[..., 1]
                 inv_m = (active * f["inv_t"]).sum(-1) / active.sum(-1).clamp(min=1)
                 # Σ_q idle_q / min(T1, T2)_q on the logical qubits' own schedule; routing-only qubits as in v17
@@ -1269,7 +1292,7 @@ SINKHORN_KINDS = ("sinkhorn", "sinkhorn_rf", "sinkhorn_rf_rel", "sinkhorn_rf_rou
 
 def split_esp_kind(kind: str) -> tuple[str, str | bool]:
     """``<sinkhorn kind>_esp`` (v13 ESP head) / ``<sinkhorn kind>_espa`` (v14 analytic head) -> (base kind, head)."""
-    for sfx, head in (("_espa", "a"), ("_espi", "i"), ("_esps", "s"), ("_espf", "f"), ("_espp", "p"), ("_espfi", "fi"), ("_esp", "v13")):
+    for sfx, head in (("_espa", "a"), ("_espi", "i"), ("_esps", "s"), ("_espf", "f"), ("_espp", "p"), ("_espfi", "fi"), ("_espft", "ft"), ("_esp", "v13")):
         if kind.endswith(sfx) and kind[: -len(sfx)] in SINKHORN_KINDS:
             return kind[: -len(sfx)], head
     return kind, False
@@ -1282,7 +1305,8 @@ def is_sinkhorn_kind(kind: str) -> bool:
 def build_model(kind: str, params: dict[str, Any], devices, device: torch.device) -> nn.Module:
     kind, esp = split_esp_kind(kind)
     esp_place = esp == "p"              # v20: the formula head (f) with its own placement
-    f_exact_meas = esp == "fi"          # v19 head on the v8kdi10 recipe: exact measurements in F too (as espi)
+    f_exact_meas = esp in ("fi", "ft")  # v19 head on the v8kdi10 recipe: exact measurements in F too (as espi)
+    dur_table = esp == "ft"             # v21t: + fixed decomposition table for routing-free circuits (see forward)
     if esp_place or f_exact_meas:
         esp = "f"
     if kind == "pooled":
@@ -1305,6 +1329,8 @@ def build_model(kind: str, params: dict[str, Any], devices, device: torch.device
         if esp_place:
             model.add_esp_place()
         model.f_exact_meas = f_exact_meas
+        if dur_table:
+            model.add_dur_table()
         return model.to(device)
     if kind == "phys_uniform":
         return PhysicsHeadPredictor(

@@ -34,6 +34,7 @@ def main():
     ap.add_argument("--runs", default="v8kdi10,v8kda10,v8kde10")
     ap.add_argument("--seeds", default="5,6,7")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--kind", default=None, help="model kind for every run (e.g. a zero-shot head on trained weights)")
     args = ap.parse_args()
     torch.set_num_threads(8)
     params = load_hparams()
@@ -43,7 +44,7 @@ def main():
     dev = variant_batch(raw, list(DEVS), params["lap_pe"])
     out = {}
     for run in args.runs.split(","):
-        kind = KIND_DEFAULT.get(run, KINDS.get(run, "sinkhorn_rf_route_czc_espa"))
+        kind = args.kind or KIND_DEFAULT.get(run, KINDS.get(run, "sinkhorn_rf_route_czc_espa"))
         per = defaultdict(lambda: defaultdict(list))
         for seed in [int(s) for s in args.seeds.split(",")]:
             for split, sd in SPLITS.items():

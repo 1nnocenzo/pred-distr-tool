@@ -48,7 +48,8 @@ MODELS = {"v8kdi10 (v16), fixed gate times": ("v8kdi10", "sinkhorn_rf_route_czc_
           "v8kdfi10 (v19i): the formula head on v8kdi10": ("v8kdfi10", "sinkhorn_rf_route_czc_espfi", True),
           "v8kdfw10 (v21w: v19i + r count weight 1)": ("v8kdfw10", "sinkhorn_rf_route_czc_espfi", True),
           "v8kdfs10 (v21s: v19i + duration kept on the schedule)": ("v8kdfs10", "sinkhorn_rf_route_czc_espfi", True),
-          "v8kdfr10 (v21: v19i + r count weight 1 + duration on the schedule)": ("v8kdfr10", "sinkhorn_rf_route_czc_espfi", True)}
+          "v8kdfr10 (v21: v19i + r count weight 1 + duration on the schedule)": ("v8kdfr10", "sinkhorn_rf_route_czc_espfi", True),
+          "v8kdft10 (v21t: decomposition table for routing-free circuits, r count weight 1)": ("v8kdft10", "sinkhorn_rf_route_czc_espft", True)}
 T_FIX = {"QExa20": 10.0}
 
 

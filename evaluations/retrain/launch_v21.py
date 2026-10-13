@@ -8,22 +8,30 @@ with one or both of
                       count-based schedule instead of a correction fitted to the training families
 Then the standard ESP evaluation, duration report, T / gate-time tracking test, count oracle and the F calibration
 test (merged into results_k_v10), all chained.  4 splits × seeds 5–7, one CPU job each.
-    python launch_v21.py --run v8kdfr10 --r-weight 1 --dur-corr 1 [--dry-run]"""
+    python launch_v21.py --run v8kdfr10 --r-weight 1 --dur-corr 1 [--dry-run]
+v21t (run v8kdft10, kind *_espft): routing-free circuits are scheduled with the fixed per-gate decomposition table and
+no learned correction (count oracle, esp_count_oracle.py: 0.5% median error on variational / control), routed ones
+keep the learned counts and correction; with --r-weight 1.
+    python launch_v21.py --run v8kdft10 --kind sinkhorn_rf_route_czc_espft --r-weight 1 --label v21t"""
 import argparse, json, shlex, subprocess
 from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-KIND = "sinkhorn_rf_route_czc_espfi"
 ap = argparse.ArgumentParser(); ap.add_argument("--dry-run", action="store_true")
 ap.add_argument("--exclude", default="compute-3-1,compute-7-5,compute-7-6")
 ap.add_argument("--run", required=True); ap.add_argument("--partition", default="cpu_sapphire")
 ap.add_argument("--r-weight", type=float, default=None); ap.add_argument("--dur-corr", type=float, default=None)
 ap.add_argument("--label", default="v21")
+ap.add_argument("--nodes", default="", help="comma list: pin the trainings round-robin to these idle nodes (-w)")
+ap.add_argument("--kind", default="sinkhorn_rf_route_czc_espfi",
+                help="*_espft (v21t): fixed decomposition table for the schedule of routing-free circuits")
 a = ap.parse_args()
+KIND = a.kind
 plan = json.loads((HERE / "plan.json").read_text())
 rows = [r for r in plan if r["run"] in ("v8kdi10", "v8kdi10_s6", "v8kdi10_s7")]
 ids = []
-for r in rows:
+nodes = [n for n in a.nodes.split(",") if n]
+for k, r in enumerate(rows):
     argv = list(r["argv"])
     i = argv.index("--model"); argv[i + 1] = KIND
     init = r["out"].replace("/v8kdi10", "/v8kdfi10")                          # start from v19i's split model
@@ -38,7 +46,8 @@ for r in rows:
     name = f"{a.label}_{r['run'].replace('v8kdi10', a.run)}_{r['split']}"
     wrap = ("export CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=8 MKL_NUM_THREADS=8; bash evaluations/retrain/run_one.sh "
             + shlex.join(["python3", "-u"] + argv))
-    cmd = (f"sbatch --parsable -p {a.partition} --exclude={a.exclude} -c 8 --mem=10G -t 03:00:00 --job-name={name} "
+    where = f"-w {nodes[k % len(nodes)]}" if nodes else f"--exclude={a.exclude}"
+    cmd = (f"sbatch --parsable -p {a.partition} {where} -c 8 --mem=10G -t 03:00:00 --job-name={name} "
            f"-o evaluations/retrain/logs/%x_%j.log --wrap={shlex.quote(wrap)}")
     if a.dry_run:
         print(cmd[:900]); continue
@@ -57,6 +66,6 @@ if ids:
                                 f"--exclude={a.exclude} -c 8 --mem=14G -t 03:00:00 --job-name=eval_{a.run} "
                                 f"-o evaluations/retrain/logs/%x_%j.log --wrap={shlex.quote(ev)}",
                                 shell=True, cwd=REPO, text=True).strip()
-    line = (f"{a.label} {a.run} (v19i + r count weight {a.r_weight}, duration-correction penalty {a.dur_corr}) "
+    line = (f"{a.label} {a.run} ({KIND}, from v19i; r count weight {a.r_weight}, duration-correction penalty {a.dur_corr}) "
             f"trainings {':'.join(ids)} eval {e}")
     print(line); (HERE / "eval_jobs.txt").open("a").write(line + "\n")

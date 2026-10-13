@@ -201,6 +201,53 @@ def attach_calib_aug(dataset, directory: Path, circuit_mod: int = 0) -> None:
                 directory, n_aug, found, len(dataset.data))
 
 
+def add_extra_train(dataset, splits, directory: Path, args):
+    """v22: append the synthetic circuits of ``directory`` (synthetic_routing/synth_routing.py: synth_graphs.pt and its
+    counts / layouts / ESP labels) to the TRAINING side of every split, after the splits are drawn, so the test sets
+    (and the control split's random draw) are exactly those of the other models.  Their labels are attached with the
+    same functions as the dataset's; variant / best-of-K labels they do not have are filled as missing."""
+    import dataclasses
+    import torch
+    from genstudy.data import family_of, num_qubits_of
+    directory = Path(directory)
+    graphs = torch.load(directory / "synth_graphs.pt", weights_only=False)
+    ref = dataset.data[0]
+    for g in graphs:      # the dataset graphs' bookkeeping fields (batching needs the same keys); not model inputs
+        f = g.y.view(-1).tolist()
+        g.target_label = DEVICE_NAMES[int(max(range(len(f)), key=f.__getitem__))]
+        g.scores_dict = dict(zip(DEVICE_NAMES, f))
+        g.compilation_time_dict = {d: float("nan") for d in DEVICE_NAMES}
+        g.expected_runtime_dict = {d: float("nan") for d in DEVICE_NAMES}
+        g.dag_preprocessing_time = float("nan")
+        g.feature_vec = torch.zeros_like(ref.feature_vec)
+    mini = argparse.Namespace(data=graphs, names=[g.circuit_name for g in graphs])
+    if args.layout_lambda:
+        attach_layouts(mini, directory / "synth_layouts.pt")
+    if args.calib_aug is not None:
+        attach_calib_aug(mini, args.calib_aug, args.aug_circuit_mod)
+    if args.delta_lambda:
+        for d in graphs:
+            d.y_ob = torch.full((1, len(DEVICE_NAMES)), -1.0)
+    if args.count_lambda:
+        attach_counts(mini, directory / "synth_counts.pt")
+    if args.esp_path is not None:
+        attach_esp(mini, directory / "synth_esp_labels.pt")
+    for flag in ("tvar_path", "struct_path", "usage_path", "usage_aug_path"):
+        if getattr(args, flag, None) is not None:
+            raise SystemExit(f"--extra-train does not provide the labels of --{flag.replace('_', '-')}")
+    missing = set(ref.keys()) - set(graphs[0].keys())
+    if missing:
+        raise SystemExit(f"--extra-train graphs lack {sorted(missing)}")
+    start = len(dataset.data)
+    dataset.data.extend(graphs)
+    dataset.names.extend(mini.names)
+    dataset.families.extend(family_of(n) for n in mini.names)
+    dataset.qubits.extend(num_qubits_of(n) for n in mini.names)
+    new = tuple(range(start, len(dataset.data)))
+    logger.info("Extra training circuits (%s): %d, added to the training side of %d split(s)", directory, len(new), len(splits))
+    return [dataclasses.replace(sp, train=tuple(sp.train) + new) for sp in splits]
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0],
                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -253,6 +300,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--esp-path", type=Path, default=None,
                    help="v13: ESP / duration / depth labels (compile_check/results/esp_labels.pt)")
     p.add_argument("--esp-lambda", type=float, default=None, help="v13: weight of the ESP / duration / depth loss")
+    p.add_argument("--extra-train", type=Path, default=None,
+                   help="v22: directory with synth_graphs.pt + labels (synthetic_routing/results), training side only")
     p.add_argument("--dur-corr-lambda", type=float, default=None,
                    help="v21: L2 penalty on the formula head's learned log-duration correction (duration -> schedule)")
     p.add_argument("--esp-place-lambda", type=float, default=None,
@@ -436,6 +485,10 @@ def main() -> int:
         cutoffs = [int(v) for v in args.max_train_qubits.split(",") if v.strip()]
         splits = [dataset.size_holdout_split(n) for n in cutoffs if lo <= n < hi]
         group_by = "qubits"
+
+    if args.extra_train is not None:
+        protocol["extra_train"] = str(args.extra_train)
+        splits = add_extra_train(dataset, splits, args.extra_train, args)
 
     completed, skipped = [], []
     for position, split in enumerate(splits, start=1):

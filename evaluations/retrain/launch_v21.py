@@ -22,6 +22,8 @@ ap.add_argument("--exclude", default="compute-3-1,compute-7-5,compute-7-6")
 ap.add_argument("--run", required=True); ap.add_argument("--partition", default="cpu_sapphire")
 ap.add_argument("--r-weight", type=float, default=None); ap.add_argument("--dur-corr", type=float, default=None)
 ap.add_argument("--label", default="v21")
+ap.add_argument("--extra-train", default=None, help="v22: synthetic_routing/results (training side only)")
+ap.add_argument("--after", default="", help="sbatch dependency (afterok) for the trainings, e.g. the synthetic merge job")
 ap.add_argument("--nodes", default="", help="comma list: pin the trainings round-robin to these idle nodes (-w)")
 ap.add_argument("--kind", default="sinkhorn_rf_route_czc_espfi",
                 help="*_espft (v21t): fixed decomposition table for the schedule of routing-free circuits")
@@ -42,12 +44,15 @@ for k, r in enumerate(rows):
         i = argv.index("--count-weights"); w = argv[i + 1].split(","); w[0] = str(a.r_weight); argv[i + 1] = ",".join(w)
     if a.dur_corr is not None:
         argv += ["--dur-corr-lambda", str(a.dur_corr)]
+    if a.extra_train:
+        argv += ["--extra-train", a.extra_train]
     assert (REPO / init).is_file(), init
     name = f"{a.label}_{r['run'].replace('v8kdi10', a.run)}_{r['split']}"
     wrap = ("export CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=8 MKL_NUM_THREADS=8; bash evaluations/retrain/run_one.sh "
             + shlex.join(["python3", "-u"] + argv))
     where = f"-w {nodes[k % len(nodes)]}" if nodes else f"--exclude={a.exclude}"
-    cmd = (f"sbatch --parsable -p {a.partition} {where} -c 8 --mem=10G -t 03:00:00 --job-name={name} "
+    dep = f"--dependency=afterok:{a.after} " if a.after else ""
+    cmd = (f"sbatch --parsable {dep}-p {a.partition} {where} -c 8 --mem=12G -t 03:00:00 --job-name={name} "
            f"-o evaluations/retrain/logs/%x_%j.log --wrap={shlex.quote(wrap)}")
     if a.dry_run:
         print(cmd[:900]); continue
@@ -66,6 +71,7 @@ if ids:
                                 f"--exclude={a.exclude} -c 8 --mem=14G -t 03:00:00 --job-name=eval_{a.run} "
                                 f"-o evaluations/retrain/logs/%x_%j.log --wrap={shlex.quote(ev)}",
                                 shell=True, cwd=REPO, text=True).strip()
-    line = (f"{a.label} {a.run} ({KIND}, from v19i; r count weight {a.r_weight}, duration-correction penalty {a.dur_corr}) "
+    line = (f"{a.label} {a.run} ({KIND}, from v19i; r count weight {a.r_weight}, duration-correction penalty {a.dur_corr}, "
+            f"extra train {a.extra_train}) "
             f"trainings {':'.join(ids)} eval {e}")
     print(line); (HERE / "eval_jobs.txt").open("a").write(line + "\n")

@@ -42,7 +42,7 @@ KINDS = {"v5_espa": "sinkhorn_espa", "v8a_espa": "sinkhorn_espa", "v8kdi10": "si
          "v8kdp10": "sinkhorn_rf_route_czc_espp",
          "v8kdfi10": "sinkhorn_rf_route_czc_espfi", "v8kdfw10": "sinkhorn_rf_route_czc_espfi",
          "v8kdfs10": "sinkhorn_rf_route_czc_espfi", "v8kdfr10": "sinkhorn_rf_route_czc_espfi",
-         "v8kdft10": "sinkhorn_rf_route_czc_espft"}
+         "v8kdft10": "sinkhorn_rf_route_czc_espft", "v8kdfx10": "sinkhorn_rf_route_czc_espft"}
 
 
 def choice(score, esp):

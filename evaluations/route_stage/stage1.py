@@ -1,0 +1,337 @@
+#!/usr/bin/env python3
+"""Stage 1 (v24): a graph network that learns Sabre's routing on the model's gate graph.
+
+Per gate and device it predicts the SWAPs Sabre puts on each operand's wire just before the gate (Poisson rate) and
+the extra wait of the gate (synchronisation with the SWAP partners), both supervised by compile_check/sabre_labels.py
+through prep.py.  The routed duration is then the ASAP schedule of the gates with those SWAPs and waits (``schedule``);
+routing-free cases keep the plain schedule (exact up to the decomposition table).  No compiler at prediction time:
+the only routing input is our own greedy router (``prior_s``, ``hops``).
+Stage 2 (same network, pooled head): log(final duration / routed schedule) per circuit and device, i.e. what
+translation + optimisation do to the routed schedule (target on Sabre's replayed schedule; routing-free: on the
+logical schedule).  Prediction = schedule(stage-1 SWAPs, waits) × exp(stage 2).
+
+Splits (``--split``):
+  loso:<structs>   development: test = synthetic circuits of those structures; qaoa and the variational group
+                   (vqe_*, qnn) are left out of training entirely, so the final splits stay unseen
+  qaoa | variational | control   the standard splits' test circuits (generalization_v10, seed-5 lists); for qaoa /
+                   variational every circuit of the held-out families is out of training
+    python stage1.py train --split loso:dense,complete --epochs 30 --out results/s1_loso
+    python stage1.py eval --split qaoa --ckpt results/s1_qaoa/model.pt
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import sys
+import time
+from collections import defaultdict
+from pathlib import Path
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+HERE = Path(__file__).resolve().parent
+EVAL = HERE.parent
+sys.path.insert(0, str(EVAL / "generalization_v3"))
+from gsv3 import paths  # noqa: E402
+paths.ensure_imports()
+from gsv3 import fast_encoding as fe  # noqa: E402
+from gsv3.model import GATE2IDX_MEASURE  # noqa: E402
+from torch_geometric.data import Data  # noqa: E402
+from torch_geometric.loader import DataLoader  # noqa: E402
+from torch_geometric.utils import scatter  # noqa: E402
+
+DEVS = ("EQE1_Top", "EQE1_Bottom", "QExa20")
+T1, TM, TCZ = 0.042, 15.0, 0.130
+T_SWAP = 3 * TCZ + 2 * T1
+VAR_FAMS = ("vqe_su2", "vqe_real_amp", "vqe_two_local", "qnn")
+SPLIT_LISTS = {"qaoa": "leave_one_family_out/qaoa", "variational": "leave_one_group_out/variational",
+               "control": "random_control/random_seed5"}
+
+
+def wire_feats(gq: np.ndarray, n_q: int) -> np.ndarray:
+    """(N, 9): per operand slot, log1p(multi-qubit gates on its wire), log1p(distinct partners), position on the wire."""
+    N = len(gq)
+    multi = (gq >= 0).sum(1) >= 2
+    cnt = np.zeros(n_q); partners = [set() for _ in range(n_q)]
+    for i in np.nonzero(multi)[0]:
+        qs = [q for q in gq[i] if q >= 0]
+        for q in qs:
+            cnt[q] += 1; partners[q].update(x for x in qs if x != q)
+    seen = np.zeros(n_q)
+    out = np.zeros((N, 9), np.float32)
+    for i in range(N):
+        for k in range(3):
+            q = gq[i, k]
+            if q < 0:
+                continue
+            out[i, 3 * k] = np.log1p(cnt[q]); out[i, 3 * k + 1] = np.log1p(len(partners[q]))
+            out[i, 3 * k + 2] = seen[q] / max(cnt[q], 1)
+        if multi[i]:
+            for q in gq[i]:
+                if q >= 0:
+                    seen[q] += 1
+    return out
+
+
+def node_t(g, tr, tc):
+    U = len(fe.UNIQUE)
+    oh = g.x[:, :U].numpy()
+    meas = g.x[:, GATE2IDX_MEASURE].numpy() > 0.5
+    gq = g.gate_qubits.numpy()
+    n_op = np.clip((gq >= 0).sum(1), 1, None)
+    return np.where(meas, TM, (oh @ tr) * T1 / n_op + (oh @ tc) * TCZ).astype(np.float32)
+
+
+def build(graphs, s1, tr, tc):
+    """PyG items with the stage-1 features and targets (routing-free devices are masked out of the loss)."""
+    items = []
+    for g in graphs:
+        lab = s1.get(g.circuit_name)
+        if lab is None:
+            continue
+        gq = g.gate_qubits.numpy()
+        n_q = int(g.n_qubits)
+        dev_f = torch.cat([torch.log1p(lab["hops"].clamp(min=0)).t(), torch.log1p(lab["prior_s"]).permute(1, 0, 2).reshape(-1, 9)], 1)
+        routed = (~lab["rf"]) & torch.isfinite(lab["replay"]) & lab["aligned"]
+        t_np = node_t(g, tr, tc)
+        meas = g.x[:, GATE2IDX_MEASURE].numpy() > 0.5
+        logical = schedule_np(gq, t_np, np.zeros((len(gq), 3)), np.zeros(len(gq)), np.zeros(len(gq), bool))
+        base = torch.where(routed, lab["replay"], torch.full_like(lab["replay"], logical))
+        ok2 = (routed | lab["rf"]) & (lab["final"] > 0)
+        items.append(Data(x=g.x.float(), edge_index=g.edge_index, gate_qubits=g.gate_qubits, n_qubits=g.n_qubits,
+                          wf=torch.from_numpy(wire_feats(gq, n_q)), dev_f=dev_f.float(), t=torch.from_numpy(t_np),
+                          c2=torch.where(ok2, torch.log(lab["final"].clamp(min=1e-3) / base.clamp(min=1e-3)), torch.zeros_like(base)).view(1, -1).float(),
+                          ok2=ok2.view(1, -1), logical=torch.tensor([[logical]], dtype=torch.float),
+                          s=lab["s"].permute(1, 0, 2).float(), wait=lab["wait"].t().float(), m=lab["m"].t(),
+                          routed=routed.view(1, -1), rf=lab["rf"].view(1, -1), final=lab["final"].view(1, -1),
+                          replay=lab["replay"].view(1, -1), prior_dur=lab["prior_dur"].view(1, -1),
+                          name=g.circuit_name, num_nodes=g.num_nodes))
+    return items
+
+
+class Stage1(nn.Module):
+    def __init__(self, f_in: int, hidden: int = 96, layers: int = 6, n_dev: int = 3):
+        super().__init__()
+        self.inp = nn.Sequential(nn.Linear(f_in, hidden), nn.SiLU(), nn.Linear(hidden, hidden))
+        self.layers = nn.ModuleList([nn.Sequential(nn.Linear(4 * hidden, hidden), nn.SiLU(), nn.Linear(hidden, hidden))
+                                     for _ in range(layers)])
+        self.norms = nn.ModuleList([nn.LayerNorm(hidden) for _ in range(layers)])
+        self.dev = nn.Embedding(n_dev, 16)
+        self.head = nn.Sequential(nn.Linear(hidden + 16 + 4, hidden), nn.SiLU(), nn.Linear(hidden, 4))
+        self.head2 = nn.Sequential(nn.Linear(2 * hidden + 16, hidden), nn.SiLU(), nn.Linear(hidden, 1))   # stage 2
+        self.n_dev = n_dev
+
+    def forward(self, b):
+        x = torch.cat([b.x, b.wf, b.dev_f], 1)
+        h = self.inp(x)
+        src, dst = b.edge_index
+        for lay, nrm in zip(self.layers, self.norms):
+            fwd = scatter(h[src], dst, 0, dim_size=h.size(0), reduce="mean")          # from predecessors
+            bwd = scatter(h[dst], src, 0, dim_size=h.size(0), reduce="mean")          # from successors
+            glob = scatter(h, b.batch, 0, reduce="mean")[b.batch]
+            h = nrm(h + lay(torch.cat([h, fwd, bwd, glob], 1)))
+        N = h.size(0)
+        outs = []
+        for d in range(self.n_dev):
+            df = torch.cat([b.dev_f[:, d: d + 1], b.dev_f[:, 3 + 3 * d: 6 + 3 * d]], 1)
+            z = torch.cat([h, self.dev.weight[d].expand(N, -1), df], 1)
+            outs.append(self.head(z))
+        o = torch.stack(outs, 1)                                                     # (N, D, 4)
+        pooled = torch.cat([scatter(h, b.batch, 0, reduce="mean"), scatter(h, b.batch, 0, reduce="max")], 1)
+        c2 = torch.cat([self.head2(torch.cat([pooled, self.dev.weight[d].expand(pooled.size(0), -1)], 1))
+                        for d in range(self.n_dev)], 1)                              # (B, D) log(final / base)
+        return F.softplus(o[..., :3]), o[..., 3], c2                                  # SWAP rates, wait / T_SWAP, stage 2
+
+
+def losses(b, rate, wait, c2):
+    gq = b.gate_qubits
+    slot_ok = (gq >= 0)                                                                # (N, 3)
+    n_op = slot_ok.sum(1)
+    meas = b.x[:, GATE2IDX_MEASURE] > 0.5
+    elig = ((n_op >= 2) | meas).view(-1, 1)                                            # gates that carry SWAP labels
+    routed = b.routed[b.batch]                                                         # (N, D)
+    ms = (routed & elig).unsqueeze(-1) & slot_ok.unsqueeze(1)                         # (N, D, 3)
+    l_s = (F.poisson_nll_loss(rate, b.s, log_input=False, reduction="none") * ms).sum() / ms.sum().clamp(min=1)
+    mw = routed & b.m
+    l_w = (F.huber_loss(wait, b.wait / T_SWAP, reduction="none", delta=1.0) * mw).sum() / mw.sum().clamp(min=1)
+    l_c = (F.huber_loss(c2, b.c2, reduction="none", delta=0.2) * b.ok2).sum() / b.ok2.sum().clamp(min=1)
+    return l_s, l_w, l_c
+
+
+def schedule_np(gq, t, s, wait, use_wait):
+    """Sequential ASAP over the gates: SWAPs before a gate occupy its wires, plus the gate's wait."""
+    last = {}
+    end = 0.0
+    for i in range(len(gq)):
+        qs = [int(q) for q in gq[i] if q >= 0]
+        if not qs:
+            continue
+        ready = max(last.get(q, 0.0) + s[i, k] * T_SWAP for k, q in enumerate(qs))
+        st = ready + (wait[i] if use_wait[i] else 0.0)
+        e = max(st, max(last.get(q, 0.0) for q in qs)) + t[i]
+        for q in qs:
+            last[q] = e
+        end = max(end, e)
+    return end
+
+
+@torch.no_grad()
+def evaluate(model, items, bs=32):
+    model.eval()
+    rows = []
+    for s0 in range(0, len(items), bs):
+        b = next(iter(DataLoader(items[s0: s0 + bs], batch_size=bs)))
+        rate, wait, c2 = model(b)
+        ptr = b.ptr.tolist()
+        for i in range(len(ptr) - 1):
+            a, e = ptr[i], ptr[i + 1]
+            it = items[s0 + i]
+            gq = it.gate_qubits.numpy(); t = it.t.numpy()
+            meas = it.x[:, GATE2IDX_MEASURE].numpy() > 0.5
+            elig = ((gq >= 0).sum(1) >= 2) | meas
+            for d in range(len(DEVS)):
+                if bool(it.rf[0, d]):
+                    zero = np.zeros((len(gq), 3))
+                    p0 = schedule_np(gq, t, zero, np.zeros(len(gq)), elig)
+                    rows.append({"name": it.name, "d": d, "rf": True, "final": float(it.final[0, d]),
+                                 "pred1": p0, "pred": p0 * math.exp(float(c2[i, d]))})
+                    continue
+                if not bool(it.routed[0, d]):
+                    continue
+                r = rate[a:e, d].numpy() * elig[:, None]
+                w = wait[a:e, d].numpy() * T_SWAP
+                s_true = it.s[:, d].numpy(); w_true = it.wait[:, d].numpy()
+                p1 = schedule_np(gq, t, r, w, elig)
+                rows.append({"name": it.name, "d": d, "rf": False, "final": float(it.final[0, d]),
+                             "replay": float(it.replay[0, d]), "prior": float(it.prior_dur[0, d]),
+                             "pred1": p1, "pred": p1 * math.exp(float(c2[i, d])),
+                             "replay_c2": float(it.replay[0, d]) * math.exp(float(c2[i, d])),
+                             "pred_nowait": schedule_np(gq, t, r, w, np.zeros(len(gq), bool)),
+                             "oracle_s": schedule_np(gq, t, s_true, w_true, np.zeros(len(gq), bool)),
+                             "oracle_sw": schedule_np(gq, t, s_true, w_true, elig),
+                             "sw_pred": float(r.sum()), "sw_true": float(s_true.sum())})
+    return rows
+
+
+def summary(rows):
+    out = {}
+    rt = [r for r in rows if not r["rf"]]
+    for grp, sel in (("routed", rt), ("routing-free", [r for r in rows if r["rf"]])):
+        if not sel:
+            continue
+        fin = np.array([r["final"] for r in sel])
+        res = {"n": len(sel)}
+        keys = ("pred", "pred1", "pred_nowait", "oracle_s", "oracle_sw", "replay", "replay_c2", "prior") if grp == "routed" else ("pred", "pred1")
+        for k in keys:
+            p = np.array([r[k] for r in sel])
+            e = np.abs(p / fin - 1)
+            res[k] = {"err": float(np.median(e)), "p90": float(np.percentile(e, 90)), "bias": float(np.median(p / fin)),
+                      "w10": float((e < 0.1).mean())}
+        if grp == "routed":
+            sp, st = np.array([r["sw_pred"] for r in sel]), np.array([r["sw_true"] for r in sel])
+            res["swaps"] = {"err": float(np.median(np.abs(sp / np.maximum(st, 1) - 1))), "bias": float(np.median(sp / np.maximum(st, 1))),
+                            "corr_log": float(np.corrcoef(np.log1p(sp), np.log1p(st))[0, 1])}
+        out[grp] = res
+    return out
+
+
+def split_names(split: str, names: list[str]):
+    fam = lambda n: n.split("/")[0]
+    if split.startswith("loso:"):
+        structs = split[5:].split(",")
+        test = [n for n in names if fam(n) == "synth" and n.split("/")[1].split("_")[1] in structs]
+        train = [n for n in names if fam(n) != "qaoa" and fam(n) not in VAR_FAMS and n not in set(test)]
+        return train, test
+    lst = json.loads((EVAL / f"generalization_v10/results/v8kdfi10/{SPLIT_LISTS[split]}/predictions.json").read_text())
+    test = [n for n in lst if n in set(names)]
+    if split == "control":
+        tset = set(test)
+        return [n for n in names if n not in tset], test
+    held = {fam(n) for n in test}
+    return [n for n in names if fam(n) not in held], test
+
+
+def load_all(path: Path):
+    s1 = torch.load(path, weights_only=False)
+    graphs = torch.load(paths.DATA_DIR / "graph_dataset_expected_fidelity.pt", weights_only=False)
+    graphs += torch.load(EVAL / "synthetic_routing/results/synth_graphs.pt", weights_only=False)
+    graphs = [g for g in graphs if g.circuit_name in s1]
+    tab = json.loads((EVAL / "esp/results/decomp_table.json").read_text())
+    U = list(fe.UNIQUE)
+    tr = np.array([tab.get(u, {"r": 0})["r"] for u in U], float)
+    tc = np.array([tab.get(u, {"cz": 0})["cz"] for u in U], float)
+    items = build(graphs, s1, tr, tc)
+    return {it.name: it for it in items}
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("cmd", choices=("train", "eval"))
+    ap.add_argument("--split", default="loso:dense,complete")
+    ap.add_argument("--epochs", type=int, default=30)
+    ap.add_argument("--lr", type=float, default=2e-3)
+    ap.add_argument("--hidden", type=int, default=96)
+    ap.add_argument("--layers", type=int, default=6)
+    ap.add_argument("--wait-lambda", type=float, default=0.3)
+    ap.add_argument("--c2-lambda", type=float, default=1.0)
+    ap.add_argument("--bs", type=int, default=32)
+    ap.add_argument("--seed", type=int, default=5)
+    ap.add_argument("--threads", type=int, default=8)
+    ap.add_argument("--out", type=Path, default=HERE / "results/s1")
+    ap.add_argument("--ckpt", type=Path, default=None)
+    ap.add_argument("--data", type=Path, default=HERE / "results/stage1.pt")
+    args = ap.parse_args()
+    torch.set_num_threads(args.threads)
+    torch.manual_seed(args.seed); np.random.seed(args.seed)
+    data = load_all(args.data)
+    train_n, test_n = split_names(args.split, sorted(data))
+    rng = np.random.default_rng(args.seed)
+    train_n = list(rng.permutation(train_n))
+    n_val = max(1, len(train_n) // 20)
+    val_n, train_n = train_n[:n_val], train_n[n_val:]
+    print(f"split {args.split}: train {len(train_n)}, val {len(val_n)}, test {len(test_n)}", flush=True)
+    f_in = data[train_n[0]].x.size(1) + 9 + 12
+    model = Stage1(f_in, args.hidden, args.layers)
+    args.out.mkdir(parents=True, exist_ok=True)
+    if args.cmd == "train":
+        opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
+        sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=args.lr, total_steps=args.epochs * math.ceil(len(train_n) / args.bs))
+        tr_items = [data[n] for n in train_n]
+        best, hist = float("inf"), []
+        for ep in range(args.epochs):
+            model.train()
+            t0 = time.time(); tot = defaultdict(float); nb = 0
+            for b in DataLoader(tr_items, batch_size=args.bs, shuffle=True):
+                l_s, l_w, l_c = losses(b, *model(b))
+                loss = l_s + args.wait_lambda * l_w + args.c2_lambda * l_c
+                opt.zero_grad(); loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                opt.step(); sched.step()
+                tot["s"] += l_s.item(); tot["w"] += l_w.item(); tot["c"] += l_c.item(); nb += 1
+            model.eval()
+            with torch.no_grad():
+                vl = []
+                for b in DataLoader([data[n] for n in val_n], batch_size=args.bs):
+                    l_s, l_w, l_c = losses(b, *model(b)); vl.append((l_s + args.wait_lambda * l_w + args.c2_lambda * l_c).item())
+            v = float(np.mean(vl))
+            hist.append({"epoch": ep, "train_s": tot["s"] / nb, "train_w": tot["w"] / nb, "train_c": tot["c"] / nb, "val": v,
+                         "sec": time.time() - t0})
+            print(json.dumps(hist[-1]), flush=True)
+            if v < best:
+                best = v; torch.save(model.state_dict(), args.out / "model.pt")
+        (args.out / "history.json").write_text(json.dumps(hist))
+    ckpt = args.ckpt or args.out / "model.pt"
+    model.load_state_dict(torch.load(ckpt, map_location="cpu"))
+    rows = evaluate(model, [data[n] for n in test_n])
+    res = {"split": args.split, "n_test_circuits": len(test_n), **summary(rows)}
+    (args.out / f"eval_{args.split.replace(':', '_').replace(',', '-')}.json").write_text(json.dumps(res, indent=1))
+    torch.save(rows, args.out / f"rows_{args.split.replace(':', '_').replace(',', '-')}.pt")
+    print(json.dumps(res, indent=1))
+
+
+if __name__ == "__main__":
+    main()

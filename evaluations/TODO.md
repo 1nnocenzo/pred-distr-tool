@@ -159,6 +159,30 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
       NOT to do: Qiskit's SabreSwap pass as a feature (user does not agree: it is part of the compiler).
       Results expected from the queue: v21w / v21t / v22 evaluations, intervals (`report_esp_interval_v10_v22.md`),
       routed breakdowns (`report_esp_routed_v10_v21.md`, `_v22.md`).
+- [ ] **v24: two-stage routed duration (2026-10-13, `route_stage/`)**. Stage 1 = graph network that learns
+      Sabre's routing (SWAPs per operand wire + extra wait per gate, Poisson / Huber), supervised by
+      `compile_check/sabre_labels.py`; the duration is the ASAP schedule with those SWAPs; stage 2 = pooled
+      log-correction for translation + optimisation. Sabre is a training target only, never an input
+      (no compiler at prediction time).
+      - Sabre labels, full dataset (`compile_check/results/sabre_labels/report.md`): 32,895 circuits, 0 failed,
+        71,222 routed cases. Even with Sabre's true SWAPs the wire schedule is 12–22% off, biased low
+        (0.78–0.88); replaying the routed circuit is 1–6% → the rest is translation / optimisation (stage 2).
+        **Open:** the final duration matches `esp_labels.pt` within 0.1% in only 58% of cases (median |Δ| 0)
+        → `claude_scratch/label_mismatch.py` queued (1996865).
+      - Stage 1, seed 5, 20 epochs (val loss still falling), routed duration median error [p90] / bias:
+        control 0.084 [0.263] / 0.98, qaoa 0.153 [0.329] / 0.85 (without stage 2: 0.127), variational
+        0.094 [0.307] / 0.93, LOSO dense+complete 0.201 / 0.80. Routing-free 0.003–0.022.
+        SWAP total over-counted ×1.4–2.0 (median ratio) while log-correlation is 0.94–0.99, and yet the
+        duration is low → scale/schedule mismatch. Stage 2 hurts on qaoa (0.127 → 0.153).
+        Not comparable with v22 (v22 pools 3 seeds; v24 is seed 5 only) — evaluate on the same test first.
+      - ESP oracle (`route_stage/results/esp_oracle.md`): decay = k · Σ idle × mean 1/min(T1,T2) of the device
+        gives |Δ log ESP| median 1.4% / 1.3% / 0.7% (control / qaoa / variational) vs 2.2–2.6% from n·duration;
+        the best-T qubits are worse than the device mean. → with the right schedule, ESP follows.
+      - **Next (queued, `route_stage/diag_scale.py`, jobs 1996862–4):** per-slot rate calibration, mass on
+        zero-SWAP slots (softplus floor), mean vs median of the totals, duration from Poisson samples vs from
+        mean rates (Jensen: schedule of the means < mean of the schedules), attribution SWAPs vs waits.
+        Then fix (MC sampling at prediction, or zero-inflated rate / direct duration loss), 40 epochs,
+        3 seeds, evaluation on the same test as v22.
 - [ ] **More devices and topologies**: generalise ESP and duration to more chips (other coupling maps,
       sizes, native gates, gate times); new labels for the dataset and the synthetic circuits on them;
       leave-one-device-out next to LOFO / LOGO.

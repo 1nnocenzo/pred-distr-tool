@@ -272,11 +272,13 @@ def cmd_report(_args):
             for k in rk:
                 p = np.array([r[k] for r in rs])
                 i, j = np.triu_indices(len(rs), 1)
-                rk[k].append((np.argmin(p) == np.argmin(fin), fin[np.argmin(p)] / fin.min() - 1,
-                              np.mean(np.sign(p[i] - p[j]) == np.sign(fin[i] - fin[j])),
-                              np.median(np.abs(np.log(p[i] / p[j]) - np.log(fin[i] / fin[j]))), all(r["rf"] for r in rs)))
+                far = np.abs(fin[i] / fin[j] - 1) > 0.01                                 # ties (identical chips) left out
+                rk[k].append((fin[np.argmin(p)] <= fin.min() * 1.001, fin[np.argmin(p)] / fin.min() - 1,
+                              np.mean(np.sign(p[i] - p[j])[far] == np.sign(fin[i] - fin[j])[far]) if far.any() else np.nan,
+                              np.median(np.abs(np.log(p[i] / p[j]) - np.log(fin[i] / fin[j]))), all(r["rf"] for r in rs),
+                              np.mean(fin / fin.min() - 1)))
                 if np.isfinite(fds).all():
-                    rk_ds[k].append((np.argmin(p) == np.argmin(fds), fds[np.argmin(p)] / fds.min() - 1, False, 0, all(r["rf"] for r in rs)))
+                    rk_ds[k].append((fds[np.argmin(p)] <= fds.min() * 1.001, fds[np.argmin(p)] / fds.min() - 1, 0, 0, all(r["rf"] for r in rs), 0))
         for k, v in rk.items():
             if not v:
                 continue
@@ -284,12 +286,14 @@ def cmd_report(_args):
             mixed = a[:, 4] < 0.5
             vd = np.array(rk_ds[k], float) if rk_ds[k] else None
             rk_rows.append([split, k, len(a), int(mixed.sum()), f"{100 * a[mixed, 0].mean():.0f}%", f"{100 * a[mixed, 1].mean():.2f}%",
-                            f"{100 * a[mixed, 2].mean():.0f}%", f"{100 * np.median(a[mixed, 3]):.1f}%",
+                            f"{100 * a[mixed, 5].mean():.2f}%", f"{100 * np.nanmean(a[mixed, 2]):.0f}%", f"{100 * np.median(a[mixed, 3]):.1f}%",
                             f"{100 * vd[vd[:, 4] < 0.5, 0].mean():.0f}% / {100 * vd[vd[:, 4] < 0.5, 1].mean():.2f}%" if vd is not None and (vd[:, 4] < 0.5).any() else "–"])
     L += ["## Device choice by duration (circuits with ≥ 2 devices and at least one routed)", "",
           "Fastest device picked by the prediction vs the true fastest (Sabre final; last column vs the dataset label). "
-          "Regret = extra duration of the picked device, mean. Ratio error = median |log(pred_a/pred_b) − log(true_a/true_b)|.", "",
-          md(["split", "model", "circuits × seeds", "with a routed device", "right device", "regret", "pairs in right order",
+          "Right = picked device within 0.1% of the fastest (ties count as right). Regret = extra duration of the picked device, mean; "
+          "random = mean regret of a random device. Pairs in right order: pairs more than 1% apart. "
+          "Ratio error = median |log(pred_a/pred_b) − log(true_a/true_b)|.", "",
+          md(["split", "model", "circuits × seeds", "with a routed device", "right device", "regret", "random regret", "pairs in right order",
               "ratio error", "vs dataset: right / regret"], rk_rows), ""]
     (RES / "report_analysis_v24.md").write_text("\n".join(L))
     print("\n".join(L))

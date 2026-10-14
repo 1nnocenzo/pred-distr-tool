@@ -2,7 +2,7 @@
 # v24 routing stage on a machine without SLURM (see RUNBOOK.md). With the pred-distr env active:
 #   bash evaluations/route_stage/run_local.sh smoke | diag | mc | train | report | all
 # Env: THREADS (torch threads per process, 8), JOBS (trainings in parallel, 1), DEVICE (cpu | cuda, cpu),
-#      EPOCHS (40), SEEDS ("5 6 7"), MC (Poisson samples per schedule, 24)
+#      EPOCHS (40), SEEDS ("5 6 7"), MC (Poisson samples per schedule, 24), GPUS ("0 1": trainings spread round-robin)
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 cd "$HERE"
@@ -39,10 +39,12 @@ mc() {      # seed-5 checkpoints re-evaluated: sampled SWAPs + dataset target
 
 train() {   # v24b = v24 with EPOCHS epochs, 3 seeds, evaluated with MC and on the dataset target
     : > "$LOGS/train_cmds.txt"
+    local gpus=(${GPUS:-}) i=0 pre=""
     for seed in $SEEDS; do for s in $SPLITS; do
         out=results/v24b_$(name $s)_s$seed
         [ -f "$out/eval_$(name $s | sed 's/_dense_complete/_dense-complete/').json" ] && continue    # done already
-        echo "python3 -u stage1.py train --split $s --epochs $EPOCHS --seed $seed --out $out --mc $MC --esp-labels $LAB --device $DEVICE --threads $THREADS > $LOGS/train_$(name $s)_s$seed.log 2>&1 && echo 'train $s s$seed done'" >> "$LOGS/train_cmds.txt"
+        [ ${#gpus[@]} -gt 0 ] && pre="CUDA_VISIBLE_DEVICES=${gpus[i++ % ${#gpus[@]}]} "
+        echo "${pre}python3 -u stage1.py train --split $s --epochs $EPOCHS --seed $seed --out $out --mc $MC --esp-labels $LAB --device $DEVICE --threads $THREADS > $LOGS/train_$(name $s)_s$seed.log 2>&1 && echo 'train $s s$seed done'" >> "$LOGS/train_cmds.txt"
     done; done
     xargs -P "$JOBS" -I{} bash -c '{}' < "$LOGS/train_cmds.txt"
 }

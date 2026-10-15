@@ -155,9 +155,13 @@ def schedule(tc, target) -> tuple[dict, dict, float]:
     clock, busy = {}, {}
     for inst in tc.data:
         name = inst.operation.name
-        if name in ("barrier", "id"):
+        if name == "id":
             continue
         qs = tuple(tc.find_bit(q).index for q in inst.qubits)
+        if name == "barrier":            # a sync point in Qiskit's estimate_duration (MQT's ESP duration)
+            s = max(clock.get(q, 0.0) for q in qs)
+            clock.update({q: s for q in qs})
+            continue
         d = float(target[name][qs].duration)
         s = max(clock.get(q, 0.0) for q in qs)
         for q in qs:

@@ -77,6 +77,28 @@ def wire_feats(gq: np.ndarray, n_q: int) -> np.ndarray:
     return out
 
 
+def wire_prev(gq: np.ndarray):
+    """(N, 3) index of the previous gate on each operand's wire (-1: none) and (N,) topological level (longest chain
+    of wire predecessors): the gates of one level can be scheduled together (v25 differentiable schedule)."""
+    N = len(gq)
+    prev = np.full((N, 3), -1, np.int64)
+    lvl = np.zeros(N, np.int64)
+    last = {}
+    for i in range(N):
+        best = -1
+        for k in range(gq.shape[1]):
+            q = int(gq[i, k])
+            if q < 0:
+                continue
+            p = last.get(q, -1)
+            prev[i, k] = p
+            if p >= 0:
+                best = max(best, int(lvl[p]))
+            last[q] = i
+        lvl[i] = best + 1
+    return prev, lvl
+
+
 def node_t(g, tr, tc):
     U = len(fe.UNIQUE)
     oh = g.x[:, :U].numpy()
@@ -102,7 +124,8 @@ def build(graphs, s1, tr, tc):
         logical = schedule_np(gq, t_np, np.zeros((len(gq), 3)), np.zeros(len(gq)), np.zeros(len(gq), bool))
         base = torch.where(routed, lab["replay"], torch.full_like(lab["replay"], logical))
         ok2 = (routed | lab["rf"]) & (lab["final"] > 0)
-        items.append(Data(x=g.x.float(), edge_index=g.edge_index, gate_qubits=g.gate_qubits, n_qubits=g.n_qubits,
+        prev, lvl = wire_prev(gq)
+        items.append(Data(prev=torch.from_numpy(prev), lvl=torch.from_numpy(lvl), x=g.x.float(), edge_index=g.edge_index, gate_qubits=g.gate_qubits, n_qubits=g.n_qubits,
                           wf=torch.from_numpy(wire_feats(gq, n_q)), dev_f=dev_f.float(), t=torch.from_numpy(t_np),
                           c2=torch.where(ok2, torch.log(lab["final"].clamp(min=1e-3) / base.clamp(min=1e-3)), torch.zeros_like(base)).view(1, -1).float(),
                           ok2=ok2.view(1, -1), logical=torch.tensor([[logical]], dtype=torch.float),
@@ -160,6 +183,42 @@ def losses(b, rate, wait, c2):
     l_w = (F.huber_loss(wait, b.wait / T_SWAP, reduction="none", delta=1.0) * mw).sum() / mw.sum().clamp(min=1)
     l_c = (F.huber_loss(c2, b.c2, reduction="none", delta=0.2) * b.ok2).sum() / b.ok2.sum().clamp(min=1)
     return l_s, l_w, l_c
+
+
+def schedule_torch(b, rate, wait):
+    """schedule_np in torch, all circuits of the batch and all devices at once, level by level (differentiable in the
+    SWAP rates and the waits): (B, D) durations of the mean-rate schedule."""
+    gq = b.gate_qubits
+    N, D = rate.shape[0], rate.shape[1]
+    off = b.ptr[:-1][b.batch].unsqueeze(1)                                            # local -> batch gate index
+    has = b.prev >= 0
+    gprev = torch.where(has, b.prev + off, torch.zeros_like(b.prev))
+    slot = gq >= 0
+    meas = b.x[:, GATE2IDX_MEASURE] > 0.5
+    elig = (slot.sum(1) >= 2) | meas
+    end = rate.new_zeros(N, D)
+    neg = torch.finfo(rate.dtype).min / 4
+    for L in range(int(b.lvl.max()) + 1):
+        idx = (b.lvl == L).nonzero(as_tuple=True)[0]
+        if idx.numel() == 0:
+            continue
+        last = torch.where(has[idx].unsqueeze(1), end[gprev[idx]].transpose(1, 2), rate.new_zeros(()))   # (n, D, 3)
+        sl = slot[idx].unsqueeze(1)
+        sw = rate[idx] * (sl & elig[idx].view(-1, 1, 1)) * T_SWAP
+        ready = torch.where(sl, last + sw, rate.new_full((), neg)).amax(-1)               # (n, D)
+        st = ready + torch.where(elig[idx].unsqueeze(1), wait[idx] * T_SWAP, rate.new_zeros(()))
+        e = torch.maximum(st, torch.where(sl, last, rate.new_full((), neg)).amax(-1)) + b.t[idx].unsqueeze(1)
+        end = end.index_put((idx,), e)
+    return scatter(end, b.batch, 0, reduce="max")                                    # (B, D)
+
+
+def duration_loss(b, rate, wait):
+    """v25: Huber on log(schedule of the predicted SWAPs and waits / Sabre's replayed routed schedule), routed cases:
+    trains SWAPs and waits on what sets the duration (the critical path), not gate by gate."""
+    dur = schedule_torch(b, rate, wait)
+    m = b.routed & torch.isfinite(b.replay) & (b.replay > 0)
+    err = torch.log(dur.clamp(min=1e-3)) - torch.log(b.replay.clamp(min=1e-3))
+    return (F.huber_loss(err, torch.zeros_like(err), reduction="none", delta=0.2) * m).sum() / m.sum().clamp(min=1)
 
 
 def schedule_np(gq, t, s, wait, use_wait):
@@ -323,6 +382,9 @@ def main():
     ap.add_argument("--layers", type=int, default=6)
     ap.add_argument("--wait-lambda", type=float, default=0.3)
     ap.add_argument("--c2-lambda", type=float, default=1.0)
+    ap.add_argument("--dur-lambda", type=float, default=0.0,
+                    help="v25: weight of the loss on the routed duration through the differentiable schedule")
+    ap.add_argument("--dur-every", type=int, default=1, help="v25: duration loss on every k-th training batch (cost)")
     ap.add_argument("--bs", type=int, default=32)
     ap.add_argument("--seed", type=int, default=5)
     ap.add_argument("--threads", type=int, default=8)
@@ -357,10 +419,15 @@ def main():
         for ep in range(args.epochs):
             model.train()
             t0 = time.time(); tot = defaultdict(float); nb = 0
-            for b in DataLoader(tr_items, batch_size=args.bs, shuffle=True):
+            for bi, b in enumerate(DataLoader(tr_items, batch_size=args.bs, shuffle=True)):
                 b = b.to(args.device)
-                l_s, l_w, l_c = losses(b, *model(b))
+                rate, wait, c2 = model(b)
+                l_s, l_w, l_c = losses(b, rate, wait, c2)
                 loss = l_s + args.wait_lambda * l_w + args.c2_lambda * l_c
+                if args.dur_lambda and bi % args.dur_every == 0:
+                    l_d = duration_loss(b, rate, wait)
+                    loss = loss + args.dur_lambda * l_d
+                    tot["d"] += l_d.item(); tot["nd"] += 1
                 opt.zero_grad(); loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 opt.step(); sched.step()
@@ -370,9 +437,15 @@ def main():
                 vl = []
                 for b in DataLoader([data[n] for n in val_n], batch_size=args.bs):
                     b = b.to(args.device)
-                    l_s, l_w, l_c = losses(b, *model(b)); vl.append((l_s + args.wait_lambda * l_w + args.c2_lambda * l_c).item())
+                    rate, wait, c2 = model(b)
+                    l_s, l_w, l_c = losses(b, rate, wait, c2)
+                    v_ = l_s + args.wait_lambda * l_w + args.c2_lambda * l_c
+                    if args.dur_lambda:
+                        v_ = v_ + args.dur_lambda * duration_loss(b, rate, wait)
+                    vl.append(v_.item())
             v = float(np.mean(vl))
-            hist.append({"epoch": ep, "train_s": tot["s"] / nb, "train_w": tot["w"] / nb, "train_c": tot["c"] / nb, "val": v,
+            hist.append({"epoch": ep, "train_s": tot["s"] / nb, "train_w": tot["w"] / nb, "train_c": tot["c"] / nb,
+                         "train_d": tot["d"] / max(tot["nd"], 1), "val": v,
                          "sec": time.time() - t0})
             print(json.dumps(hist[-1]), flush=True)
             if v < best:

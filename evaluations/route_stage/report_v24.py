@@ -38,13 +38,13 @@ def fmt(vals, pct=True):
 
 def model_rows():
     runs = defaultdict(lambda: defaultdict(list))          # (label) -> split -> [eval dict]
-    for p in sorted(RES.glob("v24*/eval_*.json")):
+    for p in sorted(list(RES.glob("v24*/eval_*.json")) + list(RES.glob("v25*/eval_*.json"))):
         m = re.match(r"eval_(.+?)(_mc)?\.json$", p.name)
         if not m or m.group(1) not in SPLITS:
             continue
         run = re.sub(r"_s\d+$", "", p.parent.name)
-        run = "v24b" if run.startswith("v24b") else "v24"
-        mc = bool(m.group(2)) or (run == "v24b")
+        run = next((r for r in ("v25", "v24b") if run.startswith(r)), "v24")
+        mc = bool(m.group(2)) or (run in ("v24b", "v25"))
         runs[(run, mc)][m.group(1)].append(json.loads(p.read_text()))
     return runs
 

@@ -188,6 +188,15 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
         mean rates (Jensen: schedule of the means < mean of the schedules), attribution SWAPs vs waits.
         Then fix (MC sampling at prediction, or zero-inflated rate / direct duration loss), 40 epochs,
         3 seeds, evaluation on the same test as v22.
+- [ ] **v25 (2026-10-15): why routed durations are under-predicted, and the fix** (`route_stage/stage1.py --dur-lambda`).
+      Diagnosis from `route_stage/results/report_analysis_v24.md`: NOT the SWAP / CZ count (predicted SWAPs + true waits
+      5.2% qaoa / 4.5% LOSO, ≈ the 3.6% / 4.0% ceiling) but the waits: true SWAPs + predicted waits 12% / 18% (bias 0.88 /
+      0.84); critical-path waits true 18.7% / 22.9% of the duration, predicted 5.4% / 2.3%; per-gate wait corr 0.12 / 0.00.
+      The wait targets are teacher-forced per gate (64% negative on qaoa), so a per-gate Huber averages them to ~0.
+      v25 = v24b + Huber on log(schedule / Sabre's replay) through a differentiable level-wise schedule
+      (`schedule_torch`, identical to `schedule_np`): SWAPs and waits learn the critical path. Run off-cluster:
+      `run_local.sh smoke25` then `JOBS=3 run_local.sh train25` + `report`. Next if waits still lag: SWAPs that also
+      block the other logical qubits on their chip path (contention) from our greedy router.
 - [ ] **More devices and topologies**: generalise ESP and duration to more chips (other coupling maps,
       sizes, native gates, gate times); new labels for the dataset and the synthetic circuits on them;
       leave-one-device-out next to LOFO / LOGO.

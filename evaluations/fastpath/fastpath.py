@@ -302,6 +302,15 @@ def place(s: Structure, c: Calib, score: str = "vf2", max_ties: int = 64) -> lis
     return out
 
 
+def vf2_score(s: Structure, c: Calib, phys: np.ndarray) -> float:
+    """VF2Layout's average-error score (log of its fidelity estimate) of one placement of every row."""
+    sc = float(np.nansum(s.c1 * c.s1[phys]))
+    u, v, w = _pairs(s.c2)
+    if len(u):
+        sc += float((w * c.s2[phys[u], phys[v]]).sum())
+    return sc
+
+
 def evaluate(s: Structure, c: Calib, phys: np.ndarray) -> tuple[float, float]:
     """(log F, decay) of the structure on placement ``phys``: MQT's expected fidelity and ESP decay."""
     logf = float((s.r * np.nan_to_num(c.lr[phys])).sum() + (s.m * np.nan_to_num(c.lm[phys])).sum())

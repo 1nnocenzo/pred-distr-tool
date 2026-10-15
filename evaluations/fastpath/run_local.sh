@@ -2,6 +2,7 @@
 # Fast-path study on a machine without SLURM, with the pred-distr env active (qiskit 2.3.1, rustworkx, mqt.predictor):
 #   bash evaluations/fastpath/run_local.sh            # validate + predict in parallel, then report, merge, hybrid
 # Env: JOBS (parallel processes, 8), DATA_DIR (QASM circuits; default ~/compileCircuits/benchmark_dataset_30k,
+#      MODES ("validate predict"; "validate" for the validation only),
 #      else data/benchmark_dataset_30k, unpacked from data/circuits.zip if missing), N_PER_SPLIT (validation circuits per split, 60).
 # Without the models' predictions.json the circuits come from esp_labels.pt, split by family (run_fastpath.py --circuits).
 set -euo pipefail
@@ -17,7 +18,7 @@ if [ -z "${DATA_DIR:-}" ] && [ ! -d "$HOME/compileCircuits/benchmark_dataset_30k
 fi
 LOGS=evaluations/fastpath/local_logs
 mkdir -p "$LOGS"
-for mode in validate predict; do
+for mode in ${MODES:-validate predict}; do
   pids=()
   for i in $(seq 0 $((JOBS - 1))); do
     python3 -u evaluations/fastpath/run_fastpath.py $mode --task-id "$i" --n-tasks "$JOBS" "${ARGS[@]}" \

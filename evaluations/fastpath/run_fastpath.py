@@ -120,6 +120,14 @@ def fast_rows(qc, tc, tcomp, virt, bes, cal, d, s, aug, mode):
             lay = tv.layout.final_index_layout(filter_ancillas=True)
             row.update(F_true=ft, ESP_true=et, t_full=tf,
                        same_layout=all(lay[v] == p["layout"][v] for v in p["layout"]))
+            # why the placement differs: the compiler's placement scored and evaluated with the cached structure
+            c = cal[(d, key)]
+            ph_t = np.array([lay[v] for v in st.qubits])
+            ph_f = np.array([p["layout"][int(v)] for v in st.qubits])
+            lt, dt = fp.evaluate(st, c, ph_t)
+            row.update(d_score=fp.vf2_score(st, c, ph_f) - fp.vf2_score(st, c, ph_t), score_true=fp.vf2_score(st, c, ph_t),
+                       in_cache=bool((st.emb == ph_t[st.int_rows]).all(1).any()) if st.emb.shape[1] else True,
+                       logF_struct=lt, decay_struct=dt)
         elif key == "orig":
             row["F_true"], row["ESP_true"] = mqt(tc, bes[(d, key)], d)
         rows[str(key)] = row
@@ -279,6 +287,38 @@ def report(args) -> None:
         pr = fp.best_of([{"vals": [tuple(v) for v in per[s]["vals"]]} for s in seeds])
         tb = max(per.values(), key=lambda z: z["F_true"])
         bo.append((k, pr["F"], tb["F_true"], pr["ESP"], tb["ESP_true"], c, d))
+    # why the fast path misses: compiler's placement vs the fast path's, per seed
+    diag = [z for r in recs for x in r.get("dev", {}).values() for y in x["seeds"].values()
+            if y.get("found") and "cal" in y for z in y["cal"].values() if "d_score" in z]
+    if diag:
+        def lerr(z):
+            return abs(np.log(max(z["F"], 1e-300)) - np.log(max(z["F_true"], 1e-300)))
+        tol = lambda z: 1e-9 * max(1.0, abs(z["score_true"]))
+        cats = (("same placement as the compiler", lambda z: z["same_layout"]),
+                ("tie: same VF2 score, the compiler took another tied placement",
+                 lambda z: not z["same_layout"] and abs(z["d_score"]) <= tol(z)),
+                ("fast path scores higher: the compiler's search stopped early (call limit)",
+                 lambda z: not z["same_layout"] and z["d_score"] > tol(z)),
+                ("fast path scores lower, compiler's placement in the cache",
+                 lambda z: not z["same_layout"] and z["d_score"] < -tol(z) and z["in_cache"]),
+                ("fast path scores lower, compiler's placement NOT in the cache (embedding cap)",
+                 lambda z: not z["same_layout"] and z["d_score"] < -tol(z) and not z["in_cache"]))
+        L += ["## Why the placement differs", "",
+              "Each case: the compiler's own placement scored with VF2Layout's score and looked up in the cached embeddings. "
+              "Bias = median signed log F error (fast − true).", "",
+              "| cause | share of cases | abs log F error, median / p90 | bias |", "| --- | --- | --- | --- |"]
+        for lab, fn in cats:
+            g = [z for z in diag if fn(z)]
+            if g:
+                e = np.array([lerr(z) for z in g])
+                b = np.median([np.log(max(z["F"], 1e-300)) - np.log(max(z["F_true"], 1e-300)) for z in g])
+                L.append(f"| {lab} | {len(g) / len(diag):.1%} | {np.median(e):.1e} / {np.percentile(e, 90):.1e} | {b:+.1e} |")
+            else:
+                L.append(f"| {lab} | 0.0% | – | – |")
+        sc = np.array([abs(z["logF_struct"] - np.log(max(z["F_true"], 1e-300))) for z in diag if z["F_true"] > 1e-6])
+        L += ["", f"Structure check (cached structure evaluated on the compiler's own placement vs the true F): "
+              f"|Δ log F| median {np.median(sc):.1e}, p90 {np.percentile(sc, 90):.1e}, exact (< 1e-6) {np.mean(sc < 1e-6):.1%}. "
+              "Not exact = the compiled structure itself changes with the calibration (not a placement error).", ""]
     if bo:
         orig = {(c, d): (f, ft) for k, f, ft, e, et, c, d in bo if k == "orig"}
         x = [(np.log(f) - np.log(orig[(c, d)][0]), np.log(ft) - np.log(orig[(c, d)][1]))

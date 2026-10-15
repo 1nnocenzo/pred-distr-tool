@@ -457,10 +457,12 @@ def split_names(split: str, names: list[str]):
 
 def contention_table(graphs, tr, tc, cache: Path):
     """{circuit: (N, D) router contention wait} for every graph, computed once and cached (a few minutes)."""
-    if cache.is_file():
-        return torch.load(cache, weights_only=False)
+    out = torch.load(cache, weights_only=False) if cache.is_file() else {}
+    todo = [g for g in graphs if g.circuit_name not in out]
+    if not todo:
+        return out
+    graphs = todo
     chs = raw_chips()
-    out = {}
     t0 = time.time()
     for i, g in enumerate(graphs):
         gq = g.gate_qubits.numpy()
@@ -494,10 +496,19 @@ def retarget_stage2(data: dict, ds: dict) -> None:
     print(f"stage-2 target = dataset duration on {n_ok}/{n_all} (circuit, device) cases", flush=True)
 
 
-def load_all(path: Path, contention: bool = False):
+SYNTH2_GRAPHS = EVAL / "synthetic_routing/results/synth2_graphs.pt"
+
+
+def load_all(path: Path, contention: bool = False, synth2: bool = False):
     s1 = torch.load(path, weights_only=False)
+    if synth2:     # v27: + the low-parallelism synthetic class (synthetic_routing/synth_layered.py), training side only
+        extra = torch.load(path.parent / "stage1_synth2.pt", weights_only=False)
+        print(f"synth2: + {len(extra)} circuits (layered / seqdense)", flush=True)
+        s1.update(extra)
     graphs = torch.load(paths.DATA_DIR / "graph_dataset_expected_fidelity.pt", weights_only=False)
     graphs += torch.load(EVAL / "synthetic_routing/results/synth_graphs.pt", weights_only=False)
+    if synth2:
+        graphs += torch.load(SYNTH2_GRAPHS, weights_only=False)
     graphs = [g for g in graphs if g.circuit_name in s1]
     tab = json.loads((EVAL / "esp/results/decomp_table.json").read_text())
     U = list(fe.UNIQUE)
@@ -524,6 +535,8 @@ def main():
     ap.add_argument("--c2-target", choices=("sabre", "dataset"), default="sabre",
                     help="stage-2 target: Sabre's final duration (of the basis-converted circuit) or the dataset label "
                          "(esp_labels.pt, the original circuit; needs --esp-labels)")
+    ap.add_argument("--synth2", action="store_true",
+                    help="v27: add the low-parallelism synthetic circuits (stage1_synth2.pt) to the training side")
     ap.add_argument("--contention", action="store_true",
                     help="v26: our greedy router's contention wait per gate as input and as the base of the predicted wait")
     ap.add_argument("--bs", type=int, default=32)
@@ -540,7 +553,7 @@ def main():
     args = ap.parse_args()
     torch.set_num_threads(args.threads)
     torch.manual_seed(args.seed); np.random.seed(args.seed)
-    data = load_all(args.data, args.contention)
+    data = load_all(args.data, args.contention, args.synth2)
     if args.c2_target == "dataset":
         retarget_stage2(data, torch.load(args.esp_labels, weights_only=False))
     train_n, test_n = split_names(args.split, sorted(data))

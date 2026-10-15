@@ -83,6 +83,28 @@ smoke26() { # ~5 min after `contention`: 2 epochs of v26 on qaoa (prints the rou
         --esp-labels "$LAB" --device "$DEVICE" --threads "$THREADS" 2>&1 | tee "$LOGS/smoke26.log"
 }
 
+synth2() {  # CPU, once: the low-parallelism synthetic class (layered / seqdense), Sabre labels, stage-1 items
+    local n=${N_SYNTH2:-6000} j=${JOBS:-8} pids=()
+    for i in $(seq 0 $((j - 1))); do python3 -u ../synthetic_routing/synth_layered.py gen --task-id $i --n-tasks $j --n-circuits $n > "$LOGS/synth2_gen_$i.log" 2>&1 & pids+=($!); done
+    for p in "${pids[@]}"; do wait "$p"; done; pids=()
+    python3 -u ../synthetic_routing/synth_layered.py gen --merge | tee "$LOGS/synth2_merge.log"
+    for i in $(seq 0 $((j - 1))); do python3 -u ../synthetic_routing/synth_layered.py sabre --task-id $i --n-tasks $j > "$LOGS/synth2_sabre_$i.log" 2>&1 & pids+=($!); done
+    for p in "${pids[@]}"; do wait "$p"; done
+    python3 -u ../synthetic_routing/synth_layered.py prep | tee "$LOGS/synth2_prep.log"
+}
+
+train27() { # v27 = v25 + the synth2 circuits on the training side; + split loso:layered,seqdense (the new class held out)
+    : > "$LOGS/train27_cmds.txt"
+    local gpus=(${GPUS:-}) i=0 pre=""
+    for seed in $SEEDS; do for s in $SPLITS loso:layered,seqdense; do
+        out=results/v27_$(name $s)_s$seed
+        [ -f "$out/eval_$(name $s | sed 's/_dense_complete/_dense-complete/; s/_layered_seqdense/_layered-seqdense/').json" ] && continue
+        [ ${#gpus[@]} -gt 0 ] && pre="CUDA_VISIBLE_DEVICES=${gpus[i++ % ${#gpus[@]}]} "
+        echo "${pre}python3 -u stage1.py train --split $s --epochs $EPOCHS --seed $seed --out $out --dur-lambda ${DUR_LAMBDA:-1} --dur-every ${DUR_EVERY:-1} --c2-target ${C2_TARGET:-sabre} --synth2 --mc $MC --esp-labels $LAB --device $DEVICE --threads $THREADS > $LOGS/train27_$(name $s)_s$seed.log 2>&1 && echo 'train27 $s s$seed done'" >> "$LOGS/train27_cmds.txt"
+    done; done
+    xargs -P "$JOBS" -I{} bash -c '{}' < "$LOGS/train27_cmds.txt"
+}
+
 smoke25() { # ~5 min: 2 epochs of v25 on qaoa, 20 test circuits (checks speed and that the duration loss falls)
     python3 -u stage1.py train --split qaoa --epochs 2 --out results/smoke25 --dur-lambda 1 --max-test 20 --mc 4 \
         --esp-labels "$LAB" --device "$DEVICE" --threads "$THREADS" 2>&1 | tee "$LOGS/smoke25.log"
@@ -91,7 +113,7 @@ smoke25() { # ~5 min: 2 epochs of v25 on qaoa, 20 test circuits (checks speed an
 report() { python3 -u report_v24.py | tee "$LOGS/report.log"; }
 
 case ${1:-all} in
-    smoke) smoke ;; diag) diag ;; mc) mc ;; train) train ;; report) report ;; smoke25) smoke25 ;; train25) train25 ;; contention) contention ;; smoke26) smoke26 ;; train26) train26 ;;
+    smoke) smoke ;; diag) diag ;; mc) mc ;; train) train ;; report) report ;; smoke25) smoke25 ;; train25) train25 ;; contention) contention ;; smoke26) smoke26 ;; train26) train26 ;; synth2) synth2 ;; train27) train27 ;;
     all) smoke; diag; mc; report; train; report ;;
-    *) echo "usage: $0 smoke|diag|mc|train|report|smoke25|train25|contention|smoke26|train26|all"; exit 1 ;;
+    *) echo "usage: $0 smoke|diag|mc|train|report|smoke25|train25|contention|smoke26|train26|synth2|train27|all"; exit 1 ;;
 esac

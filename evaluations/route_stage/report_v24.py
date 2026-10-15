@@ -17,7 +17,7 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 RES = HERE / "results"
-SPLITS = ("control", "qaoa", "variational", "loso_dense-complete")
+SPLITS = ("control", "qaoa", "variational", "loso_dense-complete", "loso_layered-seqdense")
 
 
 def g(d, *ks):
@@ -38,13 +38,13 @@ def fmt(vals, pct=True):
 
 def model_rows():
     runs = defaultdict(lambda: defaultdict(list))          # (label) -> split -> [eval dict]
-    for p in sorted(list(RES.glob("v24*/eval_*.json")) + list(RES.glob("v25*/eval_*.json")) + list(RES.glob("v26*/eval_*.json"))):
+    for p in sorted(list(RES.glob("v24*/eval_*.json")) + list(RES.glob("v25*/eval_*.json")) + list(RES.glob("v26*/eval_*.json")) + list(RES.glob("v27*/eval_*.json"))):
         m = re.match(r"eval_(.+?)(_mc)?\.json$", p.name)
         if not m or m.group(1) not in SPLITS:
             continue
         run = re.sub(r"_s\d+$", "", p.parent.name)
-        run = next((r for r in ("v26", "v25", "v24b") if run.startswith(r)), "v24")
-        mc = bool(m.group(2)) or (run in ("v24b", "v25", "v26"))
+        run = next((r for r in ("v27", "v26", "v25", "v24b") if run.startswith(r)), "v24")
+        mc = bool(m.group(2)) or (run in ("v24b", "v25", "v26", "v27"))
         runs[(run, mc)][m.group(1)].append(json.loads(p.read_text()))
     return runs
 

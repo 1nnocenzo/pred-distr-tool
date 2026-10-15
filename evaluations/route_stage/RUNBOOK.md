@@ -33,6 +33,28 @@ JOBS=3 bash evaluations/route_stage/run_local.sh train   # v24b: 40 epochs x 3 s
   measured (whole dataset in memory: expect several GB); check the first run before raising `JOBS`.
 - `train` skips runs that already have their eval file, so it can be restarted.
 
+## TO LAUNCH (2026-10-15 evening): v27 = v25 + the low-parallelism synthetic class
+
+Why: v25 fixed unseen synthetic structures (13.8% -> 7.6%) and control (5.3% -> 3.3%) but not qaoa (13.9%, bias 0.86);
+randomcircuit, seen in training, is as bad. Both are dense, irregular, low-parallelism circuits repeating the same pairs
+(parallelism qaoa 0.46 / randomcircuit 0.32 vs 0.9 for the old synthetic circuits): that class was missing from training.
+`synthetic_routing/synth_layered.py` generates it (structures `layered` and `seqdense`, parallelism 0.36-0.38, density
+0.59, 2.5-4 gates per pair; without waits their schedule is 24% off, with true SWAPs + waits 4.4%: same signature as qaoa).
+Separate files, the bundle's data are not touched.
+
+```bash
+cd evaluations/route_stage
+PYTHONPATH=../../src python test_stage1.py                 # 10 s
+JOBS=8 bash run_local.sh synth2                             # CPU: 6000 circuits -> Sabre labels -> results/stage1_synth2.pt
+DEVICE=cuda GPUS="0 1" JOBS=4 bash run_local.sh train27     # 3 seeds x (4 splits + loso:layered,seqdense)
+bash run_local.sh report
+```
+
+`N_SYNTH2` changes the number of circuits (default 6000). Adopt v27 if qaoa drops clearly below v25's 13.9% (and its
+bias towards 1) with control / variational / LOSO not worse. Caveat for the paper: `layered` is the generic shape of
+qaoa-like circuits (random graphs, random rotation types), not the qaoa template; the new split loso:layered,seqdense
+shows how well the class itself generalises.
+
 ## TO LAUNCH (2026-10-15): v25 and v26, both
 
 Why: routed durations are under-predicted because of the waits, not the SWAPs (TODO.md, "v25"). Two fixes, run both

@@ -199,6 +199,13 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
       **v26 (written, to launch together with v25):** v25 + `--contention`: per gate the wait our greedy router pays
       when its SWAPs wait for / block the logical qubits on their chip path (`router_contention`, no compiler), as input
       and as the base of the predicted wait (the network learns the correction). Commands in `route_stage/RUNBOOK.md`.
+- [ ] **v25 / v26 results (2026-10-15):** v25 (duration loss) routed duration, sampled + stage 2, 3 seeds: LOSO dense,complete
+      13.8% -> 7.6% (bias 0.87 -> 1.05), control 5.3% -> 3.3%, variational 5.4% -> 5.7%, qaoa 13.7% -> 13.9% (bias 0.86).
+      v26 (router contention) = v25 everywhere, dropped: our greedy router is far from Sabre (its duration alone 56% off
+      on qaoa, 1.56x). qaoa: stage 2 adds ~4 points (10.0% -> 13.9%, wrong sign: final/replay 1.07 on heavy routing), stage 1
+      ~7% low. randomcircuit (seen) 13%, bias 0.87: a CLASS (dense, irregular, low parallelism, repeated pairs), not a
+      family. **v27 (to launch):** + `synth_layered.py` circuits of that class (route_stage/RUNBOOK.md). Sabre inside the
+      predictor: 75-87% of a full compile (qaoa 63 of 72 ms) -> not worth it; only as 'compile once' mode.
 - [ ] **qaoa label mismatch explained (2026-10-15, `compile_check/basis_mismatch.py`):** `sabre_labels.py` compiles the
       circuit AFTER `fast_encoding.to_basis` (gates outside the OpenQASM 3 basis are decomposed at level 0: qaoa `rzz` ->
       cx·rz·cx, bmw_quark `rxx`, randomcircuit's exotic gates), the dataset labels compile the ORIGINAL QASM. Same CZ

@@ -312,8 +312,9 @@ def duration_loss(b, rate, wait):
     trains SWAPs and waits on what sets the duration (the critical path), not gate by gate."""
     dur = schedule_torch(b, rate, wait)
     m = b.routed & torch.isfinite(b.replay) & (b.replay > 0)
-    err = torch.log(dur.clamp(min=1e-3)) - torch.log(b.replay.clamp(min=1e-3))
-    return (F.huber_loss(err, torch.zeros_like(err), reduction="none", delta=0.2) * m).sum() / m.sum().clamp(min=1)
+    replay = torch.where(m, b.replay, torch.ones_like(b.replay))      # NaN for routing-free cases: NaN * 0 is NaN
+    err = torch.where(m, torch.log(dur.clamp(min=1e-3)) - torch.log(replay.clamp(min=1e-3)), torch.zeros_like(dur))
+    return F.huber_loss(err, torch.zeros_like(err), reduction="none", delta=0.2).sum() / m.sum().clamp(min=1)
 
 
 def schedule_np(gq, t, s, wait, use_wait):

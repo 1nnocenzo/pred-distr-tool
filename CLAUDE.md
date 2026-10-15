@@ -199,5 +199,8 @@ Chain 2–6 after the candidate's control job so they run without supervision.
 - Claude pushes its own commits (`git push -u origin <branch>`) once the work is done and checked, so the
   user can pull and launch on the cluster; say which branch was pushed. Branches:
   `generalization-study` (open PR), `esp-depth` (ESP / duration / depth heads, branched from it).
+- Before pushing code that will run where Claude cannot test it (cluster, off-cluster machine), run a smoke test on
+  synthetic data with the real data's quirks (NaN labels of routing-free cases, masked devices, empty slots), e.g.
+  `PYTHONPATH=src python evaluations/route_stage/test_stage1.py`; masks use `torch.where`, never `x * mask` (NaN · 0 = NaN).
 - Commit finished results only (metrics, history, run logs; `.gitignore` drops `*.pth`, predictions,
   locks). Leave the user's own `.gitignore` edits and root-level scratch files alone.

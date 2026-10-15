@@ -53,6 +53,7 @@ bash run_local.sh report                  # results/report_v24.md
 | v25 | `--dur-lambda 1`: Huber on log(schedule / Sabre replay) through `schedule_torch` | routed error and bias on qaoa and LOSO | qaoa / LOSO < 10% and bias ≈ 1, control and variational not worse |
 | v26 | v25 + `--contention`: wait = router contention wait + learned correction | the heavy-routing bins (2q gates 100–500, SWAPs per 2q gate 1–2, routing share 0.4–0.8) | those bins < 12% where v25 stays > 15% |
 
+Before launching after a code change: `PYTHONPATH=../../src python test_stage1.py` (~10 s, no data needed).
 `train25` / `train26` skip runs that already have their eval file; `DUR_EVERY=2` halves the cost of the duration loss
 if an epoch is too slow (the schedule is computed level by level).
 

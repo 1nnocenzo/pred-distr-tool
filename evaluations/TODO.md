@@ -199,6 +199,15 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
       **v26 (written, to launch together with v25):** v25 + `--contention`: per gate the wait our greedy router pays
       when its SWAPs wait for / block the logical qubits on their chip path (`router_contention`, no compiler), as input
       and as the base of the predicted wait (the network learns the correction). Commands in `route_stage/RUNBOOK.md`.
+- [ ] **qaoa label mismatch explained (2026-10-15, `compile_check/basis_mismatch.py`):** `sabre_labels.py` compiles the
+      circuit AFTER `fast_encoding.to_basis` (gates outside the OpenQASM 3 basis are decomposed at level 0: qaoa `rzz` ->
+      cx·rz·cx, bmw_quark `rxx`, randomcircuit's exotic gates), the dataset labels compile the ORIGINAL QASM. Same CZ
+      count, different 1q optimisation / schedule: qaoa ratio 1.043, |diff| median 4.6%, p90 15.4%, 99% of cases (=
+      the reported mismatch); vqe_su2 0.6%; bmw_quark_copula 6.0% / 21.8%. Consequences: (1) the model's input loses
+      the information that a gate was `rzz` -> irreducible noise of that size on those families' durations unless the
+      encoding gets node types for rzz / rxx (re-encoding + retraining); (2) stage 1 can keep Sabre's SWAPs, but stage 2
+      should target the dataset label: `stage1.py --c2-target dataset` (`C2_TARGET=dataset run_local.sh train25/26`).
+      Also: `data/circuits.zip` has the OLD qaoa without final measurements; `run_fastpath.py` now adds them.
 - [ ] **More devices and topologies**: generalise ESP and duration to more chips (other coupling maps,
       sizes, native gates, gate times); new labels for the dataset and the synthetic circuits on them;
       leave-one-device-out next to LOFO / LOGO.

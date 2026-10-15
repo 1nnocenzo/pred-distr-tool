@@ -473,6 +473,27 @@ def contention_table(graphs, tr, tc, cache: Path):
     return out
 
 
+def retarget_stage2(data: dict, ds: dict) -> None:
+    """Stage-2 target = the dataset's duration (esp_labels.pt, the compilation of the ORIGINAL circuit) instead of
+    Sabre's ``final`` (the compilation of the circuit after fast_encoding.to_basis).  They differ where the source has
+    gates outside the OpenQASM 3 basis (qaoa rzz: median 4.6%, p90 15%; bmw_quark rxx; randomcircuit); stage 1 keeps
+    Sabre's SWAPs / schedule, stage 2 learns the step from that schedule to the label we evaluate against."""
+    n_ok = n_all = 0
+    for name, it in data.items():
+        lab = ds.get(name)
+        fin = it.final.view(-1)
+        if lab is None:
+            it.ok2 = torch.zeros_like(it.ok2)
+            continue
+        fd = lab["duration"].float().view(-1) * 1e6
+        ok = it.ok2.view(-1) & torch.isfinite(fd) & (fd > 0) & (fin > 0)
+        it.c2 = torch.where(ok, it.c2.view(-1) + torch.log(fd.clamp(min=1e-6) / fin.clamp(min=1e-6)),
+                            torch.zeros_like(fin)).view(1, -1)
+        it.ok2 = ok.view(1, -1)
+        n_ok += int(ok.sum()); n_all += ok.numel()
+    print(f"stage-2 target = dataset duration on {n_ok}/{n_all} (circuit, device) cases", flush=True)
+
+
 def load_all(path: Path, contention: bool = False):
     s1 = torch.load(path, weights_only=False)
     graphs = torch.load(paths.DATA_DIR / "graph_dataset_expected_fidelity.pt", weights_only=False)
@@ -500,6 +521,9 @@ def main():
     ap.add_argument("--dur-lambda", type=float, default=0.0,
                     help="v25: weight of the loss on the routed duration through the differentiable schedule")
     ap.add_argument("--dur-every", type=int, default=1, help="v25: duration loss on every k-th training batch (cost)")
+    ap.add_argument("--c2-target", choices=("sabre", "dataset"), default="sabre",
+                    help="stage-2 target: Sabre's final duration (of the basis-converted circuit) or the dataset label "
+                         "(esp_labels.pt, the original circuit; needs --esp-labels)")
     ap.add_argument("--contention", action="store_true",
                     help="v26: our greedy router's contention wait per gate as input and as the base of the predicted wait")
     ap.add_argument("--bs", type=int, default=32)
@@ -517,6 +541,8 @@ def main():
     torch.set_num_threads(args.threads)
     torch.manual_seed(args.seed); np.random.seed(args.seed)
     data = load_all(args.data, args.contention)
+    if args.c2_target == "dataset":
+        retarget_stage2(data, torch.load(args.esp_labels, weights_only=False))
     train_n, test_n = split_names(args.split, sorted(data))
     if args.max_test:
         test_n = test_n[:args.max_test]

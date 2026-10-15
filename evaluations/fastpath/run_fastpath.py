@@ -167,6 +167,8 @@ def run(args) -> None:
             rec = {"circuit": name, "split": tests[name], "dev": {}}
             try:
                 qc = qasm3.loads((DATA / f"{name}.qasm").read_text())
+                if name.startswith("qaoa/") and "measure" not in qc.count_ops():
+                    qc.measure_all()     # data/circuits.zip has the old qaoa without final measurements (qaoa_measure.py)
                 for d in DEVICES:
                     t0 = time.perf_counter()
                     sw = fp.routing_free_switch(qc, cal[(d, "orig")])

@@ -84,6 +84,18 @@ def main():
         assert rows and all(np.isfinite(r["pred"]) for r in rows), "evaluate rows not finite"
         print(f"contention={contention}: schedule diff {diff:.1e}, losses swap {l_s.item():.3f} wait {l_w.item():.3f} "
               f"stage2 {l_c.item():.3f} duration {l_d.item():.3f}, {len(rows)} eval rows: ok")
+    # --c2-target dataset: missing circuit, NaN / zero dataset durations, then finite stage-2 loss
+    its = {f"c{i}": item(rng, f"c{i}", False)[0] for i in range(4)}
+    ds = {"c0": {"duration": torch.tensor([12e-6, 25e-6, 16e-6])}, "c1": {"duration": torch.tensor([float("nan"), 0.0, 16e-6])},
+          "c2": {"duration": torch.tensor([10e-6, 22e-6, 15e-6])}}                       # c3 missing
+    S.retarget_stage2(its, ds)
+    assert not its["c3"].ok2.any() and not its["c1"].ok2[0, :2].any(), "bad cases not masked"
+    assert torch.allclose(its["c2"].c2[0, :2], torch.zeros(2), atol=1e-6), "same duration should give the same target"
+    b = next(iter(DataLoader(list(its.values()), batch_size=4)))
+    model = S.Stage1(F_X + 9 + 12, hidden=32, layers=2)
+    l_c = S.losses(b, *model(b))[2]
+    assert torch.isfinite(l_c), "stage-2 loss not finite after retargeting"
+    print("c2 target dataset: ok")
     print("all checks passed")
 
 

@@ -56,7 +56,7 @@ train25() { # v25 = v24b + loss on the routed duration through the differentiabl
         out=results/v25_$(name $s)_s$seed
         [ -f "$out/eval_$(name $s | sed 's/_dense_complete/_dense-complete/').json" ] && continue    # done already
         [ ${#gpus[@]} -gt 0 ] && pre="CUDA_VISIBLE_DEVICES=${gpus[i++ % ${#gpus[@]}]} "
-        echo "${pre}python3 -u stage1.py train --split $s --epochs $EPOCHS --seed $seed --out $out --dur-lambda ${DUR_LAMBDA:-1} --dur-every ${DUR_EVERY:-1} --mc $MC --esp-labels $LAB --device $DEVICE --threads $THREADS > $LOGS/train25_$(name $s)_s$seed.log 2>&1 && echo 'train25 $s s$seed done'" >> "$LOGS/train25_cmds.txt"
+        echo "${pre}python3 -u stage1.py train --split $s --epochs $EPOCHS --seed $seed --out $out --dur-lambda ${DUR_LAMBDA:-1} --dur-every ${DUR_EVERY:-1} --c2-target ${C2_TARGET:-sabre} --mc $MC --esp-labels $LAB --device $DEVICE --threads $THREADS > $LOGS/train25_$(name $s)_s$seed.log 2>&1 && echo 'train25 $s s$seed done'" >> "$LOGS/train25_cmds.txt"
     done; done
     xargs -P "$JOBS" -I{} bash -c '{}' < "$LOGS/train25_cmds.txt"
 }
@@ -68,7 +68,7 @@ train26() { # v26 = v25 + contention: our greedy router's wait per gate as input
         out=results/v26_$(name $s)_s$seed
         [ -f "$out/eval_$(name $s | sed 's/_dense_complete/_dense-complete/').json" ] && continue    # done already
         [ ${#gpus[@]} -gt 0 ] && pre="CUDA_VISIBLE_DEVICES=${gpus[i++ % ${#gpus[@]}]} "
-        echo "${pre}python3 -u stage1.py train --split $s --epochs $EPOCHS --seed $seed --out $out --dur-lambda ${DUR_LAMBDA:-1} --dur-every ${DUR_EVERY:-1} --contention --mc $MC --esp-labels $LAB --device $DEVICE --threads $THREADS > $LOGS/train26_$(name $s)_s$seed.log 2>&1 && echo 'train26 $s s$seed done'" >> "$LOGS/train26_cmds.txt"
+        echo "${pre}python3 -u stage1.py train --split $s --epochs $EPOCHS --seed $seed --out $out --dur-lambda ${DUR_LAMBDA:-1} --dur-every ${DUR_EVERY:-1} --c2-target ${C2_TARGET:-sabre} --contention --mc $MC --esp-labels $LAB --device $DEVICE --threads $THREADS > $LOGS/train26_$(name $s)_s$seed.log 2>&1 && echo 'train26 $s s$seed done'" >> "$LOGS/train26_cmds.txt"
     done; done
     xargs -P "$JOBS" -I{} bash -c '{}' < "$LOGS/train26_cmds.txt"
 }

@@ -21,7 +21,7 @@ little text. Be proactive: launch and chain experiments, report results with num
 | `evaluations/compile_check/` | recompilations and labels: `v8b_variants.py` (calibration variants, `--n-aug`, `--usage`), `merge_usage.py`, `results/` (`v8d/v8d_labels.pt`, `v8b_orig/`, `v8u/usage_labels.pt`) |
 | `evaluations/calibration_shift/` | calibration-shift test: `run_shift.py` (MODELS registry), `shift_k.sh predict_report` → `results_k/report.md` |
 | `evaluations/diagnostics_v4v5/` | diagnostics and oracle studies (`tracking_oracle.py`, `tracking_oracle_usage.py`, `counts_check.py`, …), reports in `results/` |
-| `evaluations/fastpath/` | two-model plan, routing-free side: `fastpath.py` (switch, cached embeddings, VF2-score placement, F / ESP per calibration without compiling), `run_fastpath.py` (validate / predict / report / merge), `launch.sh` (tasks + report + `esp/hybrid.py --fast`) |
+| `evaluations/fastpath/` | two-model plan, routing-free side: `fastpath.py` (switch, cached embeddings, VF2-score placement, F / ESP per calibration without compiling), `run_fastpath.py` (validate / predict / report / merge), `launch.sh` (SLURM: tasks + report + `esp/hybrid.py --fast`), `run_local.sh` (same without SLURM; works without the models' predictions.json) |
 | `evaluations/results_report.py` | writes `evaluations/RESULTS.md` + `figures/`; `results_loop.sh` reruns it every 15 min as a SLURM job |
 | `evaluations/explorer/fidelity_predictor_explorer.html` | source of the interactive explorer artifact |
 | `evaluations/TODO.md` | findings and open items |

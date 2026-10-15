@@ -30,6 +30,7 @@ HERE = Path(__file__).resolve().parent
 EVAL = HERE.parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(EVAL / "compile_check"))
+sys.path.append(str(EVAL.parent))       # createDevice.py at the repository root when ~/compileCircuits is absent
 import fastpath as fp  # noqa: E402
 
 DEVICES = ("EQE1_Top", "EQE1_Bottom", "QExa20")
@@ -37,6 +38,31 @@ SPLITS = {"LOFO qaoa": "leave_one_family_out/qaoa", "LOFO qnn": "leave_one_famil
           "LOGO variational": "leave_one_group_out/variational", "control": "random_control/random_seed{s}"}
 EXCLUDE = ("grover", "iqpe", "dynamic_qft", "ghz_dynamic", "seven_qubit_steane_code", "shors_nine_qubit_code")
 LOCAL = tuple(range(80, 100))          # v8d local variants (jitter / shuffle / bad qubits / mixes)
+
+
+FAMILY_SPLIT = {"qaoa": "LOFO qaoa", "qnn": "LOFO qnn", "vqe_two_local": "LOGO variational",
+                "vqe_real_amp": "LOGO variational", "vqe_su2": "LOGO variational"}
+DATA_DIRS = (Path.home() / "compileCircuits/benchmark_dataset_30k", EVAL.parent / "data/benchmark_dataset_30k")
+
+
+def data_dir(arg: Path | None) -> Path:
+    for d in ((arg,) if arg else DATA_DIRS):
+        if d is not None and d.is_dir():
+            return d
+    raise SystemExit(f"no circuit directory: pass --data-dir (tried {[str(d) for d in DATA_DIRS]})")
+
+
+def all_names(data: Path) -> dict:
+    """{circuit: split} without the models' predictions.json: every circuit of esp_labels.pt (else every QASM file),
+    split by family as the hold-outs define them (qaoa, qnn, vqe_* + qnn); the other families stand for control."""
+    lab = EVAL / "compile_check/results/esp_labels.pt"
+    if lab.is_file():
+        import torch
+        names = list(torch.load(lab, weights_only=False))
+    else:
+        names = [str(p.relative_to(data).with_suffix("")) for p in data.glob("*/*.qasm")]
+    return {n: FAMILY_SPLIT.get(n.split("/")[0], "control") for n in sorted(names)
+            if not n.split("/")[0].startswith(EXCLUDE)}
 
 
 def test_names(run: str, seeds=(5, 6, 7)) -> dict:
@@ -102,8 +128,13 @@ def fast_rows(qc, tc, tcomp, virt, bes, cal, d, s, aug, mode):
 
 def run(args) -> None:
     from qiskit import qasm3
-    from compile_check import DATA
-    tests = test_names(args.run)
+    DATA = data_dir(args.data_dir)
+    tests = test_names(args.run) if args.circuits in ("auto", "tests") else {}
+    if not tests:
+        if args.circuits == "tests":
+            raise SystemExit(f"no predictions.json of {args.run} under generalization_v9/results")
+        tests = all_names(DATA)
+        print(f"no predictions.json of {args.run}: {len(tests)} circuits from esp_labels.pt / {DATA}, split by family", flush=True)
     names = sorted(tests)
     if args.mode == "validate":
         per = defaultdict(list)
@@ -316,6 +347,10 @@ if __name__ == "__main__":
     ap.add_argument("--task-id", type=int, default=0)
     ap.add_argument("--n-tasks", type=int, default=1)
     ap.add_argument("--out", type=Path, default=HERE / "results")
+    ap.add_argument("--data-dir", type=Path, default=None, help="QASM circuits (default ~/compileCircuits/benchmark_dataset_30k, "
+                    "else data/benchmark_dataset_30k)")
+    ap.add_argument("--circuits", choices=["auto", "tests", "all"], default="auto",
+                    help="auto = the test circuits of --run's predictions.json if present, else all circuits by family")
     a = ap.parse_args()
     if a.seeds is None:
         a.seeds = "0" if a.mode in ("predict", "merge") else "0,1,2"

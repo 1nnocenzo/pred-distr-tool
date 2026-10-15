@@ -12,5 +12,4 @@ eval "$("$HOME/miniforge3/bin/conda" shell.bash hook)"; conda activate "${CONDA_
 export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}" OMP_NUM_THREADS=8 CUDA_VISIBLE_DEVICES=""
 python3 -u evaluations/fastpath/run_fastpath.py report
 python3 -u evaluations/fastpath/run_fastpath.py merge
-GS_TAG=_fast python3 -u evaluations/esp/hybrid.py --f-run "${F_RUN:-v8kdc10}" --esp-run "${ESP_RUN:-v8kdi10}" \
-  --fast evaluations/fastpath/results/fastpath_pred.json
+bash evaluations/fastpath/hybrid_step.sh

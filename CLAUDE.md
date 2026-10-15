@@ -3,7 +3,7 @@
 A graph network predicts the expected fidelity of a quantum circuit on each of three IQM-style
 devices (EQE1_Top, EQE1_Bottom, QExa20) without compiling. The current work is the
 generalization study for a paper (npj Quantum Information collection, deadline 2026-12-20),
-on branch `generalization-study` (open PR; commit locally, push only when asked).
+on branch `generalization-study` (open PR); Claude commits and pushes its finished work itself.
 
 Several co-authors may use Claude here: they may write in Italian, English or German; answer in
 the language of the message. Reports and documents for co-authors are in English, visual, with
@@ -21,6 +21,7 @@ little text. Be proactive: launch and chain experiments, report results with num
 | `evaluations/compile_check/` | recompilations and labels: `v8b_variants.py` (calibration variants, `--n-aug`, `--usage`), `merge_usage.py`, `results/` (`v8d/v8d_labels.pt`, `v8b_orig/`, `v8u/usage_labels.pt`) |
 | `evaluations/calibration_shift/` | calibration-shift test: `run_shift.py` (MODELS registry), `shift_k.sh predict_report` → `results_k/report.md` |
 | `evaluations/diagnostics_v4v5/` | diagnostics and oracle studies (`tracking_oracle.py`, `tracking_oracle_usage.py`, `counts_check.py`, …), reports in `results/` |
+| `evaluations/fastpath/` | two-model plan, routing-free side: `fastpath.py` (switch, cached embeddings, VF2-score placement, F / ESP per calibration without compiling), `run_fastpath.py` (validate / predict / report / merge), `launch.sh` (tasks + report + `esp/hybrid.py --fast`) |
 | `evaluations/results_report.py` | writes `evaluations/RESULTS.md` + `figures/`; `results_loop.sh` reruns it every 15 min as a SLURM job |
 | `evaluations/explorer/fidelity_predictor_explorer.html` | source of the interactive explorer artifact |
 | `evaluations/TODO.md` | findings and open items |
@@ -194,8 +195,9 @@ Chain 2–6 after the candidate's control job so they run without supervision.
 
 ## Commits
 
-- Small logical commits on `generalization-study`; never push unless asked; no `Co-Authored-By` trailer.
-- The user does the pushes: commit locally, then tell them which branch to push and why. Branches:
+- Small logical commits on the working branch; no `Co-Authored-By` trailer.
+- Claude pushes its own commits (`git push -u origin <branch>`) once the work is done and checked, so the
+  user can pull and launch on the cluster; say which branch was pushed. Branches:
   `generalization-study` (open PR), `esp-depth` (ESP / duration / depth heads, branched from it).
 - Commit finished results only (metrics, history, run logs; `.gitignore` drops `*.pth`, predictions,
   locks). Leave the user's own `.gitignore` edits and root-level scratch files alone.

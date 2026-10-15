@@ -61,6 +61,28 @@ train25() { # v25 = v24b + loss on the routed duration through the differentiabl
     xargs -P "$JOBS" -I{} bash -c '{}' < "$LOGS/train25_cmds.txt"
 }
 
+train26() { # v26 = v25 + contention: our greedy router's wait per gate as input and as the base of the wait (--contention)
+    : > "$LOGS/train26_cmds.txt"
+    local gpus=(${GPUS:-}) i=0 pre=""
+    for seed in $SEEDS; do for s in $SPLITS; do
+        out=results/v26_$(name $s)_s$seed
+        [ -f "$out/eval_$(name $s | sed 's/_dense_complete/_dense-complete/').json" ] && continue    # done already
+        [ ${#gpus[@]} -gt 0 ] && pre="CUDA_VISIBLE_DEVICES=${gpus[i++ % ${#gpus[@]}]} "
+        echo "${pre}python3 -u stage1.py train --split $s --epochs $EPOCHS --seed $seed --out $out --dur-lambda ${DUR_LAMBDA:-1} --dur-every ${DUR_EVERY:-1} --contention --mc $MC --esp-labels $LAB --device $DEVICE --threads $THREADS > $LOGS/train26_$(name $s)_s$seed.log 2>&1 && echo 'train26 $s s$seed done'" >> "$LOGS/train26_cmds.txt"
+    done; done
+    xargs -P "$JOBS" -I{} bash -c '{}' < "$LOGS/train26_cmds.txt"
+}
+
+contention() { # once, before train26 (it is cached in results/contention.pt; trainings in parallel would all compute it)
+    python3 -u -c "import stage1 as S; from pathlib import Path; p = Path('results/stage1.pt'); S.load_all(p, True); \
+print('contention cached:', (p.parent / 'contention.pt').is_file())" 2>&1 | tee "$LOGS/contention.log"
+}
+
+smoke26() { # ~5 min after `contention`: 2 epochs of v26 on qaoa (prints the router-vs-Sabre wait correlation)
+    python3 -u stage1.py train --split qaoa --epochs 2 --out results/smoke26 --dur-lambda 1 --contention --max-test 20 --mc 4 \
+        --esp-labels "$LAB" --device "$DEVICE" --threads "$THREADS" 2>&1 | tee "$LOGS/smoke26.log"
+}
+
 smoke25() { # ~5 min: 2 epochs of v25 on qaoa, 20 test circuits (checks speed and that the duration loss falls)
     python3 -u stage1.py train --split qaoa --epochs 2 --out results/smoke25 --dur-lambda 1 --max-test 20 --mc 4 \
         --esp-labels "$LAB" --device "$DEVICE" --threads "$THREADS" 2>&1 | tee "$LOGS/smoke25.log"
@@ -69,7 +91,7 @@ smoke25() { # ~5 min: 2 epochs of v25 on qaoa, 20 test circuits (checks speed an
 report() { python3 -u report_v24.py | tee "$LOGS/report.log"; }
 
 case ${1:-all} in
-    smoke) smoke ;; diag) diag ;; mc) mc ;; train) train ;; report) report ;; smoke25) smoke25 ;; train25) train25 ;;
+    smoke) smoke ;; diag) diag ;; mc) mc ;; train) train ;; report) report ;; smoke25) smoke25 ;; train25) train25 ;; contention) contention ;; smoke26) smoke26 ;; train26) train26 ;;
     all) smoke; diag; mc; report; train; report ;;
-    *) echo "usage: $0 smoke|diag|mc|train|report|smoke25|train25|all"; exit 1 ;;
+    *) echo "usage: $0 smoke|diag|mc|train|report|smoke25|train25|contention|smoke26|train26|all"; exit 1 ;;
 esac

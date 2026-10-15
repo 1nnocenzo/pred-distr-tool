@@ -33,6 +33,29 @@ JOBS=3 bash evaluations/route_stage/run_local.sh train   # v24b: 40 epochs x 3 s
   measured (whole dataset in memory: expect several GB); check the first run before raising `JOBS`.
 - `train` skips runs that already have their eval file, so it can be restarted.
 
+## TO LAUNCH (2026-10-15): v25 and v26, both
+
+Why: routed durations are under-predicted because of the waits, not the SWAPs (TODO.md, "v25"). Two fixes, run both
+(same seeds and splits as v24b, so `report` puts v24b / v25 / v26 side by side):
+
+```bash
+cd evaluations/route_stage
+bash run_local.sh smoke25                 # ~5 min: duration loss runs and falls
+JOBS=3 bash run_local.sh train25          # v25 = v24b + loss on the routed duration (differentiable schedule)
+bash run_local.sh contention              # once, ~15 min: our greedy router's contention wait per gate -> results/contention.pt
+bash run_local.sh smoke26                 # ~5 min; prints corr(router wait, Sabre wait): the feature's signal
+JOBS=3 bash run_local.sh train26          # v26 = v25 + contention as input and as the base of each wait
+bash run_local.sh report                  # results/report_v24.md
+```
+
+| run | what changes | look at | adopt if |
+| --- | --- | --- | --- |
+| v25 | `--dur-lambda 1`: Huber on log(schedule / Sabre replay) through `schedule_torch` | routed error and bias on qaoa and LOSO | qaoa / LOSO < 10% and bias ≈ 1, control and variational not worse |
+| v26 | v25 + `--contention`: wait = router contention wait + learned correction | the heavy-routing bins (2q gates 100–500, SWAPs per 2q gate 1–2, routing share 0.4–0.8) | those bins < 12% where v25 stays > 15% |
+
+`train25` / `train26` skip runs that already have their eval file; `DUR_EVERY=2` halves the cost of the duration loss
+if an epoch is too slow (the schedule is computed level by level).
+
 ## 3. To do and to evaluate
 
 | # | What | Where | Look at | Decision |

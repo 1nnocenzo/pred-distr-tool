@@ -195,8 +195,10 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
       The wait targets are teacher-forced per gate (64% negative on qaoa), so a per-gate Huber averages them to ~0.
       v25 = v24b + Huber on log(schedule / Sabre's replay) through a differentiable level-wise schedule
       (`schedule_torch`, identical to `schedule_np`): SWAPs and waits learn the critical path. Run off-cluster:
-      `run_local.sh smoke25` then `JOBS=3 run_local.sh train25` + `report`. Next if waits still lag: SWAPs that also
-      block the other logical qubits on their chip path (contention) from our greedy router.
+      `run_local.sh smoke25` then `JOBS=3 run_local.sh train25` + `report`.
+      **v26 (written, to launch together with v25):** v25 + `--contention`: per gate the wait our greedy router pays
+      when its SWAPs wait for / block the logical qubits on their chip path (`router_contention`, no compiler), as input
+      and as the base of the predicted wait (the network learns the correction). Commands in `route_stage/RUNBOOK.md`.
 - [ ] **More devices and topologies**: generalise ESP and duration to more chips (other coupling maps,
       sizes, native gates, gate times); new labels for the dataset and the synthetic circuits on them;
       leave-one-device-out next to LOFO / LOGO.

@@ -77,6 +77,93 @@ def wire_feats(gq: np.ndarray, n_q: int) -> np.ndarray:
     return out
 
 
+RAW_DEV = EVAL / "generalization_v2/results/device_graphs.raw.json"
+
+
+def raw_chips():
+    """(n, adj, H, next-hop parents) per device from the tracked raw device graphs (same node order as the model's)."""
+    from collections import deque
+    raw = json.loads(RAW_DEV.read_text())
+    out = []
+    for d in DEVS:
+        n = len(raw[d]["nodes"])
+        edges = sorted({(min(a, b), max(a, b)) for a, b in raw[d]["edges"]})
+        adj = [[] for _ in range(n)]
+        for a, c in edges:
+            adj[a].append(c); adj[c].append(a)
+        H, nxt = [], []
+        for s0 in range(n):
+            dist = [n + 1] * n; dist[s0] = 0; par = [-1] * n; q = deque([s0])
+            while q:
+                u = q.popleft()
+                for v in adj[u]:
+                    if dist[v] > dist[u] + 1:
+                        dist[v] = dist[u] + 1; par[v] = u; q.append(v)
+            H.append(dist); nxt.append(par)
+        out.append((n, adj, H, nxt))
+    return out
+
+
+def router_contention(gq: np.ndarray, t: np.ndarray, meas: np.ndarray, n_log: int, chip) -> np.ndarray:
+    """v26: per gate, the wait our own greedy router (prep.prior_route, no compiler) pays for contention: its gate start
+    on the chip minus the start the wire model would give (previous end on each operand wire + that wire's SWAPs).
+    Non-zero when a SWAP had to wait for, or blocked, the logical qubit sitting on its path (SWAP partners)."""
+    sys.path.insert(0, str(EVAL / "esp"))
+    from esp_router import greedy_place, path
+    n, adj, H, par = chip
+    wires = [[int(x) for x in row if x >= 0] for row in gq]
+    pairs: dict = {}
+    for qs in wires:
+        for i in range(len(qs)):
+            for j in range(i + 1, len(qs)):
+                k = (min(qs[i], qs[j]), max(qs[i], qs[j])); pairs[k] = pairs.get(k, 0) + 1
+    if n_log > n:
+        return np.zeros(len(wires), np.float32)
+    pos = greedy_place(pairs, n_log, H, adj)
+    at = {p: q for q, p in pos.items()}
+    avail = [0.0] * n
+    last = defaultdict(float)                      # end of the last gate of each logical wire (router schedule)
+    pending = defaultdict(int)
+    out = np.zeros(len(wires), np.float32)
+    for gi, qs in enumerate(wires):
+        if not qs:
+            continue
+        if len(qs) >= 2:
+            anchor = pos[qs[0]]
+            for o in qs[1:]:
+                po = pos[o]
+                if H[po][anchor] <= 1:
+                    continue
+                pth = path(par, po, anchor)
+                for u, v in zip(pth[:-2], pth[1:-1]):
+                    st = max(avail[u], avail[v]) + T_SWAP
+                    avail[u] = avail[v] = st
+                    qu, qv = at.get(u), at.get(v)
+                    for w in (qu, qv):
+                        if w is not None:
+                            pending[w] += 1
+                    at[u], at[v] = qv, qu
+                    if qu is not None:
+                        pos[qu] = v
+                    if qv is not None:
+                        pos[qv] = u
+                anchor = pos[qs[0]]
+        own = {}
+        if len(qs) >= 2 or meas[gi]:
+            for w in qs:
+                own[w] = pending[w]; pending[w] = 0
+        ready = max(last[w] + own.get(w, 0) * T_SWAP for w in qs)
+        ps = [pos[q] for q in qs]
+        st = max(avail[p] for p in ps)
+        out[gi] = st - ready
+        e = st + t[gi]
+        for p in ps:
+            avail[p] = e
+        for w in qs:
+            last[w] = e
+    return out
+
+
 def wire_prev(gq: np.ndarray):
     """(N, 3) index of the previous gate on each operand's wire (-1: none) and (N,) topological level (longest chain
     of wire predecessors): the gates of one level can be scheduled together (v25 differentiable schedule)."""
@@ -108,7 +195,7 @@ def node_t(g, tr, tc):
     return np.where(meas, TM, (oh @ tr) * T1 / n_op + (oh @ tc) * TCZ).astype(np.float32)
 
 
-def build(graphs, s1, tr, tc):
+def build(graphs, s1, tr, tc, contention=None):
     """PyG items with the stage-1 features and targets (routing-free devices are masked out of the loss)."""
     items = []
     for g in graphs:
@@ -125,7 +212,12 @@ def build(graphs, s1, tr, tc):
         base = torch.where(routed, lab["replay"], torch.full_like(lab["replay"], logical))
         ok2 = (routed | lab["rf"]) & (lab["final"] > 0)
         prev, lvl = wire_prev(gq)
-        items.append(Data(prev=torch.from_numpy(prev), lvl=torch.from_numpy(lvl), x=g.x.float(), edge_index=g.edge_index, gate_qubits=g.gate_qubits, n_qubits=g.n_qubits,
+        extra = {}
+        if contention is not None:
+            pw = contention.get(g.circuit_name)
+            extra["pw"] = (pw if pw is not None else torch.zeros(len(gq), len(DEVS))).float()
+            dev_f = torch.cat([dev_f.float(), torch.log1p(extra["pw"].clamp(min=0) / T_SWAP)], 1)
+        items.append(Data(prev=torch.from_numpy(prev), lvl=torch.from_numpy(lvl), **extra, x=g.x.float(), edge_index=g.edge_index, gate_qubits=g.gate_qubits, n_qubits=g.n_qubits,
                           wf=torch.from_numpy(wire_feats(gq, n_q)), dev_f=dev_f.float(), t=torch.from_numpy(t_np),
                           c2=torch.where(ok2, torch.log(lab["final"].clamp(min=1e-3) / base.clamp(min=1e-3)), torch.zeros_like(base)).view(1, -1).float(),
                           ok2=ok2.view(1, -1), logical=torch.tensor([[logical]], dtype=torch.float),
@@ -137,14 +229,15 @@ def build(graphs, s1, tr, tc):
 
 
 class Stage1(nn.Module):
-    def __init__(self, f_in: int, hidden: int = 96, layers: int = 6, n_dev: int = 3):
+    def __init__(self, f_in: int, hidden: int = 96, layers: int = 6, n_dev: int = 3, contention: bool = False):
         super().__init__()
+        self.contention = contention                  # v26: wait = router's contention wait + learned correction
         self.inp = nn.Sequential(nn.Linear(f_in, hidden), nn.SiLU(), nn.Linear(hidden, hidden))
         self.layers = nn.ModuleList([nn.Sequential(nn.Linear(4 * hidden, hidden), nn.SiLU(), nn.Linear(hidden, hidden))
                                      for _ in range(layers)])
         self.norms = nn.ModuleList([nn.LayerNorm(hidden) for _ in range(layers)])
         self.dev = nn.Embedding(n_dev, 16)
-        self.head = nn.Sequential(nn.Linear(hidden + 16 + 4, hidden), nn.SiLU(), nn.Linear(hidden, 4))
+        self.head = nn.Sequential(nn.Linear(hidden + 16 + 4 + int(contention), hidden), nn.SiLU(), nn.Linear(hidden, 4))
         self.head2 = nn.Sequential(nn.Linear(2 * hidden + 16, hidden), nn.SiLU(), nn.Linear(hidden, 1))   # stage 2
         self.n_dev = n_dev
 
@@ -160,14 +253,16 @@ class Stage1(nn.Module):
         N = h.size(0)
         outs = []
         for d in range(self.n_dev):
-            df = torch.cat([b.dev_f[:, d: d + 1], b.dev_f[:, 3 + 3 * d: 6 + 3 * d]], 1)
+            df = torch.cat([b.dev_f[:, d: d + 1], b.dev_f[:, 3 + 3 * d: 6 + 3 * d]]
+                           + ([b.dev_f[:, 12 + d: 13 + d]] if self.contention else []), 1)
             z = torch.cat([h, self.dev.weight[d].expand(N, -1), df], 1)
             outs.append(self.head(z))
         o = torch.stack(outs, 1)                                                     # (N, D, 4)
         pooled = torch.cat([scatter(h, b.batch, 0, reduce="mean"), scatter(h, b.batch, 0, reduce="max")], 1)
         c2 = torch.cat([self.head2(torch.cat([pooled, self.dev.weight[d].expand(pooled.size(0), -1)], 1))
                         for d in range(self.n_dev)], 1)                              # (B, D) log(final / base)
-        return F.softplus(o[..., :3]), o[..., 3], c2                                  # SWAP rates, wait / T_SWAP, stage 2
+        wait = o[..., 3] + (b.pw / T_SWAP if self.contention else 0.0)
+        return F.softplus(o[..., :3]), wait, c2                                       # SWAP rates, wait / T_SWAP, stage 2
 
 
 def losses(b, rate, wait, c2):
@@ -359,7 +454,25 @@ def split_names(split: str, names: list[str]):
     return [n for n in names if fam(n) not in held], test
 
 
-def load_all(path: Path):
+def contention_table(graphs, tr, tc, cache: Path):
+    """{circuit: (N, D) router contention wait} for every graph, computed once and cached (a few minutes)."""
+    if cache.is_file():
+        return torch.load(cache, weights_only=False)
+    chs = raw_chips()
+    out = {}
+    t0 = time.time()
+    for i, g in enumerate(graphs):
+        gq = g.gate_qubits.numpy()
+        t = node_t(g, tr, tc)
+        meas = g.x[:, GATE2IDX_MEASURE].numpy() > 0.5
+        out[g.circuit_name] = torch.from_numpy(np.stack([router_contention(gq, t, meas, int(g.n_qubits), c) for c in chs], 1))
+        if i % 2000 == 0:
+            print(f"contention {i}/{len(graphs)} ({time.time() - t0:.0f} s)", flush=True)
+    torch.save(out, cache)
+    return out
+
+
+def load_all(path: Path, contention: bool = False):
     s1 = torch.load(path, weights_only=False)
     graphs = torch.load(paths.DATA_DIR / "graph_dataset_expected_fidelity.pt", weights_only=False)
     graphs += torch.load(EVAL / "synthetic_routing/results/synth_graphs.pt", weights_only=False)
@@ -368,7 +481,8 @@ def load_all(path: Path):
     U = list(fe.UNIQUE)
     tr = np.array([tab.get(u, {"r": 0})["r"] for u in U], float)
     tc = np.array([tab.get(u, {"cz": 0})["cz"] for u in U], float)
-    items = build(graphs, s1, tr, tc)
+    ct = contention_table(graphs, tr, tc, path.parent / "contention.pt") if contention else None
+    items = build(graphs, s1, tr, tc, ct)
     return {it.name: it for it in items}
 
 
@@ -385,6 +499,8 @@ def main():
     ap.add_argument("--dur-lambda", type=float, default=0.0,
                     help="v25: weight of the loss on the routed duration through the differentiable schedule")
     ap.add_argument("--dur-every", type=int, default=1, help="v25: duration loss on every k-th training batch (cost)")
+    ap.add_argument("--contention", action="store_true",
+                    help="v26: our greedy router's contention wait per gate as input and as the base of the predicted wait")
     ap.add_argument("--bs", type=int, default=32)
     ap.add_argument("--seed", type=int, default=5)
     ap.add_argument("--threads", type=int, default=8)
@@ -399,7 +515,7 @@ def main():
     args = ap.parse_args()
     torch.set_num_threads(args.threads)
     torch.manual_seed(args.seed); np.random.seed(args.seed)
-    data = load_all(args.data)
+    data = load_all(args.data, args.contention)
     train_n, test_n = split_names(args.split, sorted(data))
     if args.max_test:
         test_n = test_n[:args.max_test]
@@ -408,8 +524,18 @@ def main():
     n_val = max(1, len(train_n) // 20)
     val_n, train_n = train_n[:n_val], train_n[n_val:]
     print(f"split {args.split}: train {len(train_n)}, val {len(val_n)}, test {len(test_n)}", flush=True)
-    f_in = data[train_n[0]].x.size(1) + 9 + 12
-    model = Stage1(f_in, args.hidden, args.layers).to(args.device)
+    f_in = data[train_n[0]].x.size(1) + 9 + 12 + (3 if args.contention else 0)
+    model = Stage1(f_in, args.hidden, args.layers, contention=args.contention).to(args.device)
+    if args.contention:      # signal check: router contention wait vs Sabre's (teacher-forced) wait on routed matched gates
+        pw, tw = [], []
+        for n in train_n[:2000]:
+            it = data[n]
+            m = it.m & it.routed
+            pw.append(it.pw[m]); tw.append(it.wait[m])
+        pw, tw = torch.cat(pw).numpy(), torch.cat(tw).numpy()
+        if len(pw) > 2:
+            print(f"contention check: corr(router wait, Sabre wait) {np.corrcoef(pw, tw)[0, 1]:.3f}, "
+                  f"router > 0 on {np.mean(pw > 1e-9):.1%} of routed gates", flush=True)
     args.out.mkdir(parents=True, exist_ok=True)
     if args.cmd == "train":
         opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)

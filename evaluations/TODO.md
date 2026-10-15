@@ -195,6 +195,14 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
       build a final test never used for any choice (a held-out family or newly generated circuits), evaluate
       the frozen model and 2–3 references on it once; report seed spreads and say when two models are
       indistinguishable (qnn varies ±0.05–0.08 across seeds).
+- [ ] **Two-model plan (2026-10-15), steps 1-2 written, to launch** (`bash evaluations/fastpath/launch.sh`):
+      routing-free pairs (switch = VF2 subgraph test) -> fast path (`fastpath/`): one reference compilation per circuit
+      and topology, embeddings cached, per calibration only VF2Layout's average-error score + MQT F / ESP (no
+      compiler; local smoke test: same layout as Qiskit except exact score ties, log F / ESP exact to 1e-15 when
+      the layout matches, 0.4-0.7 ms per calibration vs 2-3 ms recompiling); routed pairs -> the model. Outputs:
+      `fastpath/results/report_validate.md` (vs recompilation on aug 80-99, 3 seeds, tracking, time) and
+      `esp/results/report_hybrid_fast.md` (regret / right device: model, compile-hybrid, fast-hybrid).
+      Step 3 after the results: routed model (v24 + ESP from the schedule) trained on routed pairs only.
 - [ ] **Hybrid rule: compile what is cheap, predict the rest** (from the pipeline anatomy, 2026-10-11,
       `compile_check/results/pipeline_anatomy_stage/report.md`): routing-free circuits compile in 2.3 ms
       (median, ≈ the VF2 step alone) and their calibration response is exactly the compiler's VF2Layout

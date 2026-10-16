@@ -7,7 +7,7 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 cd "$HERE"
 export PYTHONPATH="$HERE/../../src${PYTHONPATH:+:$PYTHONPATH}"
-THREADS=${THREADS:-8}; JOBS=${JOBS:-1}; DEVICE=${DEVICE:-cpu}; EPOCHS=${EPOCHS:-40}; SEEDS=${SEEDS:-"5 6 7"}; MC=${MC:-24}
+THREADS=${THREADS:-8}; JOBS=${JOBS:-1}; EP_TASKS=${EP_TASKS:-4}; DEVICE=${DEVICE:-cpu}; EPOCHS=${EPOCHS:-40}; SEEDS=${SEEDS:-"5 6 7"}; MC=${MC:-24}
 LAB=../compile_check/results/esp_labels.pt
 SPLITS="qaoa variational control loso:dense,complete"
 LOGS=$HERE/local_logs
@@ -125,6 +125,24 @@ train28() { # v28 = v27 with the light Sabre as routing input instead of the gre
     xargs -P "$JOBS" -I{} bash -c '{}' < "$LOGS/train28_cmds.txt"
 }
 
+evalpath() { # v28 end to end on the test splits (CPU): switch -> exact | light Sabre + v28; duration, ESP, F, times
+    : > "$LOGS/evalpath_cmds.txt"
+    local F9=../generalization_v9/results
+    for seed in $SEEDS; do for s in qaoa variational control; do
+        ck=results/v28_${s}_s$seed/model.pt
+        [ -f "$ck" ] || { echo "missing $ck (run train28 first)"; continue; }
+        case $s in qaoa) sd=leave_one_family_out/qaoa ;; variational) sd=leave_one_group_out/variational ;;
+                   control) sd=random_control/random_seed$seed ;; esac
+        fr=v8kdc10_s$seed; [ $seed = 5 ] && fr=v8kdc10
+        fp=$F9/$fr/$sd/predictions.json
+        for i in $(seq 0 $((EP_TASKS - 1))); do
+            echo "RAYON_NUM_THREADS=1 python3 -u evalpath.py run --split $s --ckpt $ck --f-pred $fp --baselines --mc $MC --time-full-every ${TIME_FULL_EVERY:-1} --max-circuits ${EP_MAX:-0} --esp-labels $LAB --task-id $i --n-tasks $EP_TASKS > $LOGS/evalpath_${s}_s${seed}_$i.log 2>&1" >> "$LOGS/evalpath_cmds.txt"
+        done
+    done; done
+    xargs -P "$JOBS" -I{} bash -c '{}' < "$LOGS/evalpath_cmds.txt"
+    python3 -u evalpath.py report | tee "$LOGS/evalpath_report.log"
+}
+
 smoke25() { # ~5 min: 2 epochs of v25 on qaoa, 20 test circuits (checks speed and that the duration loss falls)
     python3 -u stage1.py train --split qaoa --epochs 2 --out results/smoke25 --dur-lambda 1 --max-test 20 --mc 4 \
         --esp-labels "$LAB" --device "$DEVICE" --threads "$THREADS" 2>&1 | tee "$LOGS/smoke25.log"
@@ -133,7 +151,7 @@ smoke25() { # ~5 min: 2 epochs of v25 on qaoa, 20 test circuits (checks speed an
 report() { python3 -u report_v24.py | tee "$LOGS/report.log"; }
 
 case ${1:-all} in
-    smoke) smoke ;; diag) diag ;; mc) mc ;; train) train ;; report) report ;; smoke25) smoke25 ;; train25) train25 ;; contention) contention ;; smoke26) smoke26 ;; train26) train26 ;; synth2) synth2 ;; train27) train27 ;; light) light ;; train28) train28 ;;
+    smoke) smoke ;; diag) diag ;; mc) mc ;; train) train ;; report) report ;; smoke25) smoke25 ;; train25) train25 ;; contention) contention ;; smoke26) smoke26 ;; train26) train26 ;; synth2) synth2 ;; train27) train27 ;; light) light ;; train28) train28 ;; evalpath) evalpath ;;
     all) smoke; diag; mc; report; train; report ;;
-    *) echo "usage: $0 smoke|diag|mc|train|report|smoke25|train25|contention|smoke26|train26|synth2|train27|light|train28|all"; exit 1 ;;
+    *) echo "usage: $0 smoke|diag|mc|train|report|smoke25|train25|contention|smoke26|train26|synth2|train27|light|train28|evalpath|all"; exit 1 ;;
 esac

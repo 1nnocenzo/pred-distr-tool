@@ -57,8 +57,9 @@ def circuit(name: str):
 _PM: dict = {}
 
 
-def light_case(qb, nodes, n_log, backend):
-    """Light Sabre on one device: (labels {(node, slot): n}, n_swap, aligned, replay µs, t_node {node: (start, end)})."""
+def light_case(qb, nodes, n_log, backend, keep: dict | None = None):
+    """Light Sabre on one device: (labels {(node, slot): n}, n_swap, aligned, replay µs, t_node {node: (start, end)}).
+    ``keep``: filled with the routed circuit ("routed", physical qubits) and its initial layout ("init")."""
     from qiskit.converters import dag_to_circuit
     from qiskit.transpiler import PassManager, StagedPassManager, generate_preset_pass_manager
     from qiskit.transpiler.passes import BarrierBeforeFinalMeasurements, SabreLayout
@@ -81,6 +82,8 @@ def light_case(qb, nodes, n_log, backend):
     idx = {q: i for i, q in enumerate(qb.qubits)}
     init = {idx[v]: p for v, p in st["vbits"].items() if v in idx}
     labels, n_sw, _, ok, _, replay, t_node, _ = label_case(nodes, n_log, st["routed"], init, True)
+    if keep is not None:
+        keep.update(routed=st["routed"], init=init)
     return labels, n_sw, ok, replay, t_node
 
 

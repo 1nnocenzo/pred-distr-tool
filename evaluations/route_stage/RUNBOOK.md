@@ -49,6 +49,14 @@ DEVICE=cuda GPUS="0 1" JOBS=4 bash run_local.sh train28         # needs synth2 (
 bash run_local.sh report
 ```
 
+Then the end-to-end test of the v28 path (CPU; switch -> exact compile | light Sabre + v28; duration, ESP, F, times vs the
+labels and vs the full / light compile of the same case; F from v8kdc10's predictions.json of the same split and seed,
+as the earlier ESP studies; without it F comes from the decomposition table and is biased low):
+
+```bash
+JOBS=8 EP_TASKS=4 bash run_local.sh evalpath     # -> results/evalpath/report.md (EP_MAX=300 for a quick look per split)
+```
+
 Adopt v28 if it beats v27 (qaoa 8.8%, control 3.2%, variational 5.4%, LOSO 7.4% / 11.8%) without losing elsewhere.
 `light_check.log` gives the light Sabre's own schedule error per family (the floor it brings).
 

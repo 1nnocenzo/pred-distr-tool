@@ -40,9 +40,23 @@ Devices enter as calibration graphs (per-qubit errors, T1/T2, couplers), so cali
 | `esptime/oracle.py` | formula check: duration and ESP formulas with the compiler's true inputs (`results/formula_check_*.md`) |
 | `tests/test_model.py` | 6 real compilations → items → forward / losses / backward checks (~1 min) |
 | `scripts/smoke.sh` | the whole pipeline on ~100 circuits (~15 min, CPU) |
+| `scripts/run_local.sh` | the whole pipeline on one machine, no SLURM |
 | `scripts/pipeline.sh`, `job.sh` | the whole pipeline as a chain of SLURM jobs |
 
-## Run
+## Run on a server without SLURM
+
+```bash
+conda env create -f environment.yml && conda activate pred-distr      # once
+bash scripts/run_local.sh test         # ~15 s, must print "all checks passed"
+bash scripts/run_local.sh smoke        # whole pipeline on ~90 circuits (~10 min)
+JOBS=32 bash scripts/run_local.sh labels      # compilations (the long step), resumable
+JOBS=32 bash scripts/run_local.sh dataset
+DEVICE=cuda GPUS="0 1" TRAIN_JOBS=2 bash scripts/run_local.sh train   # 4 splits x seeds 5, 6, 7
+bash scripts/run_local.sh report       # -> work/runs/summary.md
+```
+Settings and options: header of `scripts/run_local.sh`. Use `nohup ... &` or `tmux` for the long steps.
+
+## Run (step by step / SLURM)
 
 ```bash
 conda env create -f environment.yml && conda activate pred-distr

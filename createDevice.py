@@ -315,7 +315,6 @@ EQE1_TOP_COUPLING_MAP = [
     [17, 9], [17, 16], [17, 18], [17, 25], [19, 11], [19, 18], [19, 20],
     [21, 13], [21, 20], [22, 14], [22, 23], [24, 16], [24, 23], [24, 25],
 ]
-print(len(EQE1_TOP_COUPLING_MAP))  # 36 edges
 EQE1_BOT_NAME = "EQE1_Bottom"
 EQE1_BOT_NUM_QUBITS = 27                        # 0-based re-indexed (EQE1 Q26-Q52 → 0-26)
 EQE1_BOT_ACTIVE_QUBITS = list(range(0, 27))     # 0-based sub-device indices
@@ -332,7 +331,6 @@ EQE1_BOT_COUPLING_MAP = [
     [25, 21], [25, 24], [25, 26],
 ]
 
-print(len(EQE1_BOT_COUPLING_MAP))  # 37 edges (7 severed from the original EQE1 coupling map)
 # ── helpers for sub-device construction ─────────────────────────────────────
 def _filter_qubit_dict(
     d: dict[int, float], active_set: set[int],
@@ -570,6 +568,12 @@ QEXA20_COUPLING_MAP = [
 _RE_TC_EDGE = re.compile(r"^TC-(\d+)-(\d+)$")
 
 
+# QExa20 T1/T2 unit fix (ASSUMPTION, to verify): the raw DCDB values read as 1e-4 µs give a median T1 of
+# 3.5 µs, 10x below EQE1; read as ns they give T1 34.9 µs / T2 echo 15.1 µs, close to the 41 / 18 µs reported
+# for this Q-Exa system (Deng et al., arXiv:2508.21231).  Set to 1.0 to go back to the raw reading.
+QEXA20_T_SCALE = 10.0
+
+
 def _load_csv_calibration(csv_path: Path):
     """Parse the QExa20 CSV calibration into per-qubit / per-edge dicts.
 
@@ -632,7 +636,7 @@ def _load_csv_calibration(csv_path: Path):
             m = re.match(r"^QB(\d+)$", entity)
             if m:
                 q = int(m.group(1)) - 1
-                target_dict[q] = val * 1e-6   # µs → s
+                target_dict[q] = val * 1e-6 * QEXA20_T_SCALE   # µs → s, unit fix below
 
     return r_gate_error, cz_gate_error, readout_e01, readout_e10, t1, t2
 

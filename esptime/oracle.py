@@ -17,6 +17,9 @@ Decay = log ESP − log F (nats = error of log ESP when F is exact), vs the labe
                    fitted in log space (the head predicts e^a, softplus(b) per case, so it can do better than that)
   E2 no placement  E1 with every qubit at the device's mean 1/T (what the hard placement adds)
   E3 duration      E1 with the duration of D2 (no stage 2) and with the label duration +5% (sensitivity)
+  E4 counts        the model's formula since 2026-10-16: −[N_act · duration − busy] · mean 1/T, busy = r · 42 ns +
+                   2 · cz · 130 ns + measure · 15 µs from the true counts (= Σ_p busy_p exactly), T over the qubits
+                   of the initial layout; N_act = true active physical qubits, or the logical ones (no extra qubits)
     python -m esptime.oracle            # work/dataset.pt + work/labels.pt -> work/oracle/report.md, rows.json
 """
 from __future__ import annotations
@@ -26,7 +29,7 @@ import json
 import numpy as np
 import torch
 
-from .config import DEVICES, T_SWAP, VARIATIONAL, WORK
+from .config import DEVICES, T1, TCZ, TM, T_SWAP, VARIATIONAL, WORK
 from .dataset import family, schedule_np
 
 ESP_MIN = np.log(1e-3)
@@ -64,6 +67,14 @@ def rows_of(it, lab, invts) -> list[dict]:
         it_d = invts[d]
         # E0: MQT's own definition on the physical qubits of the compiled circuit
         busy_p = np.array([[n, b] for n, b in rec["busy"] if n >= 0])
+        n_r, n_m, n_cz = rec["counts"]
+        busy_tot = n_r * T1 + n_m * TM + 2 * n_cz * TCZ
+        lay0 = it.layout[:, d].numpy()
+        inv_lay = float(it_d[lay0[lay0 >= 0]].mean())
+        n_log_act = len({q for w in wires for q in w})
+        r["E4_trueN"] = -(len(busy_p) * dur - busy_tot) * inv_lay
+        r["E4_logN"] = -(n_log_act * dur - busy_tot) * inv_lay
+        r["E4_trueN_p5"] = -(len(busy_p) * 1.05 * dur - busy_tot) * inv_lay
         r["E0_own"] = float(((dur - busy_p[:, 1]).clip(min=0) * it_d[busy_p[:, 0].astype(int)]).sum())
         r["idle_phys"], r["busy_phys"], r["n_phys"] = float((dur - busy_p[:, 1]).clip(min=0).sum()), float(busy_p[:, 1].sum()), len(busy_p)
         # E1: logical wires on the routed schedule, T of the initial layout
@@ -155,6 +166,9 @@ def main():
         X = lambda ok, dk: np.array([[r[ok], r[dk] * r["inv_m"]] for r in sel])
         g["E3 duration of D2 (no c2)"] = dstat(-(X("own_D2", "dur_D2") @ coef), sel)
         g["E3 duration +5%"] = dstat(-(X("own_p5", "dur_p5") @ coef), sel)
+        g["E4 counts, true N_act"] = dstat(dl(sel, "E4_trueN"), sel)
+        g["E4 counts, N_act = logical"] = dstat(dl(sel, "E4_logN"), sel)
+        g["E4 counts, true N_act, duration +5%"] = dstat(dl(sel, "E4_trueN_p5"), sel)
         res["decay"][grp] = g
     res["decay"]["by_group E1 fitted (all)"] = {}
     coef, _ = fit(rows, "own", "dur", "inv_m")

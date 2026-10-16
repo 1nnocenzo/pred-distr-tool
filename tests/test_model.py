@@ -85,6 +85,8 @@ def test_pipeline():
     for k in ("logf", "dur", "dur_mc", "decay", "logesp"):
         assert out[k].shape == (len(items), len(DEVICES)) and torch.isfinite(out[k]).all(), k
     assert (out["logf"] <= 0).all() and (out["decay"] <= 0).all() and (out["dur"] > 0).all()
+    assert (out["n_extra"] >= 0).all() and (out["n_extra"][b.rf_pred > 0.5] == 0).all()   # none without routing
+    assert torch.isfinite(b.n_extra).all() and (b.n_extra[b.rf] == 0).all()
     loss, parts = L.total(out, b, model.backbone.hops)
     out_v = model(b, dev_v)
     loss = loss + L.calib_loss(out, out_v, b, 0)

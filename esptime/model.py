@@ -9,9 +9,12 @@
             gate embedding and operand distances) -> per gate and device: SWAP rate per operand wire (Poisson),
             extra wait; pooled: c2 = log(final duration / routed schedule).  Routing-free pairs get no SWAPs / waits.
             duration = level-wise ASAP schedule(SWAPs, waits) × e^c2.
-  ESP       log ESP = log F + decay,  decay = −[e^a · Σ_q idle_q / min(T1,T2)_q + softplus(b) · duration · mean
-            1/min(T1,T2)], idle on the routed schedule, T of the physical qubit the backbone's HARD placement picks
-            (Hungarian on A, the same placement as F); a, b from a small head.
+  ESP       log ESP = log F + decay,  decay = −e^a · [(N_log + N_extra) · duration − busy] · mean 1/min(T1,T2):
+            the idle time summed over the active physical qubits.  busy = r · 42 ns + 2 · cz · 130 ns + measure · 15 µs
+            from the backbone's counts (exact for true counts); N_log = logical qubits with a gate, N_extra = physical
+            qubits only routing activates (predicted, 0 when routing-free); T over the physical qubits the backbone's
+            HARD placement (Hungarian on A, the same placement as F) gives the logical qubits; a, N_extra from a small
+            head.  With every input true this formula is 0.06 nats from the label on routed circuits (formula check).
 """
 from __future__ import annotations
 
@@ -22,7 +25,7 @@ from torch import nn
 from torch_geometric.nn import GINEConv, GraphNorm, SAGEConv
 from torch_geometric.utils import scatter, to_dense_batch
 
-from .config import T_SWAP
+from .config import T1, TCZ, TM, T_SWAP
 from .encoding import MEASURE, N_FEATURES, N_GATE_LOCAL
 
 HP = {"hidden": 142, "plain_layers": 3, "res_layers": 1, "d": 128, "qubit_layers": 2, "device_layers": 3,
@@ -293,7 +296,7 @@ class ESPTimeModel(nn.Module):
         self.esp = nn.Sequential(nn.Linear(2 * H + de + 5, 64), nn.SiLU(), nn.Linear(64, 2))
         nn.init.zeros_(self.esp[-1].weight)
         with torch.no_grad():
-            self.esp[-1].bias.copy_(torch.tensor([0.0, -4.0]))
+            self.esp[-1].bias.copy_(torch.tensor([0.0, -2.0]))        # scale e^0 = 1, extra qubits softplus(-2) = 0.13
 
     def forward(self, b, dev, mc: int = 0, gen=None) -> dict:
         out = self.backbone(b, dev)
@@ -310,34 +313,35 @@ class ESPTimeModel(nn.Module):
         out.update(rate=rate, wait=wait, c2=c2, dur=dur)
         if mc:
             out["dur_mc"] = mc_schedule(b, rate_e.detach(), wait_e.detach(), mc, gen) * torch.exp(c2.detach())
-        # ---- ESP: idle time of every logical qubit on the routed schedule, T1/T2 of its hard-placed physical qubit
+        # ---- ESP, count formula: the idle time summed over the active PHYSICAL qubits is N_act · duration − Σ_p busy_p,
+        # and Σ_p busy_p is fixed by the compiled counts (r · 42 ns + 2 · cz · 130 ns + measure · 15 µs, exact);
+        # N_act = active logical qubits + the extra physical qubits routing activates (predicted, 0 if routing-free);
+        # 1/min(T1, T2) = mean over the physical qubits the hard placement gives the active logical qubits
         head_only = self.esp_grad == "head"
-        dur_e, rate_b = (dur.detach(), rate_e.detach()) if head_only else (dur, rate_e)
-        slot, elig = swap_slots(b)
-        gq = b.gate_qubits
+        dur_e = dur.detach() if head_only else dur
+        counts = out["counts"].detach() if head_only else out["counts"]
+        busy_tot = counts @ counts.new_tensor([T1, TM, 2 * TCZ])                     # (B, D) µs
         q_max = out["assign"].size(2)
-        sw_t = rate_b * (slot & elig.view(-1, 1)).unsqueeze(1) * T_SWAP           # (N, D, 3) SWAP time per wire
-        busy = rate.new_zeros(n_c * q_max, n_dev)
-        for k in range(gq.size(1)):
-            m = slot[:, k]
-            busy = busy.index_add(0, (b.batch * q_max + gq[:, k].clamp(min=0))[m], (b.t.view(-1, 1) + sw_t[:, :, k])[m])
-        busy = busy.view(n_c, q_max, n_dev).transpose(1, 2)                      # (B, D, Qm)
-        active = busy > 0
-        idle = torch.where(active, (dur_e.unsqueeze(-1) - busy).clamp(min=0), torch.zeros_like(busy))
+        slot, elig = swap_slots(b)
+        used = rate.new_zeros(n_c * q_max).index_fill(
+            0, (b.batch.unsqueeze(1) * q_max + b.gate_qubits.clamp(min=0))[slot], 1.0).view(n_c, q_max)
         coh, _ = to_dense_batch(dev.coh, dev.batch)                              # (D, P) 1/µs
-        inv_t = torch.einsum("bdqp,dp->bdq", hard_placement(out["assign"]), coh.to(busy))
-        own = (idle * inv_t).sum(-1)
-        n_act = active.sum(-1).clamp(min=1)
-        inv_m = (active * inv_t).sum(-1) / n_act
+        inv_t = torch.einsum("bdqp,dp->bdq", hard_placement(out["assign"]), coh.to(rate))
+        n_log = used.sum(-1, keepdim=True).clamp(min=1)                           # (B, 1)
+        inv_m = (inv_t * used.unsqueeze(1)).sum(-1) / n_log                      # (B, D)
         pooled = torch.cat([scatter(h, b.batch, 0, reduce="mean"), scatter(h, b.batch, 0, reduce="max")], 1)
         if head_only:
             pooled = pooled.detach()
-        nsw = scatter((rate_b * (slot & elig.view(-1, 1)).unsqueeze(1)).sum(-1), b.batch, 0, dim_size=n_c, reduce="sum")
+        nsw = scatter((rate_e.detach() * (slot & elig.view(-1, 1)).unsqueeze(1)).sum(-1), b.batch, 0, dim_size=n_c,
+                      reduce="sum")
         z = torch.cat([pooled.unsqueeze(1).expand(-1, n_dev, -1), dev_e.unsqueeze(0).expand(n_c, -1, -1),
-                       torch.stack([torch.log1p(dur_e), torch.log1p(idle.sum(-1)), torch.log1p(n_act.float()),
+                       torch.stack([torch.log1p(dur_e), torch.log1p(busy_tot), torch.log1p(n_log.expand(-1, n_dev)),
                                     torch.log1p(nsw), rf.float()], -1)], -1)
         o = self.esp(z)
-        decay = -(own * torch.exp(o[..., 0]) + dur_e * F.softplus(o[..., 1]) * inv_m)
+        n_extra = F.softplus(o[..., 1]) * (~rf)
+        idle_tot = ((n_log + n_extra) * dur_e - busy_tot).clamp(min=0)
+        decay = -idle_tot * inv_m * torch.exp(o[..., 0])
+        out["n_extra"] = n_extra
         out.update(decay=decay, logesp=out["logf"] + decay)
         return out
 

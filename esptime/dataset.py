@@ -8,6 +8,8 @@ Targets  (original calibration, (1, D) unless noted; ``ok`` masks the known ones
          route: s (N, D, 3) Sabre SWAPs per operand slot, wait (N, D) teacher-forced extra wait of each matched gate
          (/T_SWAP in the loss), m (N, D) matched, routed (1, D), replay (1, D) Sabre's routed schedule µs,
          c2 (1, D) = log(dur / base) with base = replay (routed) or the logical schedule (routing-free)
+         n_extra (1, D) active physical qubits of the compiled circuit beyond the logical qubits with a gate (the ESP's
+         idle runs over all active physical qubits; routing may activate extra ones)
          variants: logF_v, decay_v (1, K, D) on the K calibration variants of labels.pt (``calibs``)
     python -m esptime.dataset [--jobs 8]          # work/labels.pt + work/devices.json -> work/dataset.pt
 """
@@ -94,6 +96,8 @@ def build_item(name: str, qb, lab: dict, calibs: list[str], chs, table) -> Data:
     wait = np.zeros((N, D), np.float32)
     m = np.zeros((N, D), bool)
     routed = torch.zeros(1, D, dtype=torch.bool)
+    n_extra = torch.zeros(1, D)
+    n_log_act = len({q for w in wires for q in w})
     replay = torch.full((1, D), float("nan"))
     logical = schedule_np(wires, t)
     for di, d in enumerate(DEVICES):
@@ -103,6 +107,8 @@ def build_item(name: str, qb, lab: dict, calibs: list[str], chs, table) -> Data:
         layout[: len(r["layout"]), di] = torch.tensor(r["layout"][:nq])
         counts[0, di] = torch.tensor(r["counts"], dtype=torch.float)
         rf[0, di] = bool(r["rf"])
+        if "busy" in r:
+            n_extra[0, di] = max(sum(n >= 0 for n, _ in r["busy"]) - n_log_act, 0)
         if "swaps" in r and r.get("aligned"):
             for node, slot, n in r["swaps"]:
                 s[node, di, slot] = n
@@ -130,7 +136,7 @@ def build_item(name: str, qb, lab: dict, calibs: list[str], chs, table) -> Data:
                 counts=counts, layout=layout, rf=rf,
                 s=torch.from_numpy(s), wait=torch.from_numpy(wait), m=torch.from_numpy(m),
                 routed=routed, replay=replay, c2=c2, ok2=ok2,
-                logF_v=logf_v.nan_to_num(0.0), decay_v=dec_v.nan_to_num(0.0),
+                n_extra=n_extra, logF_v=logf_v.nan_to_num(0.0), decay_v=dec_v.nan_to_num(0.0),
                 ok_v=torch.isfinite(logf_v) & torch.isfinite(dec_v) & (dec_v <= 0))
 
 

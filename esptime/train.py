@@ -79,20 +79,25 @@ def summary(rows) -> dict:
     rows = [r for r in rows if r["ok"] and r["dur_lab"] > 0]
     if not rows:
         return {}
-    key = "dur_mc" if "dur_mc" in rows[0] else "dur"
     out = {"n_cases": len(rows), "switch_agreement": float(np.mean([r["rf"] == r["rf_pred"] for r in rows]))}
-    dur = {}
-    for grp, sel in (("all", rows), ("routed", [r for r in rows if not r["rf"]]), ("routing-free", [r for r in rows if r["rf"]])):
-        if sel:
-            dur[grp] = _err(np.array([r[key] for r in sel]), np.array([r["dur_lab"] for r in sel]))
-    dur["routed_by_2q"] = {bin_name(lo, hi): _err(np.array([r[key] for r in ss]), np.array([r["dur_lab"] for r in ss]))
-                           for lo, hi in SIZE_BINS if (ss := [r for r in rows if not r["rf"] and lo <= r["n2q"] < hi])}
-    out[f"duration ({key} vs label, relative error)"] = dur
+    for key in ("dur", "dur_mc"):                  # dur: mean SWAP rates (what the losses train); dur_mc: sampled SWAPs
+        if key not in rows[0]:
+            continue
+        dur = {}
+        for grp, sel in (("all", rows), ("routed", [r for r in rows if not r["rf"]]), ("routing-free", [r for r in rows if r["rf"]])):
+            if sel:
+                dur[grp] = _err(np.array([r[key] for r in sel]), np.array([r["dur_lab"] for r in sel]))
+        dur["routed_by_2q"] = {bin_name(lo, hi): _err(np.array([r[key] for r in ss]), np.array([r["dur_lab"] for r in ss]))
+                               for lo, hi in SIZE_BINS if (ss := [r for r in rows if not r["rf"] and lo <= r["n2q"] < hi])}
+        out[f"duration ({key} vs label, relative error)"] = dur
     lf, lft = np.array([r["logF"] for r in rows]), np.array([r["logF_lab"] for r in rows])
     le, let = np.array([r["logESP"] for r in rows]), np.array([r["logESP_lab"] for r in rows])
     big = let > math.log(1e-3)
     out["F"] = {"R2": _r2(np.exp(lf), np.exp(lft)), "abs_dlog_median": float(np.median(np.abs(lf - lft)))}
+    rt = np.array([not r["rf"] for r in rows])
     out["ESP"] = {"R2": _r2(np.exp(le), np.exp(let)),
+                  "abs_dlog_median_esp_gt_1e-3_routed": float(np.median(np.abs(le - let)[big & rt])) if (big & rt).any() else None,
+                  "abs_dlog_median_esp_gt_1e-3_routing_free": float(np.median(np.abs(le - let)[big & ~rt])) if (big & ~rt).any() else None,
                   "abs_dlog_median_esp_gt_1e-3": float(np.median(np.abs(le - let)[big])) if big.any() else None,
                   "abs_dlog_p90_esp_gt_1e-3": float(np.percentile(np.abs(le - let)[big], 90)) if big.any() else None,
                   "R2_log_esp_gt_1e-3": _r2(le[big], let[big]) if big.sum() > 2 else None}
@@ -216,6 +221,7 @@ def main():
     ap.add_argument("--time-n", type=int, default=300, help="circuits timed end to end (0: none)")
     ap.add_argument("--max-train", type=int, default=0)
     ap.add_argument("--max-test", type=int, default=0)
+    ap.add_argument("--max-levels", type=int, default=0, help="leave out circuits deeper than this (local runs; 0: all)")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--threads", type=int, default=8)
     args = ap.parse_args()
@@ -227,7 +233,8 @@ def main():
     rng = random.Random(args.seed)
 
     blob = torch.load(args.data, weights_only=False)
-    data = {it.name: it for it in blob["items"]}
+    data = {it.name: it for it in blob["items"]
+            if not args.max_levels or not it.num_nodes or int(it.lvl.max()) < args.max_levels}
     raws, calibs = blob["devices"], blob["calibs"]
     dev = device_batch(raws["orig"], raws["orig"]).to(args.device)
     devs_v = [device_batch(raws[c], raws["orig"]).to(args.device) for c in calibs if c != "orig"]

@@ -17,7 +17,8 @@ gate DAG ─► backbone: SAGE encoder ─► logical qubits ─► Sinkhorn pla
                 ▼
         route stage: SWAPs per operand wire + waits + c2 ─► level-wise ASAP schedule ─► duration
                 ▼
-        ESP head: idle time per qubit on that schedule × 1/min(T1,T2) of its placed qubit ─► decay ─► log ESP = log F + decay
+        ESP head: idle = (active qubits · duration − busy time from the counts) × mean 1/min(T1,T2) ─► decay
+                  ─► log ESP = log F + decay      (T: placed qubits if routing-free, device mean if routed)
 ```
 Devices enter as calibration graphs (per-qubit errors, T1/T2, couplers), so calibration variants are just other graphs.
 

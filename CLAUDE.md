@@ -19,6 +19,10 @@ See `README.md` (layout, run commands, splits, metrics). Generated data goes to 
   head on the backbone's hard placement. Joint training in one stage (`--init` + `--freeze-backbone` = v29 recipe).
 - Devices are calibration graphs (input), not fixed output heads.
 - Outputs: duration, log F, decay; ESP = F · exp(decay) by construction.
+- ESP count formula (2026-10-16, after the formula check): decay = −e^a · [(N_log + N_extra) · duration − busy] ·
+  mean 1/T, busy from the predicted counts (exact identity), N_extra predicted; T from the hard placement when
+  routing-free, device mean when routed (the learned placement was worse than the device mean there).
+  Duration also trained end to end (`final` loss); model selection on the target terms (F, final, decay).
 - Labels: one Qiskit L2 compilation (seed 0) of the BASIS circuit the model encodes; F, ESP, duration, layout, counts
   and Sabre SWAP targets all come from it (no more mixed seed-0 / best-of-3 labels, no qaoa rzz label gap).
 - Included: synthetic routing circuits, timing benchmark, calibration variants (+ change loss on log F and log ESP).

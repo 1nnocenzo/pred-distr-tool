@@ -19,7 +19,8 @@ Decay = log ESP − log F (nats = error of log ESP when F is exact), vs the labe
   E3 duration      E1 with the duration of D2 (no stage 2) and with the label duration +5% (sensitivity)
   E4 counts        the model's formula since 2026-10-16: −[N_act · duration − busy] · mean 1/T, busy = r · 42 ns +
                    2 · cz · 130 ns + measure · 15 µs from the true counts (= Σ_p busy_p exactly), T over the qubits
-                   of the initial layout; N_act = true active physical qubits, or the logical ones (no extra qubits)
+                   of the initial layout (or the device mean, with one global scale as the head's e^a); N_act = true
+                   active physical qubits, or the logical ones (no extra qubits)
     python -m esptime.oracle            # work/dataset.pt + work/labels.pt -> work/oracle/report.md, rows.json
 """
 from __future__ import annotations
@@ -75,6 +76,7 @@ def rows_of(it, lab, invts) -> list[dict]:
         r["E4_trueN"] = -(len(busy_p) * dur - busy_tot) * inv_lay
         r["E4_logN"] = -(n_log_act * dur - busy_tot) * inv_lay
         r["E4_trueN_p5"] = -(len(busy_p) * 1.05 * dur - busy_tot) * inv_lay
+        r["E4_trueN_devT"] = -(len(busy_p) * dur - busy_tot) * float(it_d.mean())
         r["E0_own"] = float(((dur - busy_p[:, 1]).clip(min=0) * it_d[busy_p[:, 0].astype(int)]).sum())
         r["idle_phys"], r["busy_phys"], r["n_phys"] = float((dur - busy_p[:, 1]).clip(min=0).sum()), float(busy_p[:, 1].sum()), len(busy_p)
         # E1: logical wires on the routed schedule, T of the initial layout
@@ -169,6 +171,8 @@ def main():
         g["E4 counts, true N_act"] = dstat(dl(sel, "E4_trueN"), sel)
         g["E4 counts, N_act = logical"] = dstat(dl(sel, "E4_logN"), sel)
         g["E4 counts, true N_act, duration +5%"] = dstat(dl(sel, "E4_trueN_p5"), sel)
+        e4d = dl(sel, "E4_trueN_devT")
+        g["E4 counts, true N_act, device-mean T, one global scale"] = dstat(e4d * np.exp(np.median(np.log(np.maximum(-dl(sel, "decay"), 1e-9) / np.maximum(-e4d, 1e-9)))), sel)
         res["decay"][grp] = g
     res["decay"]["by_group E1 fitted (all)"] = {}
     coef, _ = fit(rows, "own", "dur", "inv_m")

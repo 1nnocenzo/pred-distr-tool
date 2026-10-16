@@ -35,6 +35,10 @@ COMPILE_MS = {(0, 20): (19.1, 33.5), (20, 50): (36.8, 86.1), (50, 200): (68.9, 5
               (600, 10 ** 9): (190.1, 2785.8)}
 
 
+# Validation terms the best model is selected on: the targets (F, final duration, ESP decay), not the auxiliaries
+SELECT = ("f", "final", "decay")
+
+
 def n2q(it) -> int:
     return int(((it.gate_qubits >= 0).sum(1) >= 2).sum())
 
@@ -278,8 +282,10 @@ def main():
             hist.append({"epoch": ep, "sec": round(time.time() - t0, 1), **{f"train_{k}": v for k, v in tr.items()},
                          **{f"val_{k}": v for k, v in va.items()}})
             print(json.dumps(hist[-1]), flush=True)
-            if va["loss"] < best:
-                best = va["loss"]
+            sel = sum(va.get(k, 0.0) for k in SELECT)          # model selection on the target terms only
+            hist[-1]["val_select"] = sel
+            if sel < best:
+                best = sel
                 torch.save(model.state_dict(), args.out / "model.pt")
             torch.save({"model": model.state_dict(), "opt": opt.state_dict(), "sched": sched.state_dict(),
                         "epoch": ep, "best": best, "hist": hist}, ck)

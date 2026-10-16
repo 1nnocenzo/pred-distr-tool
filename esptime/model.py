@@ -12,9 +12,10 @@
   ESP       log ESP = log F + decay,  decay = −e^a · [(N_log + N_extra) · duration − busy] · mean 1/min(T1,T2):
             the idle time summed over the active physical qubits.  busy = r · 42 ns + 2 · cz · 130 ns + measure · 15 µs
             from the backbone's counts (exact for true counts); N_log = logical qubits with a gate, N_extra = physical
-            qubits only routing activates (predicted, 0 when routing-free); T over the physical qubits the backbone's
-            HARD placement (Hungarian on A, the same placement as F) gives the logical qubits; a, N_extra from a small
-            head.  With every input true this formula is 0.06 nats from the label on routed circuits (formula check).
+            qubits only routing activates (predicted, 0 when routing-free); T: routing-free -> the physical qubits the
+            backbone's HARD placement (Hungarian on A, the same placement as F) gives the logical qubits, routed -> the
+            device mean; a, N_extra from a small head.  Formula check with true inputs, routed: 0.06 nats with the
+            compiler's layout, 0.145 with the device mean (the learned placement gave ~0.4).
 """
 from __future__ import annotations
 
@@ -316,7 +317,9 @@ class ESPTimeModel(nn.Module):
         # ---- ESP, count formula: the idle time summed over the active PHYSICAL qubits is N_act · duration − Σ_p busy_p,
         # and Σ_p busy_p is fixed by the compiled counts (r · 42 ns + 2 · cz · 130 ns + measure · 15 µs, exact);
         # N_act = active logical qubits + the extra physical qubits routing activates (predicted, 0 if routing-free);
-        # 1/min(T1, T2) = mean over the physical qubits the hard placement gives the active logical qubits
+        # 1/min(T1, T2): routing-free -> mean over the physical qubits the hard placement gives the active logical qubits;
+        # routed -> mean over the device (the learned placement is further from the compiler's qubits than the device
+        # mean on routed circuits, and routing moves the qubits anyway; formula check: 0.145 nats with true inputs)
         head_only = self.esp_grad == "head"
         dur_e = dur.detach() if head_only else dur
         counts = out["counts"].detach() if head_only else out["counts"]
@@ -325,10 +328,11 @@ class ESPTimeModel(nn.Module):
         slot, elig = swap_slots(b)
         used = rate.new_zeros(n_c * q_max).index_fill(
             0, (b.batch.unsqueeze(1) * q_max + b.gate_qubits.clamp(min=0))[slot], 1.0).view(n_c, q_max)
-        coh, _ = to_dense_batch(dev.coh, dev.batch)                              # (D, P) 1/µs
+        coh, cmask = to_dense_batch(dev.coh, dev.batch)                          # (D, P) 1/µs
         inv_t = torch.einsum("bdqp,dp->bdq", hard_placement(out["assign"]), coh.to(rate))
         n_log = used.sum(-1, keepdim=True).clamp(min=1)                           # (B, 1)
-        inv_m = (inv_t * used.unsqueeze(1)).sum(-1) / n_log                      # (B, D)
+        inv_dev = (coh.sum(1) / cmask.sum(1)).to(rate)                           # (D,)
+        inv_m = torch.where(rf, (inv_t * used.unsqueeze(1)).sum(-1) / n_log, inv_dev.expand(n_c, -1))   # (B, D)
         pooled = torch.cat([scatter(h, b.batch, 0, reduce="mean"), scatter(h, b.batch, 0, reduce="max")], 1)
         if head_only:
             pooled = pooled.detach()

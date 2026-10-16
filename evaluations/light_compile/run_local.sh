@@ -10,7 +10,7 @@ JOBS=${JOBS:-4}; N=${N:-400}; DATA_DIR=${DATA_DIR:-../../data/benchmark_dataset_
 mkdir -p local_logs
 pids=()
 for i in $(seq 0 $((JOBS - 1))); do
-    python3 -u pipeline.py eval --task-id $i --n-tasks $JOBS --n $N --data-dir "$DATA_DIR" > local_logs/eval_$i.log 2>&1 & pids+=($!)
+    python3 -u light_compile.py eval --task-id $i --n-tasks $JOBS --n $N --data-dir "$DATA_DIR" > local_logs/eval_$i.log 2>&1 & pids+=($!)
 done
 for p in "${pids[@]}"; do wait "$p"; done
-python3 -u pipeline.py report | tee local_logs/report.log
+python3 -u light_compile.py report | tee local_logs/report.log

@@ -4,6 +4,12 @@ Target: npj Quantum Information collection "Foundations and Advances in HPC/AI-Q
 Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
 
 ## In progress (2026-10-08)
+- **Light compile instead of the routed model (2026-10-16, `light_compile/`, 800 circuits × 3 devices, 1 thread):** switch
+  (cheap checks + VF2 limit 2000: median 0.04 ms, max 9 ms, 99.2% agreement with the compiler, 23 / 1007 routing-free
+  cases lost) → routing-free exact; routed → level 2 with the light Sabre, physics computed exactly. Routed vs level 2
+  seed 0: duration 5.4% (seed-1 floor 3.9%), qaoa 6.6% (floor 4.8%; v27 model 8.8%); abs Δlog ESP where ESP > 1e-3: 0.29
+  (floor 0.20; v8kdi10 + v19i model 0.30-0.65). Time −70% overall, 0.15-0.27× the full compile above 50 2q gates.
+  Open: is the route-stage model still needed (only if it beats this at lower cost); best-of-3 labels vs one light run.
 - **v28 (2026-10-16, to launch): light Sabre as the routing input of the route stage** (`route_stage/sabre_light.py`,
   `stage1.py --prior sabre-light`). The greedy router was far from Sabre (routed schedule 65% off on test circuits); Qiskit's
   SabreLayout with 1 trial / 1 iteration / 1 routing trial after the level-2 init stage gives SWAPs 1.08-1.20x the full

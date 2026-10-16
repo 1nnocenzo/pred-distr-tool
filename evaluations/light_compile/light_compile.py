@@ -12,8 +12,8 @@ Rule, per device:
              are computed exactly (fastpath's MQT formulas), so the only error is the cheaper routing.
   model      (option) the route-stage model on the light Sabre (stage1.py --prior sabre-light, v28 checkpoint) for
              the duration; needs a trained checkpoint, not used by `eval` unless --ckpt is given.
-    python pipeline.py eval --task-id 0 --n-tasks 4 --n 400     # reference, seed floor, light, switch, times
-    python pipeline.py report                                   # -> results/report.md
+    python light_compile.py eval --task-id 0 --n-tasks 4 --n 400     # reference, seed floor, light, switch, times
+    python light_compile.py report                                   # -> results/report.md
 """
 from __future__ import annotations
 
@@ -33,7 +33,8 @@ sys.path[:0] = [str(EVAL / "fastpath"), str(EVAL / "compile_check"), str(EVAL / 
 sys.path.append(str(EVAL.parent))
 DEVS = ("EQE1_Top", "EQE1_Bottom", "QExa20")
 OUT = HERE / "results"
-SMALL = 50                     # 2-qubit gates of the logical circuit up to which the exact compiler is used
+SMALL = 0                      # 2-qubit gates up to which a ROUTED circuit is compiled exactly (2026-10-16: 50 costs
+                               # 45% more time for 8.4% -> 4.9% routed duration error on the rest; 0 = light for every routed case)
 CALL_LIMIT = 2_000             # VF2 states of the switch (2026-10-16: max 2.9 ms; 2.6% of routing-free cases missed
                                # before the cheap checks)
 SKIP = {"grover", "iqpe", "dynamic_qft", "ghz_dynamic", "seven_qubit_steane_code", "shors_nine_qubit_code"}

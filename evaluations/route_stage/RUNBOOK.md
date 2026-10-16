@@ -33,7 +33,46 @@ JOBS=3 bash evaluations/route_stage/run_local.sh train   # v24b: 40 epochs x 3 s
   measured (whole dataset in memory: expect several GB); check the first run before raising `JOBS`.
 - `train` skips runs that already have their eval file, so it can be restarted.
 
-## TO LAUNCH (2026-10-16): v28 = v27 with the light Sabre as routing input
+## TO LAUNCH (2026-10-16): v29 = ONE model for F, duration and ESP (instead of v28)
+
+v28 needs the light Sabre on every circuit (`results/sabre_light.pt`), which was never produced; v29 needs only the v27
+bundle. Until now the ESP path ran two networks (F model + route stage) with two placements: F from the F model's,
+the decay from the light Sabre's physical qubits. v29 (`unified.py`) is one forward:
+- **backbone** = v8kdfi10's F network (generalization_v10, same data and splits as the route stage), frozen: F, placement and
+  calibration tracking exactly v8kdfi10's; its own ESP head is off;
+- **route stage** = v27 (greedy router features, synth2, duration loss) + the backbone's gate embeddings and operand distances
+  as inputs; routing-free pairs (the backbone's VF2 test, no compiler) get no SWAPs / waits;
+- **ESP** = log F − [e^a · Σ_q idle_q / min(T1,T2)_q + softplus(b) · duration · mean 1/min(T1,T2)], idle on the routed
+  schedule, T of the physical qubit the backbone's hard placement picks (the same placement as F); a, b from a small head
+  trained on the decay labels.
+- the MC schedule is one level-wise torch pass over all samples (no Python loop over gates); eval times the whole prediction
+  per circuit (greedy router + forward + MC, batch 1, one thread) by 2q-gate bin, next to the light compile.
+
+Extra data (from the cluster, ~4 MB each): the v8kdfi10 weights, same paths as on the cluster:
+`evaluations/generalization_v10/results/v8kdfi10{,_s6,_s7}/{leave_one_family_out/qaoa,leave_one_group_out/variational,random_control/random_seed{5|6|7}}/model.pth`
+(9 files; the LOSO splits use the control model of the same seed). `generalization_v2/results/device_graphs.pt` is optional
+(the tracked JSON copy is used otherwise).
+
+```bash
+cd evaluations/route_stage
+PYTHONPATH=../../src python test_unified.py                      # 30 s, no data
+bash run_local.sh smoke29                                         # ~10 min: 2 epochs on 300 circuits, 20 timed
+DEVICE=cuda GPUS="0 1" JOBS=4 bash run_local.sh train29           # 3 seeds x (4 splits + loso:layered,seqdense), 40 epochs
+bash run_local.sh report                                          # report_v24.md: duration rows + "v29" section (ESP, F, time)
+```
+
+Cost: every training batch also runs the frozen F backbone (no gradient): expect ~1.5-2x v27's epoch time; use the GPU.
+Options: `ESP_GRAD=route` (the decay loss also trains SWAPs / waits / stage 2), `C2_TARGET=dataset`, `--train-f`
+(fine-tune the backbone too; then rerun the calibration test, its tracking may move).
+
+| look at | adopt v29 as the ESP path if |
+| --- | --- |
+| routed duration vs dataset (sampled) | not worse than v27 (qaoa 6.4%, variational 5.5%, control 7.1% vs dataset) |
+| abs Δlog ESP, ESP > 1e-3, routed | below v8kdfi10 (0.53 / 0.65 / 0.30) and close to the light compile (0.29; seed floor 0.20) |
+| R² F | = v8kdfi10 (frozen backbone: identical by construction) |
+| time per circuit (total) | below the light compile in the same 2q-gate bin (19 / 37 / 69 / 132 / 190 ms) |
+
+## PARKED (2026-10-16): v28 = v27 with the light Sabre as routing input (needs results/sabre_light.pt; v29 first)
 
 The greedy router (prior SWAPs, hops) is far from Sabre: on test circuits its routed schedule is 65% off the true one, the
 light Sabre's 4-8% (qaoa / qft / randomcircuit / synthetic; SWAPs 1.10-1.20x). Light Sabre = Qiskit's level-2 init stage +

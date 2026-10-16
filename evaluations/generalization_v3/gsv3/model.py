@@ -546,6 +546,7 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
 
     def forward(self, circuits, devices) -> torch.Tensor:
         g = self.gate_proj(self.circuit_encoder(circuits))
+        self.last_gate_emb = g                                       # v29: the route stage reads the gate embeddings
         q, gq_glob, valid = self._qubits(circuits, g)
         phys, mask, dev_glob = self._devices(devices)                # (D, P, d)
         self._dev_h = phys                                           # v12: device embeddings for the placed-circuit network
@@ -650,7 +651,8 @@ class SinkhornPlacementPredictor(PhysicsHeadPredictor):
             n_ops_esp = torch.where(tab_rf[gb].unsqueeze(-1), n_tab.unsqueeze(1).expand_as(n_ops_esp), n_ops_esp)
         self.last_counts = scatter(n_ops, gb, dim=0, dim_size=n_circ, reduce="sum")   # v8
         self.last_n_ops = n_ops                                      # (G, D, 3) per gate: r, measure, cz
-        if self.esp_head and hasattr(devices, "coh"):     # device batches built elsewhere may lack T1/T2
+        # device batches built elsewhere may lack T1/T2; v29 (route_stage/unified.py) computes the ESP itself
+        if self.esp_head and hasattr(devices, "coh") and not getattr(self, "skip_esp", False):
             self.last_esp_feats = self.esp_features(circuits, devices, g, gb, n_circ, n_ops_esp, valid, local, assign, dev_glob)
             if tab_rf is not None:
                 self.last_esp_feats["corr_mask"] = (~tab_rf).float()

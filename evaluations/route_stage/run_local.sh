@@ -143,6 +143,27 @@ evalpath() { # v28 end to end on the test splits (CPU): switch -> exact | light 
     python3 -u evalpath.py report | tee "$LOGS/evalpath_report.log"
 }
 
+test29() {  # ~30 s, no data: unified.py on small real circuits with synthetic labels (run after any code change)
+    python3 -u test_unified.py 2>&1 | tee "$LOGS/test29.log"
+}
+
+smoke29() { # ~10 min: 2 epochs of v29 on qaoa, 300 training / 20 test circuits, 20 timed (checks speed and the losses)
+    python3 -u unified.py train --split qaoa --epochs 2 --out results/smoke29 --synth2 --max-train 300 --max-test 20 --mc 4 \
+        --time-n 20 --esp-labels "$LAB" --device "$DEVICE" --threads "$THREADS" 2>&1 | tee "$LOGS/smoke29.log"
+}
+
+train29() { # v29 = ONE model: F backbone v8kdfi10 (frozen) + v27 route stage on its embeddings + ESP on its placement
+    : > "$LOGS/train29_cmds.txt"
+    local gpus=(${GPUS:-}) i=0 pre=""
+    for seed in $SEEDS; do for s in $SPLITS loso:layered,seqdense; do
+        out=results/v29_$(name $s)_s$seed
+        [ -f "$out/eval_$(name $s | sed 's/_dense_complete/_dense-complete/; s/_layered_seqdense/_layered-seqdense/').json" ] && continue
+        [ ${#gpus[@]} -gt 0 ] && pre="CUDA_VISIBLE_DEVICES=${gpus[i++ % ${#gpus[@]}]} "
+        echo "${pre}python3 -u unified.py train --split $s --epochs $EPOCHS --seed $seed --out $out --dur-lambda ${DUR_LAMBDA:-1} --dur-every ${DUR_EVERY:-1} --c2-target ${C2_TARGET:-sabre} --esp-lambda ${ESP_LAMBDA:-1} --esp-grad ${ESP_GRAD:-head} --synth2 --mc $MC --time-n ${TIME_N:-300} --esp-labels $LAB --device $DEVICE --threads $THREADS > $LOGS/train29_$(name $s)_s$seed.log 2>&1 && echo 'train29 $s s$seed done'" >> "$LOGS/train29_cmds.txt"
+    done; done
+    xargs -P "$JOBS" -I{} bash -c '{}' < "$LOGS/train29_cmds.txt"
+}
+
 smoke25() { # ~5 min: 2 epochs of v25 on qaoa, 20 test circuits (checks speed and that the duration loss falls)
     python3 -u stage1.py train --split qaoa --epochs 2 --out results/smoke25 --dur-lambda 1 --max-test 20 --mc 4 \
         --esp-labels "$LAB" --device "$DEVICE" --threads "$THREADS" 2>&1 | tee "$LOGS/smoke25.log"
@@ -151,7 +172,7 @@ smoke25() { # ~5 min: 2 epochs of v25 on qaoa, 20 test circuits (checks speed an
 report() { python3 -u report_v24.py | tee "$LOGS/report.log"; }
 
 case ${1:-all} in
-    smoke) smoke ;; diag) diag ;; mc) mc ;; train) train ;; report) report ;; smoke25) smoke25 ;; train25) train25 ;; contention) contention ;; smoke26) smoke26 ;; train26) train26 ;; synth2) synth2 ;; train27) train27 ;; light) light ;; train28) train28 ;; evalpath) evalpath ;;
+    smoke) smoke ;; diag) diag ;; mc) mc ;; train) train ;; report) report ;; smoke25) smoke25 ;; train25) train25 ;; contention) contention ;; smoke26) smoke26 ;; train26) train26 ;; synth2) synth2 ;; train27) train27 ;; light) light ;; train28) train28 ;; evalpath) evalpath ;; test29) test29 ;; smoke29) smoke29 ;; train29) train29 ;;
     all) smoke; diag; mc; report; train; report ;;
-    *) echo "usage: $0 smoke|diag|mc|train|report|smoke25|train25|contention|smoke26|train26|synth2|train27|light|train28|evalpath|all"; exit 1 ;;
+    *) echo "usage: $0 smoke|diag|mc|train|report|smoke25|train25|contention|smoke26|train26|synth2|train27|light|train28|evalpath|test29|smoke29|train29|all"; exit 1 ;;
 esac

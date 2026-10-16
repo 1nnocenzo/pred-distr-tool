@@ -10,7 +10,13 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
   seed 0: duration 5.4% (seed-1 floor 3.9%), qaoa 6.6% (floor 4.8%; v27 model 8.8%); abs Δlog ESP where ESP > 1e-3: 0.29
   (floor 0.20; v8kdi10 + v19i model 0.30-0.65). Time −70% overall, 0.15-0.27× the full compile above 50 2q gates.
   Open: is the route-stage model still needed (only if it beats this at lower cost); best-of-3 labels vs one light run.
-- **v28 (2026-10-16, to launch): light Sabre as the routing input of the route stage** (`route_stage/sabre_light.py`,
+- **v29 (2026-10-16, to launch, replaces v28): ONE model for F, duration and ESP** (`route_stage/unified.py`, RUNBOOK
+  "v29"): frozen v8kdfi10 F backbone + v27 route stage on its gate embeddings + ESP formula on the backbone's hard placement
+  (same placement for F and decay; no second F model call; vectorised MC schedule). Why: the v28 path ran two models with
+  two placements (F model's for F, light Sabre's for the decay), and v28's light-Sabre data were never produced. Adopt if
+  routed ESP beats v8kdfi10 (abs Δlog ESP 0.53 / 0.65 / 0.30) toward the light compile (0.29) at a lower time per circuit
+  than the light compile in the same size bin. Needs the 9 v8kdfi10 model.pth from the cluster.
+- **v28 (2026-10-16, parked: needs results/sabre_light.pt): light Sabre as the routing input of the route stage** (`route_stage/sabre_light.py`,
   `stage1.py --prior sabre-light`). The greedy router was far from Sabre (routed schedule 65% off on test circuits); Qiskit's
   SabreLayout with 1 trial / 1 iteration / 1 routing trial after the level-2 init stage gives SWAPs 1.08-1.20x the full
   Sabre's and a routed schedule within 4-8%, at ~6-10 ms per (circuit, device) (randomcircuit ~40 ms) vs 35-220 ms for
@@ -193,7 +199,8 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
         duration is low → scale/schedule mismatch. Stage 2 hurts on qaoa (0.127 → 0.153).
         Not comparable with v22 (v22 pools 3 seeds; v24 is seed 5 only) — evaluate on the same test first.
       - ESP oracle (`route_stage/results/esp_oracle.md`): decay = k · Σ idle × mean 1/min(T1,T2) of the device
-        gives |Δ log ESP| median 1.4% / 1.3% / 0.7% (control / qaoa / variational) vs 2.2–2.6% from n·duration;
+        gives |Δ log ESP| median 1.4 / 1.3 / 0.7 (control / qaoa / variational; log units, i.e. ESP off by ×2–4, NOT %: routed
+        decay median −16, all routed cases) vs 2.2–2.6 from n·duration;
         the best-T qubits are worse than the device mean. → with the right schedule, ESP follows.
       - **Next (queued, `route_stage/diag_scale.py`, jobs 1996862–4):** per-slot rate calibration, mass on
         zero-SWAP slots (softplus floor), mean vs median of the totals, duration from Poisson samples vs from
@@ -216,7 +223,7 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
       20%, bias 0.86 -> 0.92), vs dataset 10.9% -> **6.4%** (Sabre-vs-dataset floor 4.6%); SWAP count bias 0.88 -> 1.03;
       stage 2 now helps qaoa (10.5% -> 8.8%) instead of hurting. control 3.3% -> 3.2%, variational 5.7% -> 5.4%, LOSO
       dense,complete 7.6% -> 7.4%. New split LOSO layered,seqdense (class held out) 11.8%: the gain needs the class in
-      training. Next: ESP of routed circuits from the v27 schedule (oracle 0.7-1.4%); bias still 0.92 on qaoa.
+      training. Next: ESP of routed circuits from the v27 schedule (oracle |Δlog ESP| 0.7-1.4, log units = ×2-4, not %); bias still 0.92 on qaoa.
 - [ ] **v25 / v26 results (2026-10-15):** v25 (duration loss) routed duration, sampled + stage 2, 3 seeds: LOSO dense,complete
       13.8% -> 7.6% (bias 0.87 -> 1.05), control 5.3% -> 3.3%, variational 5.4% -> 5.7%, qaoa 13.7% -> 13.9% (bias 0.86).
       v26 (router contention) = v25 everywhere, dropped: our greedy router is far from Sabre (its duration alone 56% off

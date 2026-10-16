@@ -242,8 +242,10 @@ class Stage1(nn.Module):
         self.head2 = nn.Sequential(nn.Linear(2 * hidden + 16, hidden), nn.SiLU(), nn.Linear(hidden, 1))   # stage 2
         self.n_dev = n_dev
 
-    def forward(self, b):
-        x = torch.cat([b.x, b.wf, b.dev_f], 1)
+    def forward(self, b, extra=None):
+        """extra (N, k): more node inputs (v29: the F backbone's gate embedding and operand distances); ``self.last_h``
+        keeps the node states for heads built on top (v29 ESP head)."""
+        x = torch.cat([b.x, b.wf, b.dev_f] + ([extra] if extra is not None else []), 1)
         h = self.inp(x)
         src, dst = b.edge_index
         for lay, nrm in zip(self.layers, self.norms):
@@ -252,6 +254,7 @@ class Stage1(nn.Module):
             glob = scatter(h, b.batch, 0, reduce="mean")[b.batch]
             h = nrm(h + lay(torch.cat([h, fwd, bwd, glob], 1)))
         N = h.size(0)
+        self.last_h = h
         outs = []
         for d in range(self.n_dev):
             df = torch.cat([b.dev_f[:, d: d + 1], b.dev_f[:, 3 + 3 * d: 6 + 3 * d]]

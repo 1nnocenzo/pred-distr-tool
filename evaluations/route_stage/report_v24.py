@@ -38,15 +38,50 @@ def fmt(vals, pct=True):
 
 def model_rows():
     runs = defaultdict(lambda: defaultdict(list))          # (label) -> split -> [eval dict]
-    for p in sorted(list(RES.glob("v24*/eval_*.json")) + list(RES.glob("v25*/eval_*.json")) + list(RES.glob("v26*/eval_*.json")) + list(RES.glob("v27*/eval_*.json")) + list(RES.glob("v28*/eval_*.json"))):
+    for p in sorted(list(RES.glob("v24*/eval_*.json")) + list(RES.glob("v25*/eval_*.json")) + list(RES.glob("v26*/eval_*.json")) + list(RES.glob("v27*/eval_*.json")) + list(RES.glob("v28*/eval_*.json")) + list(RES.glob("v29*/eval_*.json"))):
         m = re.match(r"eval_(.+?)(_mc)?\.json$", p.name)
         if not m or m.group(1) not in SPLITS:
             continue
         run = re.sub(r"_s\d+$", "", p.parent.name)
-        run = next((r for r in ("v28", "v27", "v26", "v25", "v24b") if run.startswith(r)), "v24")
-        mc = bool(m.group(2)) or (run in ("v24b", "v25", "v26", "v27", "v28"))
+        run = next((r for r in ("v29", "v28", "v27", "v26", "v25", "v24b") if run.startswith(r)), "v24")
+        mc = bool(m.group(2)) or (run in ("v24b", "v25", "v26", "v27", "v28", "v29"))
         runs[(run, mc)][m.group(1)].append(json.loads(p.read_text()))
     return runs
+
+
+def v29_section(runs) -> list[str]:
+    """v29 (unified.py): one model for F, duration and ESP; ESP / F / device choice and the end-to-end time."""
+    by_split = runs.get(("v29", True), {})
+    if not by_split:
+        return []
+    L = ["", "## v29: one model (F backbone v8kdfi10 + route stage + ESP on the same placement)", "",
+         "abs Δlog ESP where the true ESP > 1e-3 (as the earlier ESP reports); routed / all = by the label's routing flag. "
+         "References on routed cases: v8kdfi10 abs Δlog ESP 0.53 (qaoa) / 0.65 (variational) / 0.30 (control) "
+         "(esp/results/report_esp_routed_v10_v19i.md); light compile 0.29, compiler seed floor 0.20 "
+         "(light_compile/results/report.md).", "",
+         "| split | seeds | R² F | R² ESP | abs Δlog ESP, ESP > 1e-3: all | routed | routing-free | rel. abs Δlog ESP, routed (all ESP) | "
+         "right device by ESP | ESP regret | routed duration vs dataset (sampled) | switch agreement |",
+         "|" + " --- |" * 12]
+    for s in SPLITS:
+        ev = by_split.get(s, [])
+        if not ev:
+            continue
+        e = lambda grp, k: fmt([g(x, "esp", grp, k) for x in ev], False)
+        L.append(f"| {s} | {len(ev)} | {e('all', 'R2 F')} | {e('all', 'R2 ESP')} | {e('all', 'abs dlog ESP median (ESP>1e-3)')} | "
+                 f"{e('routed', 'abs dlog ESP median (ESP>1e-3)')} | {e('routing-free', 'abs dlog ESP median (ESP>1e-3)')} | "
+                 f"{fmt([g(x, 'esp', 'routed', 'rel abs dlog ESP median (all)') for x in ev])} | "
+                 f"{fmt([g(x, 'device_by_esp', 'right') for x in ev])} | {fmt([g(x, 'device_by_esp', 'regret') for x in ev], False)} | "
+                 f"{fmt([g(x, 'routed', 'vs_dataset', 'pred_mc', 'err') for x in ev])} | {fmt([g(x, 'switch', 'agreement') for x in ev])} |")
+    L += ["", "### Time per circuit, whole prediction (3 devices, batch 1, one thread, median ms)", "",
+          "features = greedy router on the 3 chips + wire features; forward = F, placement, switch, route stage, ESP (one "
+          "model); mc = sampled schedule. Light / full compile: light_compile/results/report.md (other circuits, same bins).", "",
+          "| split | 2q gates | n | features | forward | mc | total | light compile | full compile |", "|" + " --- |" * 9]
+    for s in SPLITS:
+        for x in by_split.get(s, [])[:1]:
+            for k, t in (g(x, "timing", "by_2q") or {}).items():
+                L.append(f"| {s} | {k} | {t['n']} | {t['feat_ms']:.1f} | {t['forward_ms']:.1f} | {t['mc_ms']:.1f} | "
+                         f"**{t['total_ms']:.1f}** | {t['light_compile_ms']:.1f} | {t['full_compile_ms']:.1f} |")
+    return L
 
 
 def main():
@@ -68,6 +103,7 @@ def main():
                      f"{fmt(col('oracle_sw', 'err'))} | {fmt(col('vs_dataset', 'pred_mc', 'err'))} | "
                      f"{fmt(col('vs_dataset', 'sabre_final', 'err'))} | {fmt(col('swaps', 'bias'), False)} / {fmt(col('swaps', 'mean_ratio'), False)} | "
                      f"{fmt([g(e, 'routing-free', 'pred', 'err') for e in ev])} |")
+    L += v29_section(runs)
     diags = sorted(RES.glob("diag_scale_*.json"))
     diags = [p for p in diags if "smoke" not in p.name]
     if diags:

@@ -134,9 +134,9 @@ evalpath() { # v28 end to end on the test splits (CPU): switch -> exact | light 
         case $s in qaoa) sd=leave_one_family_out/qaoa ;; variational) sd=leave_one_group_out/variational ;;
                    control) sd=random_control/random_seed$seed ;; esac
         fr=v8kdc10_s$seed; [ $seed = 5 ] && fr=v8kdc10
-        fp=$F9/$fr/$sd/predictions.json
+        fp=$F9/$fr/$sd/predictions.json         # used only when $F9/$fr/$sd/model.pth is missing (then F is not timed)
         for i in $(seq 0 $((EP_TASKS - 1))); do
-            echo "RAYON_NUM_THREADS=1 python3 -u evalpath.py run --split $s --ckpt $ck --f-pred $fp --baselines --mc $MC --time-full-every ${TIME_FULL_EVERY:-1} --max-circuits ${EP_MAX:-0} --esp-labels $LAB --task-id $i --n-tasks $EP_TASKS > $LOGS/evalpath_${s}_s${seed}_$i.log 2>&1" >> "$LOGS/evalpath_cmds.txt"
+            echo "RAYON_NUM_THREADS=1 python3 -u evalpath.py run --split $s --ckpt $ck --f-model $F9/$fr/$sd --f-pred $fp --baselines --mc $MC --time-full-every ${TIME_FULL_EVERY:-1} --max-circuits ${EP_MAX:-0} --esp-labels $LAB --task-id $i --n-tasks $EP_TASKS > $LOGS/evalpath_${s}_s${seed}_$i.log 2>&1" >> "$LOGS/evalpath_cmds.txt"
         done
     done; done
     xargs -P "$JOBS" -I{} bash -c '{}' < "$LOGS/evalpath_cmds.txt"

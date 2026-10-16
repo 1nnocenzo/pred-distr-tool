@@ -7,8 +7,9 @@ The path at prediction time, per circuit and device (no compilation for routed c
   routed      -> light Sabre (sabre_light.light_case: placement + SWAPs on physical qubits)
                  -> the v28 model (stage1.py --prior sabre-light) on that input: SWAPs and waits of the full Sabre
                     -> duration (schedule of Poisson-sampled SWAPs, median of MC, × stage 2)
-                 -> F from the F model, as before (v8kdc10's predictions.json of the same split and seed, --f-pred; the
-                    F the hybrid / ESP studies used)
+                 -> F from the F model, as before: v8kdc10 run here on the circuit and timed (--f-model: its split
+                    folder with model.pth); without the weights, its saved predictions.json (--f-pred, not timed:
+                    add ~10-40 ms per circuit)
                  -> ESP = F · Π_active exp(−(duration − busy_q) / min(T1, T2)_q): the ESP head's formula (gsv3/model.py,
                     v19 formula head) with the v28 duration, on the light Sabre's physical qubits and busy times (its
                     gates converted to native r / cz / measure with esp/results/decomp_table.json, plus the SWAPs the
@@ -158,8 +159,39 @@ def swap_logf(dev) -> float:
 
 
 # ------------------------------------------------------------------------------------------------- one case
+class FModel:
+    """v8kdc10 (kind sinkhorn_rf_route_czc) on one circuit at a time, CPU, timed: log F per device."""
+
+    def __init__(self, folder: Path | None, kind: str = "sinkhorn_rf_route_czc"):
+        from gsv3 import paths
+        from gsv3.devices import variant_batch
+        from gsv3.model import build_model, load_hparams
+        params = load_hparams()
+        gpath = paths.V2_DEVICE_GRAPHS
+        if gpath.is_file():
+            raw = torch.load(gpath, weights_only=False)["raw"]
+        else:                                    # the tracked JSON copy (off-cluster checkouts have no .pt)
+            raw = json.loads(S.RAW_DEV.read_text())
+            OUT.mkdir(parents=True, exist_ok=True)
+            gpath = OUT / "device_graphs_from_raw_json.pt"
+            torch.save({"raw": raw}, gpath)
+        self.dev = variant_batch(raw, list(S.DEVS), params["lap_pe"], gpath)
+        self.model = build_model(kind, params, self.dev, torch.device("cpu"))
+        if folder is not None:
+            self.model.load_state_dict(torch.load(folder / "model.pth", map_location="cpu"))
+        self.model.eval()
+
+    def __call__(self, g) -> tuple[np.ndarray, float]:
+        from torch_geometric.loader import DataLoader
+        b = next(iter(DataLoader([g], batch_size=1)))
+        t0 = time.perf_counter()
+        with torch.no_grad():
+            logf = self.model(b, self.dev)
+        return np.exp(np.minimum(logf.view(-1).numpy(), 0)), time.perf_counter() - t0
+
+
 def predict_circuit(name, qc, g, model, devs, tab, tr, tc, chips, mc: int, rng, baselines: bool, time_full: bool,
-                    fpred=None):
+                    fpred=None, fmodel=None):
     """Every step for one circuit on every device; returns per-device rows with values and times."""
     T = {}
     t0 = time.perf_counter(); qb = fe.to_basis(qc); g_live = fe.to_data(qc); T["encode"] = time.perf_counter() - t0
@@ -182,9 +214,12 @@ def predict_circuit(name, qc, g, model, devs, tab, tr, tc, chips, mc: int, rng, 
     routed_any = any(not r[0] for r in rf_all)
     item = rate = None
     t_feat = t_model = 0.0
+    t_f = 0.0
     if routed_any:
         item, t_feat, s_light = live_item(g, light, tr, tc, chips)
         t0 = time.perf_counter(); rate, wait, c2 = model_out(model, item); t_model = time.perf_counter() - t0
+        if fmodel is not None:
+            fpred, t_f = fmodel(g)
     for di, dev in enumerate(devs):
         rf, how, t_sw = rf_all[di]
         # the encoding is only needed when some device is routed (the model reads the graph)
@@ -205,14 +240,15 @@ def predict_circuit(name, qc, g, model, devs, tab, tr, tc, chips, mc: int, rng, 
             logf_m = math.log(max(float(fpred[di]), 1e-300)) if fpred is not None else logf_tab
             busy_m = tp["busy"] + np.where(tp["active"], 2 * d_sw * S.T_SWAP / max(tp["active"].sum(), 1), 0)
             logesp_m = esp_from(logf_m, busy_m, tp["active"], dur, dev)
-            r["f_source"] = "v8kdc10" if fpred is not None else "table"
+            r["f_source"] = ("v8kdc10 run" if fmodel is not None else "v8kdc10 saved") if fpred is not None else "table"
+            r["t_fmodel"] = t_f / len(devs)
             r["model_tableF"] = {"logF": logf_tab, "logESP": esp_from(logf_tab, busy_m, tp["active"], dur, dev), "duration": dur}
             t_phys = time.perf_counter() - t0
             replay = float(light[di][3])
             r.update(path="model", n_sw_light=sw_light, n_sw_model=sw_model, missing=tp["missing"],
                      t_light=t_light[di], t_features=t_feat / len(devs), t_model=t_model / len(devs), t_sched=t_sched,
                      t_phys=t_phys,
-                     t_path=t_light[di] + t_feat / len(devs) + t_model / len(devs) + t_sched + t_phys,
+                     t_path=t_light[di] + t_feat / len(devs) + t_model / len(devs) + t_f / len(devs) + t_sched + t_phys,
                      pred={"logF": logf_m, "logESP": logesp_m, "duration": dur},
                      light_table={"logF": tp["logF"], "logESP": esp_from(tp["logF"], tp["busy"], tp["active"], replay, dev),
                                   "duration": replay})
@@ -256,8 +292,11 @@ def run(args) -> None:
     f_in = next(iter(graphs.values())).x.size(1) + 9 + 12 + 3
     model = load_model(args.ckpt, f_in, args.hidden, args.layers)
     tag = args.tag or (args.ckpt.parent.name if args.ckpt else "untrained")
-    fpred = None
-    if args.f_pred is not None and args.f_pred.is_file():
+    fpred, fmodel = None, None
+    if args.f_model is not None and (args.f_model / "model.pth").is_file():
+        fmodel = FModel(args.f_model)
+        print(f"F model run here: {args.f_model / 'model.pth'}", flush=True)
+    elif args.f_pred is not None and args.f_pred.is_file():
         fpred = json.loads(args.f_pred.read_text())
         print(f"F from {args.f_pred} ({len(fpred)} circuits)", flush=True)
     else:
@@ -278,7 +317,7 @@ def run(args) -> None:
                 if fpred is not None and fp_ is None:
                     continue                                       # not in the F model's test set
                 rows = predict_circuit(name, qc, graphs[name], model, devs, tab, tr, tc, chips, args.mc, rng,
-                                       args.baselines, ci % args.time_full_every == 0, fp_)
+                                       args.baselines, ci % args.time_full_every == 0, fp_, fmodel)
                 lab = ds[name]
                 for di, d in enumerate(S.DEVS):
                     rows[d]["label"] = labels_of(lab, di)
@@ -300,6 +339,7 @@ def smoke(args) -> None:
     SL.DATA_DIRS = (args.data_dir,) + tuple(SL.DATA_DIRS)
     rng = np.random.default_rng(0)
     model = None
+    fmodel = FModel(None)                     # untrained v8kdc10: plumbing and timing only
     n = 0
     for fam in ("qaoa", "randomcircuit", "qft", "vqe_su2", "ghz", "qnn", "ae"):
         for p in sorted((args.data_dir / fam).glob("*.qasm"))[:2]:
@@ -310,7 +350,7 @@ def smoke(args) -> None:
             if model is None:
                 model = load_model(None, g.x.size(1) + 9 + 12 + 3, 96, 6)
             rows = predict_circuit(f"{fam}/{p.stem}", qc, g, model, devs, tab, tr, tc, chips, 8, rng, True, True,
-                                   [0.5, 0.5, 0.5] if n % 2 else None)
+                                   None, fmodel if n % 2 else None)
             for d, r in rows.items():
                 vals = [r["pred"][k] for k in ("logF", "logESP", "duration")]
                 assert all(np.isfinite(v) for v in vals), (p.stem, d, r)
@@ -403,9 +443,11 @@ def report(args) -> None:
                   f"{tp.sum() / tfu.sum():.2f} | {np.median(tl) if tl else float('nan'):.1f} |")
             rsel = [x for x in tf if x["path"] == "model"]
             if rsel:
-                parts = ("t_encode", "t_switch", "t_light", "t_features", "t_model", "t_sched", "t_phys")
+                parts = ("t_encode", "t_switch", "t_light", "t_features", "t_model", "t_fmodel", "t_sched", "t_phys")
                 w("\nRouted path, median ms per step: " + ", ".join(
-                    f"{k[2:]} {np.median([x[k] for x in rsel]) * 1e3:.2f}" for k in parts))
+                    f"{k[2:]} {np.median([x.get(k, 0.0) for x in rsel]) * 1e3:.2f}" for k in parts))
+                if any(x.get("f_source") == "v8kdc10 saved" for x in rsel):
+                    w("(F read from predictions.json: the F model's time, ~10-40 ms per circuit, is NOT in 'path')")
         w("")
     (OUT / "report.md").write_text("\n".join(L) + "\n")
     print("\n".join(L))
@@ -426,6 +468,7 @@ if __name__ == "__main__":
     ap.add_argument("--max-circuits", type=int, default=0)
     ap.add_argument("--baselines", action="store_true", help="also the light compile on routed cases")
     ap.add_argument("--time-full-every", type=int, default=1, help="time the full compile on every k-th circuit")
+    ap.add_argument("--f-model", type=Path, default=None, help="v8kdc10 split folder with model.pth: run and timed here")
     ap.add_argument("--f-pred", type=Path, default=None, help="predictions.json of the F model (v8kdc10) for this split / seed")
     ap.add_argument("--esp-labels", type=Path, default=EVAL / "compile_check/results/esp_labels.pt")
     ap.add_argument("--data-dir", type=Path, default=EVAL.parent / "data/benchmark_dataset_30k")

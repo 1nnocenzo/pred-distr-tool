@@ -43,3 +43,20 @@ Why the counts are poor (diagnosis on the TRAINING circuits of the counts model)
 - weak signal: 225 optimiser steps in total (count loss still falling); the F loss (MSE on F + 0.1 MSE on log F)
   hardly sees routed circuits (small F): their F is overestimated x3.5 on training circuits (log F +1.26);
 - not the scales s_k (stay at 1.0) and not the placement's errors (ratio 1.00-1.04 to the compiler's qubits).
+
+## Structured counts (table x correction + route-stage SWAPs) and the F-loss fix
+
+| | `route`, old count head (s5 / s6) | structured, F loss clipped (`route` s5 / s6, `counts` s5) | structured + exact log F loss (`route` s5 / s6, `counts` s5) |
+| --- | --- | --- | --- |
+| counts on routed test circuits, r / cz (pred/true) | 0.38 / 0.54 (counts model) | 0.75-0.81 / 0.85-0.89 | **0.84-0.85 / 0.98-1.01** |
+| log F error on routed training circuits (median) | +1.26 (counts model) | +1.18 | **-0.04 / -0.10** |
+| abs Δlog F, all test cases | 0.38 / 0.19 | 0.22 / 0.21 / 0.20 | **0.19 / 0.19 / 0.18** |
+| duration routed (median / p90) | 6.4% / 26% | 5-7% / 25-27% | 6.1-6.8% / **20-24%** |
+| ESP all | 0.198 / 0.133 | 0.248 / 0.224 / 0.198 | 0.229 / 0.217 / 0.190 |
+| ESP routed (24 cases): decay part | 0.42 / 0.49 | | **0.32 / 0.43 / 0.28** |
+| device choice by ESP: regret | 0.0071 / 0.0073 | 0.018-0.021 | 0.0195-0.0196 |
+
+The clipped F target (log max(F, 1e-3)) had pushed the count correction to 0.5x of the table on routed circuits;
+with the exact log F the correction settles at 0.7-0.8 and F on routed circuits is right. The device-choice regret
+is identical across the three runs (0.0167 by F): a few of the 57 test circuits dominate it, not readable here.
+Default kept: `--esp-busy counts` (best decay error, one seed); compare both on the full data.

@@ -1,6 +1,6 @@
 """Training losses.  Every term is masked to the labels it has; ``total`` sums them with the weights of ``LAMBDAS``.
 
-  f        MSE on F + 0.1 · MSE on log max(F, 1e-3)                         (backbone, the F recipe)
+  f        MSE on F + 0.1 · Huber on log F (exact label, not clipped)        (backbone)
   region   compiler's layout: occupancy BCE + operand-distance MSE (log1p)    (backbone placement)
   count    native counts, MSE on log1p, kind weights r 1, cz 1 (measure is exact)   (backbone count head; the ESP's
            busy time is computed from these counts)
@@ -37,7 +37,9 @@ def f_loss(logf, b, logf_lab=None, ok=None):
     ok = (b.ok if ok is None else ok).float()
     y = torch.exp(logf_lab)
     lin = (torch.exp(logf.clamp(max=0)) - y) ** 2
-    log = (logf - torch.log(y.clamp(min=1e-3))) ** 2
+    # log term on the exact (unrounded) log F label, no clip: the old recipe's log max(F, 1e-3) taught every circuit
+    # with F < 1e-3 to predict log F = -6.9, which halved the counts of deep routed circuits (their ESP needs them)
+    log = F.huber_loss(logf, logf_lab, reduction="none", delta=1.0)
     return _masked_mean(lin + 0.1 * log, ok)
 
 

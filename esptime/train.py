@@ -214,6 +214,8 @@ def main():
     ap.add_argument("--lr-route", type=float, default=2e-3, help="route stage and ESP head learning rate")
     ap.add_argument("--esp-grad", choices=("head", "all"), default="head",
                     help="head: the decay loss trains only the ESP head; all: also the route stage")
+    ap.add_argument("--esp-busy", choices=("counts", "route"), default="counts",
+                    help="ESP busy time: from the backbone's counts, or table gate times + the route stage's SWAPs")
     ap.add_argument("--calib-every", type=int, default=0, help="variant pass + change loss every k-th batch (0: off)")
     ap.add_argument("--lambda", dest="lam", action="append", default=[], help="loss weight override, e.g. dur=0.5")
     ap.add_argument("--init", type=Path, default=None, help="start from these weights")
@@ -253,7 +255,7 @@ def main():
     print(f"split {args.split}: train {len(train_n)}, val {len(val_n)}, test {len(test_n)}; "
           f"{len(devs_v)} calibration variants", flush=True)
 
-    model = ESPTimeModel(dev, esp_grad=args.esp_grad).to(args.device)
+    model = ESPTimeModel(dev, esp_grad=args.esp_grad, esp_busy=args.esp_busy).to(args.device)
     if args.init:
         model.load_state_dict(torch.load(args.init, map_location="cpu"))
     if args.freeze_backbone:

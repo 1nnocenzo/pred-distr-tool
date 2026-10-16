@@ -11,7 +11,8 @@
             duration = level-wise ASAP schedule(SWAPs, waits) × e^c2.
   ESP       log ESP = log F + decay,  decay = −e^a · [(N_log + N_extra) · duration − busy] · mean 1/min(T1,T2):
             the idle time summed over the active physical qubits.  busy = r · 42 ns + 2 · cz · 130 ns + measure · 15 µs
-            from the backbone's counts (exact for true counts); N_log = logical qubits with a gate, N_extra = physical
+            from the backbone's counts (exact for true counts; ``esp_busy="route"``: table gate time on every operand
+            wire + the route stage's SWAPs · T_SWAP, independent of the count head); N_log = logical qubits with a gate, N_extra = physical
             qubits only routing activates (predicted, 0 when routing-free); T: routing-free -> the physical qubits the
             backbone's HARD placement (Hungarian on A, the same placement as F) gives the logical qubits, routed -> the
             device mean; a, N_extra from a small head.  Formula check with true inputs, routed: 0.06 nats with the
@@ -286,11 +287,11 @@ def hard_placement(assign: torch.Tensor) -> torch.Tensor:
 
 # ------------------------------------------------------------------------------------------------ the model
 class ESPTimeModel(nn.Module):
-    def __init__(self, devices, hp=HP, esp_grad: str = "head"):
+    def __init__(self, devices, hp=HP, esp_grad: str = "head", esp_busy: str = "counts"):
         super().__init__()
         self.backbone = Backbone(devices, hp)
         n_dev, d, H, de = int(devices.num_graphs), hp["d"], hp["route_hidden"], hp["dev_emb"]
-        self.esp_grad = esp_grad
+        self.esp_grad, self.esp_busy = esp_grad, esp_busy
         self.emb = nn.Sequential(nn.Linear(d, 32), nn.SiLU())
         self.dev_proj = nn.Linear(d, de)
         self.route = RouteStage(N_FEATURES + 9 + 4 * n_dev + 32 + n_dev, H, hp["route_layers"], de)
@@ -322,10 +323,15 @@ class ESPTimeModel(nn.Module):
         # mean on routed circuits, and routing moves the qubits anyway; formula check: 0.145 nats with true inputs)
         head_only = self.esp_grad == "head"
         dur_e = dur.detach() if head_only else dur
-        counts = out["counts"].detach() if head_only else out["counts"]
-        busy_tot = counts @ counts.new_tensor([T1, TM, 2 * TCZ])                     # (B, D) µs
         q_max = out["assign"].size(2)
         slot, elig = swap_slots(b)
+        if self.esp_busy == "counts":         # the backbone's counts: exact identity for true counts
+            counts = out["counts"].detach() if head_only else out["counts"]
+            busy_tot = counts @ counts.new_tensor([T1, TM, 2 * TCZ])                 # (B, D) µs
+        else:                                 # "route": table gate time on every operand wire + the predicted SWAPs
+            sw = rate_e.detach() if head_only else rate_e
+            per = b.t.view(-1, 1) * slot.sum(1, keepdim=True) + (sw * (slot & elig.view(-1, 1)).unsqueeze(1)).sum(-1) * T_SWAP
+            busy_tot = scatter(per, b.batch, 0, dim_size=n_c, reduce="sum")
         used = rate.new_zeros(n_c * q_max).index_fill(
             0, (b.batch.unsqueeze(1) * q_max + b.gate_qubits.clamp(min=0))[slot], 1.0).view(n_c, q_max)
         coh, cmask = to_dense_batch(dev.coh, dev.batch)                          # (D, P) 1/µs

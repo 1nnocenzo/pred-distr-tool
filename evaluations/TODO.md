@@ -199,6 +199,12 @@ Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
       **v26 (written, to launch together with v25):** v25 + `--contention`: per gate the wait our greedy router pays
       when its SWAPs wait for / block the logical qubits on their chip path (`router_contention`, no compiler), as input
       and as the base of the predicted wait (the network learns the correction). Commands in `route_stage/RUNBOOK.md`.
+- [ ] **v27 results (2026-10-16): adopt as the routed-duration stage.** v25 + `synth_layered.py` circuits (dense, irregular,
+      low-parallelism). Routed duration, sampled + stage 2, 3 seeds (± std ≤ 0.3 points): qaoa 13.9% -> **8.8%** (p90 30% ->
+      20%, bias 0.86 -> 0.92), vs dataset 10.9% -> **6.4%** (Sabre-vs-dataset floor 4.6%); SWAP count bias 0.88 -> 1.03;
+      stage 2 now helps qaoa (10.5% -> 8.8%) instead of hurting. control 3.3% -> 3.2%, variational 5.7% -> 5.4%, LOSO
+      dense,complete 7.6% -> 7.4%. New split LOSO layered,seqdense (class held out) 11.8%: the gain needs the class in
+      training. Next: ESP of routed circuits from the v27 schedule (oracle 0.7-1.4%); bias still 0.92 on qaoa.
 - [ ] **v25 / v26 results (2026-10-15):** v25 (duration loss) routed duration, sampled + stage 2, 3 seeds: LOSO dense,complete
       13.8% -> 7.6% (bias 0.87 -> 1.05), control 5.3% -> 3.3%, variational 5.4% -> 5.7%, qaoa 13.7% -> 13.9% (bias 0.86).
       v26 (router contention) = v25 everywhere, dropped: our greedy router is far from Sabre (its duration alone 56% off

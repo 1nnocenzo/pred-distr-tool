@@ -105,6 +105,26 @@ train27() { # v27 = v25 + the synth2 circuits on the training side; + split loso
     xargs -P "$JOBS" -I{} bash -c '{}' < "$LOGS/train27_cmds.txt"
 }
 
+light() {   # CPU, once: the light Sabre (1 trial) on every circuit of stage1.pt (+ synth2) -> results/sabre_light.pt
+    local j=${JOBS:-8} pids=()
+    for i in $(seq 0 $((j - 1))); do python3 -u sabre_light.py run --task-id $i --n-tasks $j > "$LOGS/light_$i.log" 2>&1 & pids+=($!); done
+    for p in "${pids[@]}"; do wait "$p"; done
+    python3 -u sabre_light.py merge | tee "$LOGS/light_merge.log"
+    python3 -u sabre_light.py check --n 3000 | tee "$LOGS/light_check.log"
+}
+
+train28() { # v28 = v27 with the light Sabre as routing input instead of the greedy router (--prior sabre-light)
+    : > "$LOGS/train28_cmds.txt"
+    local gpus=(${GPUS:-}) i=0 pre=""
+    for seed in $SEEDS; do for s in $SPLITS loso:layered,seqdense; do
+        out=results/v28_$(name $s)_s$seed
+        [ -f "$out/eval_$(name $s | sed 's/_dense_complete/_dense-complete/; s/_layered_seqdense/_layered-seqdense/').json" ] && continue
+        [ ${#gpus[@]} -gt 0 ] && pre="CUDA_VISIBLE_DEVICES=${gpus[i++ % ${#gpus[@]}]} "
+        echo "${pre}python3 -u stage1.py train --split $s --epochs $EPOCHS --seed $seed --out $out --dur-lambda ${DUR_LAMBDA:-1} --dur-every ${DUR_EVERY:-1} --c2-target ${C2_TARGET:-sabre} --synth2 --prior sabre-light --mc $MC --esp-labels $LAB --device $DEVICE --threads $THREADS > $LOGS/train28_$(name $s)_s$seed.log 2>&1 && echo 'train28 $s s$seed done'" >> "$LOGS/train28_cmds.txt"
+    done; done
+    xargs -P "$JOBS" -I{} bash -c '{}' < "$LOGS/train28_cmds.txt"
+}
+
 smoke25() { # ~5 min: 2 epochs of v25 on qaoa, 20 test circuits (checks speed and that the duration loss falls)
     python3 -u stage1.py train --split qaoa --epochs 2 --out results/smoke25 --dur-lambda 1 --max-test 20 --mc 4 \
         --esp-labels "$LAB" --device "$DEVICE" --threads "$THREADS" 2>&1 | tee "$LOGS/smoke25.log"
@@ -113,7 +133,7 @@ smoke25() { # ~5 min: 2 epochs of v25 on qaoa, 20 test circuits (checks speed an
 report() { python3 -u report_v24.py | tee "$LOGS/report.log"; }
 
 case ${1:-all} in
-    smoke) smoke ;; diag) diag ;; mc) mc ;; train) train ;; report) report ;; smoke25) smoke25 ;; train25) train25 ;; contention) contention ;; smoke26) smoke26 ;; train26) train26 ;; synth2) synth2 ;; train27) train27 ;;
+    smoke) smoke ;; diag) diag ;; mc) mc ;; train) train ;; report) report ;; smoke25) smoke25 ;; train25) train25 ;; contention) contention ;; smoke26) smoke26 ;; train26) train26 ;; synth2) synth2 ;; train27) train27 ;; light) light ;; train28) train28 ;;
     all) smoke; diag; mc; report; train; report ;;
-    *) echo "usage: $0 smoke|diag|mc|train|report|smoke25|train25|contention|smoke26|train26|synth2|train27|all"; exit 1 ;;
+    *) echo "usage: $0 smoke|diag|mc|train|report|smoke25|train25|contention|smoke26|train26|synth2|train27|light|train28|all"; exit 1 ;;
 esac

@@ -195,7 +195,7 @@ def node_t(g, tr, tc):
     return np.where(meas, TM, (oh @ tr) * T1 / n_op + (oh @ tc) * TCZ).astype(np.float32)
 
 
-def build(graphs, s1, tr, tc, contention=None):
+def build(graphs, s1, tr, tc, contention=None, prior_s=None):
     """PyG items with the stage-1 features and targets (routing-free devices are masked out of the loss)."""
     items = []
     for g in graphs:
@@ -204,7 +204,8 @@ def build(graphs, s1, tr, tc, contention=None):
             continue
         gq = g.gate_qubits.numpy()
         n_q = int(g.n_qubits)
-        dev_f = torch.cat([torch.log1p(lab["hops"].clamp(min=0)).t(), torch.log1p(lab["prior_s"]).permute(1, 0, 2).reshape(-1, 9)], 1)
+        ps = prior_s.get(g.circuit_name, lab["prior_s"]) if prior_s is not None else lab["prior_s"]     # v28: light Sabre
+        dev_f = torch.cat([torch.log1p(lab["hops"].clamp(min=0)).t(), torch.log1p(ps.float()).permute(1, 0, 2).reshape(-1, 9)], 1)
         routed = (~lab["rf"]) & torch.isfinite(lab["replay"]) & lab["aligned"]
         t_np = node_t(g, tr, tc)
         meas = g.x[:, GATE2IDX_MEASURE].numpy() > 0.5
@@ -499,7 +500,30 @@ def retarget_stage2(data: dict, ds: dict) -> None:
 SYNTH2_GRAPHS = EVAL / "synthetic_routing/results/synth2_graphs.pt"
 
 
-def load_all(path: Path, contention: bool = False, synth2: bool = False):
+def light_prior(graphs, tr, tc, light: dict):
+    """v28: per circuit, the light Sabre's SWAPs per operand slot (D, N, 3) and its teacher-forced wait per gate (N, D) on
+    its own routed schedule (prep.wait_targets, as the labels' waits): the routing input instead of the greedy router."""
+    from prep import wait_targets
+    ps, pw = {}, {}
+    for g in graphs:
+        li = light.get(g.circuit_name)
+        if li is None or li["n_nodes"] != g.num_nodes:
+            continue
+        gq = g.gate_qubits.numpy()
+        wires = [[int(x) for x in row if x >= 0] for row in gq]
+        t = node_t(g, tr, tc)
+        w = np.zeros((len(gq), len(DEVS)), np.float32)
+        for d in range(len(DEVS)):
+            tn = {k: (a, b) for k, a, b in li["t_node"][d]}
+            if tn:
+                w[:, d] = wait_targets(wires, t, li["s"][d].numpy(), tn)
+        ps[g.circuit_name] = li["s"].float()
+        pw[g.circuit_name] = torch.from_numpy(w)
+    print(f"light Sabre prior on {len(ps)}/{len(graphs)} circuits", flush=True)
+    return ps, pw
+
+
+def load_all(path: Path, contention: bool = False, synth2: bool = False, prior: str = "greedy"):
     s1 = torch.load(path, weights_only=False)
     if synth2:     # v27: + the low-parallelism synthetic class (synthetic_routing/synth_layered.py), training side only
         extra = torch.load(path.parent / "stage1_synth2.pt", weights_only=False)
@@ -514,6 +538,10 @@ def load_all(path: Path, contention: bool = False, synth2: bool = False):
     U = list(fe.UNIQUE)
     tr = np.array([tab.get(u, {"r": 0})["r"] for u in U], float)
     tc = np.array([tab.get(u, {"cz": 0})["cz"] for u in U], float)
+    if prior == "sabre-light":
+        ps, ct = light_prior(graphs, tr, tc, torch.load(path.parent / "sabre_light.pt", weights_only=False))
+        items = build(graphs, s1, tr, tc, ct, ps)
+        return {it.name: it for it in items}
     ct = contention_table(graphs, tr, tc, path.parent / "contention.pt") if contention else None
     items = build(graphs, s1, tr, tc, ct)
     return {it.name: it for it in items}
@@ -535,6 +563,9 @@ def main():
     ap.add_argument("--c2-target", choices=("sabre", "dataset"), default="sabre",
                     help="stage-2 target: Sabre's final duration (of the basis-converted circuit) or the dataset label "
                          "(esp_labels.pt, the original circuit; needs --esp-labels)")
+    ap.add_argument("--prior", choices=("greedy", "sabre-light"), default="greedy",
+                    help="routing input: our greedy router (v24-v27) or the light Sabre (v28: sabre_light.py; SWAPs per slot "
+                         "replace the greedy ones and its waits are the base of the predicted wait)")
     ap.add_argument("--synth2", action="store_true",
                     help="v27: add the low-parallelism synthetic circuits (stage1_synth2.pt) to the training side")
     ap.add_argument("--contention", action="store_true",
@@ -553,7 +584,9 @@ def main():
     args = ap.parse_args()
     torch.set_num_threads(args.threads)
     torch.manual_seed(args.seed); np.random.seed(args.seed)
-    data = load_all(args.data, args.contention, args.synth2)
+    if args.prior == "sabre-light":
+        args.contention = True                       # the light Sabre's waits go where the router contention went (v26)
+    data = load_all(args.data, args.contention, args.synth2, args.prior)
     if args.c2_target == "dataset":
         retarget_stage2(data, torch.load(args.esp_labels, weights_only=False))
     train_n, test_n = split_names(args.split, sorted(data))

@@ -33,6 +33,25 @@ JOBS=3 bash evaluations/route_stage/run_local.sh train   # v24b: 40 epochs x 3 s
   measured (whole dataset in memory: expect several GB); check the first run before raising `JOBS`.
 - `train` skips runs that already have their eval file, so it can be restarted.
 
+## TO LAUNCH (2026-10-16): v28 = v27 with the light Sabre as routing input
+
+The greedy router (prior SWAPs, hops) is far from Sabre: on test circuits its routed schedule is 65% off the true one, the
+light Sabre's 4-8% (qaoa / qft / randomcircuit / synthetic; SWAPs 1.10-1.20x). Light Sabre = Qiskit's level-2 init stage +
+barrier + SabreLayout with 1 trial / 1 iteration / 1 routing trial (`sabre_light.py`), ~6-10 ms per (circuit, device)
+including the alignment to the model's nodes (randomcircuit ~40 ms). Its SWAPs per slot replace the greedy ones and its
+waits are the base of the predicted wait. Declared in the paper as a cheap approximate routing pass at prediction time.
+
+```bash
+cd evaluations/route_stage
+PYTHONPATH=../../src python test_stage1.py                     # 10 s
+JOBS=8 bash run_local.sh light                                  # CPU: every circuit -> results/sabre_light.pt + check
+DEVICE=cuda GPUS="0 1" JOBS=4 bash run_local.sh train28         # needs synth2 (stage1_synth2.pt) as v27
+bash run_local.sh report
+```
+
+Adopt v28 if it beats v27 (qaoa 8.8%, control 3.2%, variational 5.4%, LOSO 7.4% / 11.8%) without losing elsewhere.
+`light_check.log` gives the light Sabre's own schedule error per family (the floor it brings).
+
 ## TO LAUNCH (2026-10-15 evening): v27 = v25 + the low-parallelism synthetic class
 
 Why: v25 fixed unseen synthetic structures (13.8% -> 7.6%) and control (5.3% -> 3.3%) but not qaoa (13.9%, bias 0.86);

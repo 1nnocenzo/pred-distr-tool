@@ -4,6 +4,12 @@ Target: npj Quantum Information collection "Foundations and Advances in HPC/AI-Q
 Co-Design" (deadline 20 Dec 2026; check the collection's eligibility rules).
 
 ## In progress (2026-10-08)
+- **v28 (2026-10-16, to launch): light Sabre as the routing input of the route stage** (`route_stage/sabre_light.py`,
+  `stage1.py --prior sabre-light`). The greedy router was far from Sabre (routed schedule 65% off on test circuits); Qiskit's
+  SabreLayout with 1 trial / 1 iteration / 1 routing trial after the level-2 init stage gives SWAPs 1.08-1.20x the full
+  Sabre's and a routed schedule within 4-8%, at ~6-10 ms per (circuit, device) (randomcircuit ~40 ms) vs 35-220 ms for
+  level 2's Sabre. Launch: `run_local.sh light` then `train28` (RUNBOOK). The self-written Python Sabre (`sabre_lite.py`,
+  70 ms, 2.4x SWAPs) is dropped.
 - [ ] v5b (v5 + 150-epoch budget, cosine LR, SWA, Sinkhorn temperature 1.0 → 0.3):
       3 seeds on LOGO variational, LOFO qaoa/qnn, control. Goal: reduce the seed
       instability of v5 (variational 0.798 ± 0.103 vs v4 0.896 ± 0.002).

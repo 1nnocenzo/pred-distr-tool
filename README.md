@@ -1,63 +1,84 @@
-# Fidelity-Aware Scheduling of Quantum Circuits on Multi-QPU Systems
+# esptime: execution time and ESP of a quantum circuit, without compiling
 
-Minimal, cleaned-up version of the research repository: a GNN predicts the
-expected fidelity of a circuit on each device of a multi-QPU system
-(`EQE1_Top`, `EQE1_Bottom`, `QExa20`), and a scheduling policy uses those
-predictions to select the best device for every circuit in a unified queue.
-Dry-run experiments compare the GNN policy against Oracle, GT-Weighted, and
-Round-Robin baselines on ground-truth fidelities.
+One graph network predicts, for a circuit (OpenQASM, 2–20 qubits) on each of three IQM devices
+(EQE1_Top 26 q, EQE1_Bottom 27 q, QExa20 20 q; native gates `r`, `cz`, `measure`):
 
-## Structure
+| output | definition (labels: Qiskit 2.3.1 level 2, seed 0, on the basis circuit the model encodes) |
+| --- | --- |
+| **duration** | ASAP schedule of the compiled circuit, r 42 ns, cz 130 ns, measure 15 µs |
+| **ESP** | MQT estimated success probability = F · exp(decay), decay = −Σ_q idle_q / min(T1, T2)_q |
+| F (auxiliary) | MQT expected fidelity = Π (1 − error) over the compiled operations |
+
+It is the v29 design of the earlier study (branch `esp-depth`), trained as one model:
 
 ```
-data/
-  circuits.zip                  # benchmark dataset (OpenQASM 3, family/name.qasm)
-src/
-  model/
-    gnn.py                      # GNN architecture
-    encoding.py                 # circuit -> DAG graph encoding (extracted from predictor-gnn)
-    best_model.pth              # trained checkpoint       (placeholder, awaiting new model)
-    best_params.json            # model hyper-parameters   (placeholder, awaiting new model)
-    expected_fidelity_results_benchmark.json  # ground-truth per-device fidelities
-    test_circuit_names.json     # held-out test split (evaluation subset)
-  qms/                          # minimal extract of QMS (policy engine only)
-    policy/                     # MultiDevicePolicy base, registry, round-robin baseline
-  predictor-gnn/                # (not tracked) local mqt-predictor fork, model
-                                # training only; the pipeline does not import from it
-evaluations/
-  pipeline/
-    gnn_device_policy.py        # GNN device-selection policy (registers "gnn_device")
-    run_gnn_dispatch.py         # dry-run benchmark driver
-    plot_benchmark.py           # figures from dispatch_results.json
-  training/                     # (training evaluations)
+gate DAG ─► backbone: SAGE encoder ─► logical qubits ─► Sinkhorn placement on the device graph ─► counts ─► log F
+                │ gate embeddings, operand distances, hard placement
+                ▼
+        route stage: SWAPs per operand wire + waits + c2 ─► level-wise ASAP schedule ─► duration
+                ▼
+        ESP head: idle time per qubit on that schedule × 1/min(T1,T2) of its placed qubit ─► decay ─► log ESP = log F + decay
 ```
+Devices enter as calibration graphs (per-qubit errors, T1/T2, couplers), so calibration variants are just other graphs.
 
-## Setup
+## Layout
+
+| path | what |
+| --- | --- |
+| `createDevice.py`, `data/` | backends and calibrations (QExa20 T1/T2 ×10 unit fix: `QEXA20_T_SCALE`, an assumption), `circuits.zip` = MQT Bench |
+| `esptime/config.py` | paths (`ESPTIME_WORK`, default `work/`), devices, gate times, excluded families |
+| `esptime/encoding.py` | circuit → gate DAG (40 features per gate); `decomp_table.json` = r / cz per gate type |
+| `esptime/devices.py` | backends, calibration variants `aug<j>`, raw and standardised device graphs |
+| `esptime/labels.py` | **one compilation per (circuit, calibration, device)** → F, decay, duration, layout, counts, routing-free, Sabre SWAPs per gate |
+| `esptime/synth.py` | 21k synthetic routing circuits (training side only) |
+| `esptime/router.py` | compiler-free routing inputs: VF2 routing-free test, greedy router SWAPs / hops, wire features |
+| `esptime/dataset.py` | labels + circuits → `work/dataset.pt`; splits |
+| `esptime/model.py` | `ESPTimeModel` = backbone + route stage + ESP head |
+| `esptime/losses.py` | all losses and their weights (`LAMBDAS`) |
+| `esptime/train.py` | train / evaluate / time one split → `work/runs/<split>_s<seed>/metrics.json` |
+| `tests/test_model.py` | 6 real compilations → items → forward / losses / backward checks (~1 min) |
+| `scripts/smoke.sh` | the whole pipeline on ~100 circuits (~15 min, CPU) |
+| `scripts/pipeline.sh`, `job.sh` | the whole pipeline as a chain of SLURM jobs |
+
+## Run
 
 ```bash
-unzip data/circuits.zip -d data/    # -> data/benchmark_dataset_30k/
-pip install torch torch_geometric qiskit qiskit-qasm3-import numpy matplotlib
+conda env create -f environment.yml && conda activate pred-distr
+python tests/test_model.py                 # "all checks passed"
+bash scripts/smoke.sh                      # end to end on a few circuits
+
+# full data (cluster): N_TASKS label jobs per source, then merge -> dataset -> 4 splits x 3 seeds
+bash scripts/pipeline.sh
+# or step by step
+python -m esptime.synth                                     # work/circuits/synth/*.qasm
+python -m esptime.labels run --source mqt --calibs orig,aug0-19 --task-id 0 --n-tasks 1
+python -m esptime.labels run --source synth --calibs orig,aug0-19
+python -m esptime.labels merge                              # work/labels.pt, work/devices.json
+python -m esptime.dataset --jobs 8                          # work/dataset.pt
+python -m esptime.train --split lofo:qaoa --seed 5 --calib-every 4 [--device cuda]
 ```
 
-## Run experiments
+Splits: `control` (20% of the real circuits by name hash), `lofo:qaoa`, `lofo:qnn`, `logo:variational`
+(vqe_* + qnn), `loso:<synthetic structures>` (development). Synthetic circuits are only ever in training.
 
-```bash
-# Quick check (10 circuits, single weight)
-python evaluations/pipeline/run_gnn_dispatch.py --max-circuits 10
+`metrics.json`: duration error (median / p90 / bias vs the label; routed, routing-free, routed by 2q-gate bin),
+R² of F and ESP, |Δlog ESP| for ESP > 1e-3, device choice by ESP and by F (right share, regret), routing-free switch
+agreement, time per circuit by 2q-gate bin next to the light / full compile.
 
-# Full sweep over fidelity weights on the test split
-python evaluations/pipeline/run_gnn_dispatch.py --fidelity-weights 0.0:1.0:0.1
+Useful options of `train`: `--calib-every k` (variant pass + change loss every k-th batch), `--esp-grad all` (the
+decay loss also trains the route stage), `--lambda dur=0.5` (loss weights), `--init ckpt --freeze-backbone` (v29's
+two-stage recipe), `--mc 24` (Poisson samples of the SWAPs at evaluation).
 
-# Drop circuits whose best ground-truth fidelity is below a threshold
-python evaluations/pipeline/run_gnn_dispatch.py --min-best-fidelity 0.01 --fidelity-weights 0.0:1.0:0.1
+## Reference numbers (earlier study, other labels: compare trends, not digits)
 
-# Plots (reads evaluations/pipeline/results/dispatch_results.json by default)
-python evaluations/pipeline/plot_benchmark.py
-```
+| | value |
+| --- | --- |
+| routed duration, median error | v27 route stage qaoa 6.4%; light compile 5.4%; compiler seed floor 3.9% |
+| routed ESP, abs Δlog ESP (ESP > 1e-3) | F model's ESP head 0.30–0.65; light compile 0.29; seed floor 0.20 |
+| time per circuit, 3 devices, by 2q gates 0–20 / 20–50 / 50–200 / 200–600 / 600+ | full compile 33 / 86 / 531 / 1845 / 2786 ms; light compile 19 / 37 / 69 / 132 / 190 ms |
 
-Results (JSON + CSV + log) land in `evaluations/pipeline/results/`; plots in
-`evaluations/pipeline/results/plots/`.
+## Known caveats
 
-By default the benchmark is restricted to the held-out test split
-(`--names-path src/model/test_circuit_names.json`); the oracle and all metrics
-use ground truth, while the GNN policy decides from its own predictions.
+1. Routed ESP is very sensitive to the duration: Δlog ESP ≈ (Δduration / duration) · |log ESP|.
+2. QExa20's T1/T2 ×10 (`createDevice.QEXA20_T_SCALE`) is an assumption to verify.
+3. The earlier study selected ~30 model versions on the same test splits: freeze a model before a final test.

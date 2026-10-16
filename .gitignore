@@ -1,53 +1,8 @@
 __pycache__/
 *.pyc
-src/predictor-gnn/
-data/benchmark_dataset_30k/
-
-# Generalization studies (v1-v5) and calibration shift: keep code, plans, READMEs,
-# per-split metrics/histories and summary tables; leave out trained models,
-# checkpoints, per-circuit predictions (regenerable), the qubit-annotated dataset
-# and SLURM logs.
-evaluations/generalization*/results*/**/*.pth
-evaluations/generalization*/results*/**/*.pt
-evaluations/generalization*/results*/**/*.tmp
-evaluations/generalization*/results*/**/.lock
-evaluations/generalization*/results*/**/predictions.json
-evaluations/generalization*/results*/**/heldout_predictions.json
-evaluations/generalization*/results*/slurm/
-evaluations/generalization*/results_smoke/
-evaluations/generalization_v3/data/
-evaluations/calibration_shift/results/run_*.log
-evaluations/STATUS.md
-evaluations/STATUS.tmp
-evaluations/generalization*/results*/scheduling/**/dispatch_results.json
-evaluations/generalization*/results*/scheduling/**/fidelity_gnn_predicted.json
-
-# Recompilation (compile_check): per-circuit outputs, layouts, QPY files and SLURM logs
-# are large and regenerable; keep only the scripts. Same for logs of the other tools.
-evaluations/compile_check/results/
-evaluations/compile_check/slurm/
-evaluations/gpu_bench/*.log
-evaluations/diagnostics_v4v5/results/*.log
-evaluations/calibration_shift/results_k/*.log
-evaluations/calibration_shift/results_k/predictions.json
-
-# Routing stage (v24): datasets, checkpoints and per-case rows are large and regenerable
-evaluations/route_stage/results/**/*.pt
-evaluations/route_stage/results/*.pt
-evaluations/route_stage/local_logs/
-evaluations/route_stage/results/smoke/
-evaluations/route_stage/results/sabre_light/
-
-# fast path: raw task files and merged per-circuit predictions (regenerable), SLURM logs
-evaluations/fastpath/results/validate/
-evaluations/fastpath/results/predict/
-evaluations/fastpath/results/fastpath_pred.json
-evaluations/fastpath/slurm/*.log
-evaluations/fastpath/local_logs/
-
-# synthetic circuits, their compilations, labels and graphs (regenerable with synth_routing.py / synth_layered.py)
-evaluations/synthetic_routing/circuits/
-evaluations/synthetic_routing/results/
-evaluations/light_compile/results/*.jsonl
-evaluations/light_compile/local_logs/
-evaluations/route_stage/results/evalpath/*.jsonl
+# generated data (circuits, labels, dataset, runs): regenerable with the pipeline, see README.md
+work/
+work_*/
+# keep finished results small: commit runs/*/metrics.json + history.json by copying them under results/
+*.pth
+*.pt

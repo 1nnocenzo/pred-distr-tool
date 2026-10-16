@@ -7,6 +7,8 @@ seed_transpiler 0.  Per (circuit, calibration, device):
   dur           ASAP duration of the compiled circuit, µs
   layout        device-graph node of every logical qubit (initial layout, ancillas dropped)
   counts        native r / measure / cz;  rf: Qiskit's VF2Layout found a perfect layout (no routing)
+  busy          [[node, µs], ...] gate time of every active physical qubit (MQT's exec time: the ESP's idle is
+                duration − busy on these qubits)
 Route targets (original calibration only; Sabre's routing does not depend on the errors): Sabre's routed
 circuit walked against the model's gate nodes -> SWAPs per (node, operand slot), each matched node's [start, end] in
 the routed schedule (table gate times), the replayed routed duration and whether every gate was matched.
@@ -45,11 +47,11 @@ def circuit_sources(source: str, per_family: int = 0) -> list[tuple[str, str]]:
         name = f"{parts[-2]}/{Path(parts[-1]).stem}"
         if name.split("/")[0] not in EXCLUDE:
             out.append((name, f))
-    if per_family:                       # smoke tests: the first k circuits of every family (smallest names first)
+    if per_family:                       # samples: k circuits of every family, deterministic in the name
         by = defaultdict(list)
-        for x in out:
+        for x in sorted(out, key=lambda x: zlib.crc32(b"sample" + x[0].encode())):
             by[x[0].split("/")[0]].append(x)
-        out = [y for v in by.values() for y in v[:per_family]]
+        out = sorted(y for v in by.values() for y in v[:per_family])
     return out
 
 
@@ -172,13 +174,21 @@ def compile_case(qb, nodes, be, route: bool) -> dict:
                    initial_layout=None, routing_method=None, layout_method=None)
     ops = tc.count_ops()
     node = {q: i for i, q in enumerate(active_qubits(be))}
+    busy = defaultdict(float)
+    for inst in tc.data:
+        if inst.operation.name in ("barrier", "id", "delay"):
+            continue
+        qs = tuple(tc.find_bit(q).index for q in inst.qubits)
+        for q in qs:
+            busy[q] += target[inst.operation.name][qs].duration * 1e6
     rec = {"logF": math.log(f) if f > 0 else None,
            "decay": (math.log(esp) - math.log(f)) if esp > 0 and f > 0 else None,
            "dur": float(sc.estimate_duration(target=target)) * 1e6,
            "layout": [node.get(p, -1) for p in tc.layout.initial_index_layout(filter_ancillas=True)],
            "counts": [int(sum(v for k, v in ops.items() if k not in ("cz", "measure", "barrier", "delay"))),
                       int(ops.get("measure", 0)), int(ops.get("cz", 0))],
-           "rf": st.get("vf2") == VF2LayoutStopReason.SOLUTION_FOUND}
+           "rf": st.get("vf2") == VF2LayoutStopReason.SOLUTION_FOUND,
+           "busy": [[node.get(q, -1), round(v, 4)] for q, v in sorted(busy.items())]}
     if route and not rec["rf"] and "routed" in st:
         idx = {q: i for i, q in enumerate(qb.qubits)}
         init = {idx[v]: p for v, p in st["vbits"].items() if v in idx}

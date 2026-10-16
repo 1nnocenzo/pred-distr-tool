@@ -24,3 +24,22 @@ Busy time from the route stage (logical wires + predicted SWAPs) instead of the 
 
 Also found: model selection on the total validation loss (auxiliaries included, 15 circuits) kept epochs 4-6 of 25;
 on the target terms it is still noisy (val F jumps). Default is now the last epoch (`--select best` optional).
+
+## Busy time from the route stage, and the count loss weight (same sample and settings)
+
+| | counts (s5 / s6) | `--esp-busy route` (s5 / s6) | counts, λ_count = 1 (s5) |
+| --- | --- | --- | --- |
+| duration routed | 5.9% / 5.6% | 6.4% / 6.6% | 7.1% |
+| ESP all | 0.159 / 0.164 | 0.198 / **0.133** | 0.186 |
+| ESP routing-free | 0.106 / 0.101 | 0.151 / **0.083** | 0.130 |
+| ESP routed (24 cases) | 0.557 / 0.663 | **0.350 / 0.420** | 0.618 |
+| device choice: right / regret | 0.68 / 0.0052, 0.58 / 0.0111 | 0.61 / 0.0071, 0.65 / 0.0073 | 0.67 / 0.0092 |
+
+Why the counts are poor (diagnosis on the TRAINING circuits of the counts model):
+- not a hard target: the decomposition table alone gives r 0.97-1.00 and cz 1.00 (routing-free) / 0.62 (routed) of the
+  true counts, cz 1.08 with 3 CZ per true SWAP; the learned head gives r 0.46, cz 0.58 on routed circuits;
+- the count head starts from 1 r / 1 cz per gate, not from the table, and its routed cz uses a circuit-level greedy
+  hop estimate, not the route stage's SWAPs;
+- weak signal: 225 optimiser steps in total (count loss still falling); the F loss (MSE on F + 0.1 MSE on log F)
+  hardly sees routed circuits (small F): their F is overestimated x3.5 on training circuits (log F +1.26);
+- not the scales s_k (stay at 1.0) and not the placement's errors (ratio 1.00-1.04 to the compiler's qubits).

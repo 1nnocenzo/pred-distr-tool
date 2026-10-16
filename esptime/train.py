@@ -4,7 +4,7 @@
     python -m esptime.train --split control --seed 5 --out work/runs/control_s5 [--calib-every 4] [--device cuda]
     python -m esptime.train --split lofo:qaoa --eval-only --out work/runs/qaoa_s5
 Splits: control, lofo:<family> (lofo:qaoa, lofo:qnn), logo:variational, loso:<synthetic structures>.
-Writes model.pt (best validation loss), checkpoint.pt (resume), history.json, metrics.json (+ timing).
+Writes model.pt (last epoch, or --select best), checkpoint.pt (resume), history.json, metrics.json (+ timing).
 """
 from __future__ import annotations
 
@@ -225,6 +225,8 @@ def main():
     ap.add_argument("--time-n", type=int, default=300, help="circuits timed end to end (0: none)")
     ap.add_argument("--max-train", type=int, default=0)
     ap.add_argument("--max-test", type=int, default=0)
+    ap.add_argument("--select", choices=("last", "best"), default="last",
+                    help="model kept: the last epoch (OneCycle ends at lr ~ 0) or the best validation F + final + decay")
     ap.add_argument("--max-levels", type=int, default=0, help="leave out circuits deeper than this (local runs; 0: all)")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--threads", type=int, default=8)
@@ -284,7 +286,7 @@ def main():
             print(json.dumps(hist[-1]), flush=True)
             sel = sum(va.get(k, 0.0) for k in SELECT)          # model selection on the target terms only
             hist[-1]["val_select"] = sel
-            if sel < best:
+            if args.select == "last" or sel < best:
                 best = sel
                 torch.save(model.state_dict(), args.out / "model.pt")
             torch.save({"model": model.state_dict(), "opt": opt.state_dict(), "sched": sched.state_dict(),

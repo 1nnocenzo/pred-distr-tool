@@ -3,8 +3,9 @@
   backbone  gate DAG --SAGE--> gate embeddings g --> logical-qubit embeddings (mean/max + 2 GINE on the interaction
             graph); device graph --3 GINE--> physical-qubit embeddings; placement scores + Sinkhorn (τ 0.3, 20 iter.)
             = soft one-to-one layout A.  Per gate and device: operand context, placement-weighted errors, expected
-            operand distance Aᵀ H A, routing-free flag, routing estimate -> native counts (r, measure exact, cz =
-            base(gate) · (1 + κ · extra hops · (1 − routing-free))) -> log F = − Σ_g Σ_k s_k n_k ε_k.
+            operand distance Aᵀ H A, routing-free flag, routing estimate -> corrections δ of the native counts:
+            r = table r · e^δr + 4 · SWAPs, cz = table cz · e^δcz + 3 · SWAPs (decomposition table of the gate type,
+            the route stage's SWAPs before the gate), measure exact -> log F = − Σ_g Σ_k s_k n_k ε_k.
   route     gate-graph network (inputs: gate features, wire features, greedy-router SWAPs / hops, the backbone's
             gate embedding and operand distances) -> per gate and device: SWAP rate per operand wire (Poisson),
             extra wait; pooled: c2 = log(final duration / routed schedule).  Routing-free pairs get no SWAPs / waits.
@@ -27,12 +28,12 @@ from torch import nn
 from torch_geometric.nn import GINEConv, GraphNorm, SAGEConv
 from torch_geometric.utils import scatter, to_dense_batch
 
-from .config import T1, TCZ, TM, T_SWAP
-from .encoding import MEASURE, N_FEATURES, N_GATE_LOCAL
+from .config import T1, TCZ, TM, T_SWAP, decomp_table
+from .encoding import MEASURE, N_FEATURES, UNIQUE
 
 HP = {"hidden": 142, "plain_layers": 3, "res_layers": 1, "d": 128, "qubit_layers": 2, "device_layers": 3,
       "mlp": (512, 256, 128), "tau": 0.3, "iters": 20, "route_hidden": 96, "route_layers": 6, "dev_emb": 16}
-SOFTPLUS_ONE = 0.5413                       # softplus(0.5413) = 1
+SWAP_R, SWAP_CZ = 4, 3                      # a routing SWAP in the native basis (as T_SWAP)
 
 
 # ------------------------------------------------------------------------------------------------ backbone
@@ -98,9 +99,11 @@ class Backbone(nn.Module):
         self.w_q, self.w_p = nn.Linear(d, d), nn.Linear(d, d)
         self.dummy_score = nn.Parameter(torch.zeros(()))
         self.tau, self.iters = hp["tau"], hp["iters"]
-        self.cost = _mlp(5 * d + 4, hp["mlp"], 3, SOFTPLUS_ONE)          # count head: r, measure, κ (cz)
-        self.cz_base = nn.Linear(N_GATE_LOCAL, 1)
-        nn.init.constant_(self.cz_base.bias, SOFTPLUS_ONE)
+        self.cost = _mlp(5 * d + 4, hp["mlp"], 3, 0.0)                   # count head: log corrections δ_r, -, δ_cz
+        nn.init.zeros_(self.cost[-1].weight)                               # starts exactly at the decomposition table
+        tab = decomp_table()
+        self.register_buffer("tab_r", torch.tensor([float(tab.get(u, {"r": 0})["r"]) for u in UNIQUE]), persistent=False)
+        self.register_buffer("tab_cz", torch.tensor([float(tab.get(u, {"cz": 0})["cz"]) for u in UNIQUE]), persistent=False)
         self.log_scale = nn.Parameter(torch.zeros(3))
         self.register_buffer("hops", hop_matrices(devices.cpu()), persistent=False)
         self.d = d
@@ -187,15 +190,23 @@ class Backbone(nn.Module):
         g_e = g.unsqueeze(1).expand(-1, n_dev, -1)
         z = torch.cat([g_e, c_mean, c_range, dev_glob.unsqueeze(0).expand(g.size(0), -1, -1), g_e * c_mean,
                        dist.unsqueeze(-1), torch.log1p(dist).unsqueeze(-1), rf[gb].unsqueeze(-1), route[gb].unsqueeze(-1)], -1)
-        n_ops = F.softplus(self.cost(z))                                   # (G, D, 3)
-        base = F.softplus(self.cz_base(b.x[:, :N_GATE_LOCAL])) * multi.view(-1, 1)
-        cz = base * (1 + n_ops[..., 2] * torch.expm1(route)[gb] * (1 - rf[gb]))
-        meas = (b.x[:, MEASURE] > 0.5).float().view(-1, 1).expand(-1, n_dev)   # compilation keeps the measurements
-        n_ops = torch.stack([n_ops[..., 0], meas, cz], -1)
-        cost = (n_ops * g_eps * self.log_scale.exp()).sum(-1)
-        return {"logf": -scatter(cost, gb, 0, dim_size=n_c, reduce="sum"), "g": g, "dist": dist, "assign": assign,
-                "q_mask": q_mask, "col_mask": pmask, "counts": scatter(n_ops, gb, 0, dim_size=n_c, reduce="sum"),
-                "dev_glob": dev_glob}
+        delta = self.cost(z).clamp(-3, 3)                                  # (G, D, 3)
+        return {"delta": delta, "g_eps": g_eps, "g": g, "dist": dist, "assign": assign, "q_mask": q_mask,
+                "col_mask": pmask, "dev_glob": dev_glob}
+
+    def counts_logf(self, b, out, swaps):
+        """Native counts per gate and device, then log F.  r = table r · e^δr + 4 · SWAPs, cz = table cz · e^δcz +
+        3 · SWAPs (the route stage's SWAPs before the gate), measure exact; log F = − Σ_g Σ_k s_k n_k ε_k."""
+        oh = b.x[:, : len(UNIQUE)]
+        meas = (b.x[:, MEASURE] > 0.5).float().view(-1, 1).expand_as(swaps)
+        delta = out["delta"]
+        n_r = (oh @ self.tab_r).unsqueeze(1) * torch.exp(delta[..., 0]) + SWAP_R * swaps
+        n_cz = (oh @ self.tab_cz).unsqueeze(1) * torch.exp(delta[..., 2]) + SWAP_CZ * swaps
+        n_ops = torch.stack([n_r, meas, n_cz], -1)                         # (G, D, 3)
+        cost = (n_ops * out["g_eps"] * self.log_scale.exp()).sum(-1)
+        n_c = b.num_graphs
+        out["logf"] = -scatter(cost, b.batch, 0, dim_size=n_c, reduce="sum")
+        out["counts"] = scatter(n_ops, b.batch, 0, dim_size=n_c, reduce="sum")
 
 
 # ------------------------------------------------------------------------------------------------ route stage
@@ -313,6 +324,11 @@ class ESPTimeModel(nn.Module):
         wait_e = torch.where(nr, wait, torch.zeros_like(wait))
         dur = schedule_torch(b, rate_e, wait_e) * torch.exp(c2)                 # (B, D) µs
         out.update(rate=rate, wait=wait, c2=c2, dur=dur)
+        slot, elig = swap_slots(b)
+        # SWAPs before each gate: a SWAP is attached to the wires of both logical qubits it moves -> half the sum;
+        # detached, so the F loss does not move the route stage's SWAPs (they have their own targets)
+        swaps = (rate_e.detach() * (slot & elig.view(-1, 1)).unsqueeze(1)).sum(-1) / 2
+        self.backbone.counts_logf(b, out, swaps)
         if mc:
             out["dur_mc"] = mc_schedule(b, rate_e.detach(), wait_e.detach(), mc, gen) * torch.exp(c2.detach())
         # ---- ESP, count formula: the idle time summed over the active PHYSICAL qubits is N_act · duration − Σ_p busy_p,
@@ -324,7 +340,6 @@ class ESPTimeModel(nn.Module):
         head_only = self.esp_grad == "head"
         dur_e = dur.detach() if head_only else dur
         q_max = out["assign"].size(2)
-        slot, elig = swap_slots(b)
         if self.esp_busy == "counts":         # the backbone's counts: exact identity for true counts
             counts = out["counts"].detach() if head_only else out["counts"]
             busy_tot = counts @ counts.new_tensor([T1, TM, 2 * TCZ])                 # (B, D) µs

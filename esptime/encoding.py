@@ -15,7 +15,6 @@ BASIS = ["x", "y", "z", "h", "s", "sdg", "t", "tdg", "sx", "p", "rx", "ry", "rz"
 UNIQUE = [*BASIS, "measure"]
 GATE2IDX = {g: i for i, g in enumerate(UNIQUE)}
 MEASURE = GATE2IDX["measure"]
-N_GATE_LOCAL = len(UNIQUE) + 6 + 3              # one-hot, sin/cos, arity, controls, n params: the gate alone
 N_FEATURES = len(UNIQUE) + 6 + 6
 MAX_OPERANDS = 3
 

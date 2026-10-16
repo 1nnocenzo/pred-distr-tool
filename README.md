@@ -36,6 +36,7 @@ Devices enter as calibration graphs (per-qubit errors, T1/T2, couplers), so cali
 | `esptime/model.py` | `ESPTimeModel` = backbone + route stage + ESP head |
 | `esptime/losses.py` | all losses and their weights (`LAMBDAS`) |
 | `esptime/train.py` | train / evaluate / time one split → `work/runs/<split>_s<seed>/metrics.json` |
+| `esptime/oracle.py` | formula check: duration and ESP formulas with the compiler's true inputs (`results/formula_check_*.md`) |
 | `tests/test_model.py` | 6 real compilations → items → forward / losses / backward checks (~1 min) |
 | `scripts/smoke.sh` | the whole pipeline on ~100 circuits (~15 min, CPU) |
 | `scripts/pipeline.sh`, `job.sh` | the whole pipeline as a chain of SLURM jobs |

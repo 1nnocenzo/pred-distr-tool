@@ -46,7 +46,7 @@ labels() {
     done
     wait
   done
-  grep -h "error" "$ESPTIME_WORK"/labels/*.jsonl 2>/dev/null | wc -l | xargs echo "circuits with an error:"
+  { grep -h "error" "$ESPTIME_WORK"/labels/*.jsonl 2>/dev/null || true; } | wc -l | xargs echo "circuits with an error:"   # no match = exit 1 under pipefail
 }
 
 dataset() {

@@ -105,7 +105,7 @@ class Backbone(nn.Module):
         self.register_buffer("tab_r", torch.tensor([float(tab.get(u, {"r": 0})["r"]) for u in UNIQUE]), persistent=False)
         self.register_buffer("tab_cz", torch.tensor([float(tab.get(u, {"cz": 0})["cz"]) for u in UNIQUE]), persistent=False)
         self.log_scale = nn.Parameter(torch.zeros(3))
-        self.register_buffer("hops", hop_matrices(devices.cpu()), persistent=False)
+        self.register_buffer("hops", hop_matrices(devices.clone().cpu()), persistent=False)
         self.d = d
 
     def _qubits(self, b, g):

@@ -56,6 +56,14 @@ bash scripts/run_local.sh report       # -> work/runs/summary.md
 ```
 Settings and options: header of `scripts/run_local.sh`. Use `nohup ... &` or `tmux` for the long steps.
 
+Measured on a 128-core / 377 GB / 2× H100 server (2026-10-18, full dataset, `CALIBS=orig`, 38,895 circuits):
+- one training peaks at **~80 GB RAM** (the 7 GB of a 50-circuit test run is not representative): set `TRAIN_JOBS`
+  to RAM / 80 GB, otherwise the kernel kills trainings at startup without a traceback;
+- **CPU beats GPU** for this model (level-by-level schedule, many small kernels): one small epoch 24 s on 8 CPU threads
+  vs 206 s on an H100, so prefer `DEVICE=cpu THREADS=8`; a full epoch is ~20-25 min on 8 threads, 40 epochs ~15 h;
+- `train` returns 0 even when trainings fail: check the end of its output ("trainings that failed") and that every
+  `work/runs/<split>_s<seed>/metrics.json` exists before `report`.
+
 ## Run (step by step / SLURM)
 
 ```bash

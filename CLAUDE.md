@@ -40,7 +40,7 @@ See `README.md` (layout, run commands, splits, metrics). Generated data goes to 
   user where each job runs. On gpu_h200 skip the broken GPU 0000:19:00.0. V100 partitions do not work (torch 2.11+cu128).
 - Some shared nodes run ~30× slower (compute-5-6, compute-5-8): check the first epochs; resubmit with `-w <idle node>`.
 - Request memory near the measured peak (`sstat -j <id>.batch -o MaxRSS`; `sacct`/`seff` do not work). Compile task
-  ~2G. Training / dataset memory not measured yet in this scaffold: measure on the first runs.
+  ~2G. Training ~80 GB RAM on the full dataset (orig calibrations; measured 2026-10-18, see README).
 - No job arrays; submit tasks in a loop (`scripts/pipeline.sh`). Chain steps with `--dependency`.
 
 ## Commits

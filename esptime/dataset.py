@@ -16,6 +16,7 @@ Targets  (original calibration, (1, D) unless noted; ``ok`` masks the known ones
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import math
 import time
@@ -151,7 +152,9 @@ def _work(job):
     name, key, lab = job
     try:
         qb = to_basis(read_qasm(key, None if name.startswith("synth/") else _CTX["zip"]))
-        return build_item(name, qb, lab, _CTX["calibs"], _CTX["chs"], _CTX["table"]), None
+        buf = io.BytesIO()  # bytes, not tensors: torch would pass each tensor as a file descriptor ("received 0 items of ancdata")
+        torch.save(build_item(name, qb, lab, _CTX["calibs"], _CTX["chs"], _CTX["table"]), buf)
+        return buf.getvalue(), None
     except Exception as e:  # noqa: BLE001
         return None, f"{name}: {type(e).__name__}: {e}"[:200]
 
@@ -169,7 +172,7 @@ def main():
     items, errs = [], []
     with Pool(args.jobs, initializer=_init, initargs=(raws["orig"], calibs)) as pool:
         for i, (it, err) in enumerate(pool.imap(_work, jobs, chunksize=16)):
-            items.append(it) if it is not None else errs.append(err)
+            items.append(torch.load(io.BytesIO(it), weights_only=False)) if it is not None else errs.append(err)
             if i % 2000 == 0:
                 print(f"[{time.time() - t0:5.0f} s] {i}/{len(jobs)}", flush=True)
     torch.save({"items": items, "calibs": calibs, "devices": raws}, args.out)

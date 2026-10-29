@@ -163,12 +163,23 @@ def timing(model, dev, items, n: int, mc: int, seed: int = 0) -> dict:
 
 
 # ------------------------------------------------------------------------------------------------ training
-def depth_batches(items, bs: int, rng: random.Random) -> list[list[int]]:
+def depth_batches(items, bs: int, rng: random.Random, max_nodes: int = 0) -> list[list[int]]:
     """Batches of circuits of similar depth (sorted by topological levels with jitter), in random order: the
-    schedule runs one step per level, so a deep circuit would otherwise set the cost of every batch it lands in."""
+    schedule runs one step per level, so a deep circuit would otherwise set the cost of every batch it lands in.
+    max_nodes > 0: a batch also closes before its gates would exceed max_nodes (training RAM grows with the gates of
+    a batch, and the deepest circuits all land in one batch); circuits are never split, a larger one goes alone."""
     depth = [int(it.lvl.max()) + 1 if it.num_nodes else 0 for it in items]
     order = sorted(range(len(items)), key=lambda i: depth[i] * rng.uniform(0.8, 1.25))
-    batches = [order[i: i + bs] for i in range(0, len(order), bs)]
+    batches, cur, n = [], [], 0
+    for i in order:
+        k = int(items[i].num_nodes)
+        if cur and (len(cur) == bs or (max_nodes and n + k > max_nodes)):
+            batches.append(cur)
+            cur, n = [], 0
+        cur.append(i)
+        n += k
+    if cur:
+        batches.append(cur)
     rng.shuffle(batches)
     return batches
 
@@ -196,7 +207,8 @@ def run_epoch(model, dev, devs_v, loader, opt=None, sched=None, args=None, rng=N
                 loss.backward()
                 nn.utils.clip_grad_norm_([p for p in model.parameters() if p.requires_grad], 1.0)
                 opt.step()
-                sched.step()
+                if sched.last_epoch < sched.total_steps:
+                    sched.step()
             tot["loss"] += float(loss)
             for k, v in parts.items():
                 tot[k] += v
@@ -230,6 +242,8 @@ def main():
     ap.add_argument("--select", choices=("last", "best"), default="last",
                     help="model kept: the last epoch (OneCycle ends at lr ~ 0) or the best validation F + final + decay")
     ap.add_argument("--max-levels", type=int, default=0, help="leave out circuits deeper than this (local runs; 0: all)")
+    ap.add_argument("--max-nodes", type=int, default=0,
+                    help="at most this many gates per training batch (sets the RAM peak; e.g. 100000; 0: only --bs)")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--threads", type=int, default=8)
     args = ap.parse_args()
@@ -268,7 +282,9 @@ def main():
         rest = [p for n, p in model.named_parameters() if not n.startswith("backbone.")]
         groups = ([{"params": bb, "lr": args.lr}] if bb else []) + [{"params": rest, "lr": args.lr_route}]
         opt = torch.optim.AdamW(groups, weight_decay=1e-4)
-        steps = args.epochs * math.ceil(len(train_n) / args.bs)
+        tr_items, va_items = [data[n] for n in train_n], [data[n] for n in val_n]
+        # batches per epoch vary a little with the depth jitter when --max-nodes is set: estimate, guard in run_epoch
+        steps = args.epochs * len(depth_batches(tr_items, args.bs, random.Random(args.seed), args.max_nodes))
         sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=[g["lr"] for g in groups], total_steps=steps)
         ck = args.out / "checkpoint.pt"
         start, best, hist = 0, float("inf"), []
@@ -277,11 +293,10 @@ def main():
             model.load_state_dict(st["model"]); opt.load_state_dict(st["opt"]); sched.load_state_dict(st["sched"])
             start, best, hist = st["epoch"] + 1, st["best"], st["hist"]
             print(f"resumed at epoch {start}", flush=True)
-        tr_items, va_items = [data[n] for n in train_n], [data[n] for n in val_n]
         for ep in range(start, args.epochs):
             t0 = time.time()
-            tr = run_epoch(model, dev, devs_v, DataLoader(tr_items, batch_sampler=depth_batches(tr_items, args.bs, rng)),
-                           opt, sched, args, rng)
+            batches = depth_batches(tr_items, args.bs, rng, args.max_nodes)
+            tr = run_epoch(model, dev, devs_v, DataLoader(tr_items, batch_sampler=batches), opt, sched, args, rng)
             va = run_epoch(model, dev, [], DataLoader(va_items, batch_size=args.bs), args=args)
             hist.append({"epoch": ep, "sec": round(time.time() - t0, 1), **{f"train_{k}": v for k, v in tr.items()},
                          **{f"val_{k}": v for k, v in va.items()}})

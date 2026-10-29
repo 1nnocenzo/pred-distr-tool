@@ -16,7 +16,7 @@
 #   TRAIN_JOBS=2       trainings in parallel (each holds the dataset in memory)
 #   DEVICE=cuda GPUS="0 1"   GPUs, assigned round robin to the trainings (default: CPU)
 #   THREADS=8          torch threads per training      EPOCHS=40
-#   TRAIN_ARGS="--calib-every 4"   extra arguments of esptime.train (e.g. "--esp-busy counts", "--max-levels 20000")
+#   TRAIN_ARGS="--calib-every 4"   extra arguments of esptime.train (e.g. "--esp-busy counts", "--max-nodes 100000")
 #   ESPTIME_WORK=/path  where generated data goes (default: work/ in the repository)
 # Logs: $ESPTIME_WORK/logs/
 set -euo pipefail

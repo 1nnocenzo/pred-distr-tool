@@ -8,15 +8,17 @@ measurement gets, as the other families are written (same textual edit as esp-de
 Every new file is re-loaded and checked: same gates, one more barrier, exactly n_qubits measurements.  Every other
 entry of the zip is copied byte for byte.  The guard ``esptime.labels.check_circuits`` keeps it fixed.
 
-    python scripts/qaoa_add_measure.py [--dry-run]
+    python scripts/qaoa_add_measure.py [--dry-run] [--jobs N]
 """
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 import zipfile
 from collections import Counter
+from multiprocessing import Pool
 from pathlib import Path
 
 ZIP = Path(__file__).resolve().parents[1] / "data" / "circuits.zip"
@@ -40,22 +42,30 @@ def check(src: str, new: str) -> bool:
             and all(o1.get(k, 0) == v for k, v in o0.items()) and set(o1) == set(o0) | {"measure", "barrier"})
 
 
+def _one(src: str) -> str | None:
+    new = add_measure(src)
+    return new if check(src, new) else None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--jobs", type=int, default=os.cpu_count())
     args = ap.parse_args()
     tmp = ZIP.with_suffix(".zip.tmp")
-    fixed, bad = 0, []
+    with zipfile.ZipFile(ZIP) as zin:
+        todo = {i.filename: zin.read(i).decode() for i in zin.infolist()
+                if "/qaoa/" in i.filename and i.filename.endswith(".qasm") and b"measure" not in zin.read(i)}
+    names = sorted(todo)
+    with Pool(args.jobs) as pool:                    # the qasm3 parser is slow: ~30 min on one core
+        new = dict(zip(names, pool.map(_one, [todo[n] for n in names], chunksize=4)))
+    bad = [n for n in names if new[n] is None]
+    fixed = len(names) - len(bad)
     with zipfile.ZipFile(ZIP) as zin, zipfile.ZipFile(tmp, "w") as zout:
         for info in zin.infolist():
             data = zin.read(info)
-            if "/qaoa/" in info.filename and info.filename.endswith(".qasm") and b"measure" not in data:
-                src = data.decode()
-                new = add_measure(src)
-                if not check(src, new):
-                    bad.append(info.filename)
-                    continue
-                data, fixed = new.encode(), fixed + 1
+            if new.get(info.filename):
+                data = new[info.filename].encode()
             zout.writestr(info, data)
     if bad or args.dry_run:
         tmp.unlink()

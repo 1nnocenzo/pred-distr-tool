@@ -26,7 +26,7 @@ Devices enter as calibration graphs (per-qubit errors, T1/T2, couplers), so cali
 
 | path | what |
 | --- | --- |
-| `createDevice.py`, `data/` | backends and calibrations (QExa20 T1/T2 ×10 unit fix: `QEXA20_T_SCALE`, an assumption), `circuits.zip` = MQT Bench |
+| `createDevice.py`, `data/` | backends and calibrations (QExa20 T1/T2 ×10 unit fix: `QEXA20_T_SCALE`, an assumption), `circuits.zip` = MQT Bench, qaoa with final measurements added (`scripts/qaoa_add_measure.py`, 2026-11-16) |
 | `esptime/config.py` | paths (`ESPTIME_WORK`, default `work/`), devices, gate times, excluded families |
 | `esptime/encoding.py` | circuit → gate DAG (40 features per gate); `decomp_table.json` = r / cz per gate type |
 | `esptime/devices.py` | backends, calibration variants `aug<j>`, raw and standardised device graphs |
@@ -103,6 +103,15 @@ two-stage recipe), `--mc 24` (Poisson samples of the SWAPs at evaluation).
 | routed duration, median error | v27 route stage qaoa 6.4%; light compile 5.4%; compiler seed floor 3.9% |
 | routed ESP, abs Δlog ESP (ESP > 1e-3) | F model's ESP head 0.30–0.65; light compile 0.29; seed floor 0.20 |
 | time per circuit, 3 devices, by 2q gates 0–20 / 20–50 / 50–200 / 200–600 / 600+ | full compile 33 / 86 / 531 / 1845 / 2786 ms; light compile 19 / 37 / 69 / 132 / 190 ms |
+
+## qaoa measurements (fixed 2026-11-16)
+
+MQT Bench's qaoa generator is the only one without `measure_all()`: until 2026-11-16 the 2,964 qaoa circuits of
+`data/circuits.zip` had no measurements, so their duration / ESP labels had no 15 µs readout (runs_2026-11-01 and
+earlier esptime runs are affected on qaoa and control). The zip is now fixed at the source, and three guards keep it so:
+`labels run` and `dataset` stop on any MQT circuit without measurements (`labels.check_circuits`), `labels merge` drops
+label records compiled without measurements, and `tests/test_circuits.py` checks the zip. Relabel only qaoa on a
+machine with the old labels: `FAMILIES=qaoa JOBS=32 bash scripts/run_local.sh labels` (same `CALIBS`), then `dataset`.
 
 ## Known caveats
 

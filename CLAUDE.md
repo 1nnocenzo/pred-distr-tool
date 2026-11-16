@@ -25,11 +25,13 @@ See `README.md` (layout, run commands, splits, metrics). Generated data goes to 
   Duration also trained end to end (`final` loss); model selection on the target terms (F, final, decay).
 - Labels: one Qiskit L2 compilation (seed 0) of the BASIS circuit the model encodes; F, ESP, duration, layout, counts
   and Sabre SWAP targets all come from it (no more mixed seed-0 / best-of-3 labels, no qaoa rzz label gap).
+- Every MQT circuit ends with measurements: qaoa had none until 2026-11-16 (fixed in `data/circuits.zip`; guards in
+  `labels.check_circuits` / `merge`, `tests/test_circuits.py`). Never replace the zip with an unfixed MQT copy.
 - Included: synthetic routing circuits, timing benchmark, calibration variants (+ change loss on log F and log ESP).
 
 ## Workflow
 
-- First: `python tests/test_model.py` after any code change; `bash scripts/smoke.sh` after pipeline changes.
+- First: `python tests/test_circuits.py && python tests/test_model.py` after any code change; `bash scripts/smoke.sh` after pipeline changes.
 - Then work on correctness of duration and ESP against the labels (metrics.json), 4 splits × seeds 5, 6, 7.
 
 ## Cluster rules (PoliTo HPC)

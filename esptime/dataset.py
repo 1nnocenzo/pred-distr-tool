@@ -33,7 +33,7 @@ from . import router
 from .config import CIRCUITS_ZIP, DEVICES, T_SWAP, VARIATIONAL, WORK, decomp_table
 from .devices import chips
 from .encoding import MEASURE, encode, gate_times, to_basis
-from .labels import circuit_sources, read_qasm
+from .labels import check_circuits, circuit_sources, measured, read_qasm
 
 D = len(DEVICES)
 
@@ -164,7 +164,12 @@ def main():
     ap.add_argument("--jobs", type=int, default=1)
     ap.add_argument("--out", default=str(WORK / "dataset.pt"))
     args = ap.parse_args()
+    check_circuits()                     # the circuits the items encode must be the measured ones the labels compiled
     labels = torch.load(WORK / "labels.pt", weights_only=False)
+    stale = sorted(n for n, r in labels.items() if not measured(r))
+    if stale:
+        raise SystemExit(f"{len(stale)} labels compiled without measurements (e.g. {stale[:3]}): relabel them and "
+                         "re-run `python -m esptime.labels merge` (it drops such records)")
     raws = json.loads((WORK / "devices.json").read_text())
     calibs = sorted({c for r in labels.values() for c in r["calib"]}, key=lambda c: (c != "orig", len(c), c))
     jobs = [(n, k, labels[n]) for src in ("mqt", "synth") for n, k in circuit_sources(src) if n in labels]

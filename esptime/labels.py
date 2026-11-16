@@ -55,6 +55,24 @@ def circuit_sources(source: str, per_family: int = 0) -> list[tuple[str, str]]:
     return out
 
 
+def check_circuits() -> None:
+    """Every MQT circuit of the zip must end with measurements (the duration and ESP labels include the 15 µs
+    readout).  MQT Bench's qaoa has none: an old data/circuits.zip stops the pipeline here instead of producing
+    readout-free labels.  Fix: git pull (the zip in the repository is fixed) or scripts/qaoa_add_measure.py."""
+    with zipfile.ZipFile(CIRCUITS_ZIP) as z:
+        bad = [n for n in z.namelist() if n.endswith(".qasm") and n.split("/")[-2] not in EXCLUDE
+               and b"measure" not in z.read(n)]
+    if bad:
+        fams = sorted({n.split("/")[-2] for n in bad})
+        raise SystemExit(f"{CIRCUITS_ZIP}: {len(bad)} circuits without measurements (families {fams}). "
+                         "Run `python scripts/qaoa_add_measure.py` or `git pull` the fixed zip.")
+
+
+def measured(rec: dict) -> bool:
+    """A label record compiled from a circuit with measurements (stale qaoa records have 0 measurements)."""
+    return "error" not in rec and all(c["counts"][1] > 0 for cal in rec["calib"].values() for c in cal.values())
+
+
 def read_qasm(key: str, z: zipfile.ZipFile | None):
     from qiskit import qasm3
     text = z.read(key).decode() if z is not None and not key.startswith("/") else Path(key).read_text()
@@ -206,12 +224,18 @@ def run(args) -> None:
     TAB = decomp_table()
     calibs = parse_calibs(args.calibs)
     bes = {c: backends(c) for c in calibs}
+    if args.source == "mqt":
+        check_circuits()
+    fams = set(args.families.split(",")) if args.families else None
     items = [x for x in circuit_sources(args.source, args.per_family)
-             if zlib.crc32(x[0].encode()) % args.n_tasks == args.task_id]
+             if zlib.crc32(x[0].encode()) % args.n_tasks == args.task_id and (fams is None or x[0].split("/")[0] in fams)]
     out_dir = args.out
     out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / f"{args.source}_{args.calibs.replace(',', '_')}_task{args.task_id:03d}.jsonl"
-    done = {json.loads(l)["circuit"] for l in out_file.read_text().splitlines() if l.strip()} if out_file.is_file() else set()
+    # resume: circuits already labelled, except stale records without measurements (recompiled, appended; merge
+    # keeps the measured record)
+    recs = [json.loads(l) for l in out_file.read_text().splitlines() if l.strip()] if out_file.is_file() else []
+    done = {r["circuit"] for r in recs if "error" in r or measured(r)}
     z = zipfile.ZipFile(CIRCUITS_ZIP) if args.source == "mqt" else None
     t0 = time.time()
     with out_file.open("a") as fh:
@@ -237,7 +261,7 @@ def run(args) -> None:
 def merge(args) -> None:
     import torch
     from .devices import backends, raw_graph
-    out, calibs, err = {}, set(), 0
+    out, calibs, err, stale = {}, set(), 0, set()
     for f in sorted(args.out.glob("*task*.jsonl")):
         for l in f.read_text().splitlines():
             if not l.strip():
@@ -246,9 +270,17 @@ def merge(args) -> None:
             if "error" in r:
                 err += 1
                 continue
+            if not measured(r):                      # compiled from a circuit without measurements: dropped
+                stale.add(r["circuit"])
+                continue
             cur = out.setdefault(r["circuit"], {"n_nodes": r["n_nodes"], "nq": r["nq"], "calib": {}})
             cur["calib"].update(r["calib"])
             calibs |= set(r["calib"])
+    stale -= set(out)
+    if stale:
+        fams = sorted({n.split("/")[0] for n in stale})
+        print(f"WARNING: {len(stale)} circuits have only records without measurements (families {fams}), left out: "
+              f"relabel them with `python -m esptime.labels run --families {','.join(fams)} ...`")
     WORK.mkdir(exist_ok=True)
     torch.save(out, WORK / "labels.pt")
     raws = {c: {d: raw_graph(be) for d, be in backends(c).items()} for c in sorted(calibs | {"orig"})}
@@ -296,6 +328,7 @@ def main():
     ap.add_argument("--calibs", default="orig", help="orig and/or variants, e.g. orig,aug0-9")
     ap.add_argument("--source", choices=("mqt", "synth"), default="mqt")
     ap.add_argument("--per-family", type=int, default=0, help="smoke tests: first k circuits per family")
+    ap.add_argument("--families", default="", help="only these MQT families, e.g. qaoa (relabel one family)")
     ap.add_argument("--out", type=Path, default=OUT)
     args = ap.parse_args()
     {"run": run, "merge": merge, "decomp": decomp}[args.cmd](args)

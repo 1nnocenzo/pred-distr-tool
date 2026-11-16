@@ -16,6 +16,7 @@
 #   TRAIN_JOBS=2       trainings in parallel (each holds the dataset in memory)
 #   DEVICE=cuda GPUS="0 1"   GPUs, assigned round robin to the trainings (default: CPU)
 #   THREADS=8          torch threads per training      EPOCHS=40
+#   FAMILIES=qaoa      labels: relabel only these MQT families (synthetic circuits skipped)
 #   TRAIN_ARGS="--calib-every 4"   extra arguments of esptime.train (e.g. "--esp-busy counts", "--max-nodes 100000")
 #   ESPTIME_WORK=/path  where generated data goes (default: work/ in the repository)
 # Logs: $ESPTIME_WORK/logs/
@@ -38,10 +39,12 @@ mkdir -p "$LOG"
 
 labels() {
   [ -n "$(ls "$ESPTIME_WORK"/circuits/synth/*.qasm 2>/dev/null | head -1)" ] || $PY -m esptime.synth > "$LOG/synth.log" 2>&1
-  for src in mqt synth; do
-    echo "labels $src: $JOBS processes, calibrations $CALIBS (logs $LOG/labels_${src}_*.log)"
+  local srcs="mqt synth" fam=""
+  [ -n "${FAMILIES:-}" ] && srcs=mqt && fam="--families $FAMILIES"
+  for src in $srcs; do
+    echo "labels $src: $JOBS processes, calibrations $CALIBS ${fam} (logs $LOG/labels_${src}_*.log)"
     for t in $(seq 0 $((JOBS - 1))); do
-      OMP_NUM_THREADS=1 $PY -m esptime.labels run --source $src --calibs "$CALIBS" --task-id $t --n-tasks $JOBS \
+      OMP_NUM_THREADS=1 $PY -m esptime.labels run --source $src --calibs "$CALIBS" --task-id $t --n-tasks $JOBS $fam \
         > "$LOG/labels_${src}_$t.log" 2>&1 &
     done
     wait
@@ -94,7 +97,7 @@ EOF
 }
 
 case "${1:-}" in
-  test)    $PY tests/test_model.py ;;
+  test)    $PY tests/test_circuits.py && $PY tests/test_model.py ;;
   smoke)   PY="$PY" bash scripts/smoke.sh ;;
   labels)  labels ;;
   dataset) dataset ;;

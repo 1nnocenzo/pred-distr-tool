@@ -1,0 +1,126 @@
+{
+ "split": "lofo:qnn",
+ "seed": 5,
+ "n_test_circuits": 760,
+ "args": {
+  "split": "lofo:qnn",
+  "seed": "5",
+  "epochs": "40",
+  "bs": "32",
+  "lr": "0.0003",
+  "lr_route": "0.002",
+  "esp_grad": "head",
+  "esp_busy": "counts",
+  "calib_every": "4",
+  "lam": "[]",
+  "init": "None",
+  "freeze_backbone": "False",
+  "data": "/u/home/go68jan/pred-distr-tool/work/dataset.pt",
+  "out": "/u/home/go68jan/pred-distr-tool/work/runs/lofo_qnn_s5",
+  "eval_only": "False",
+  "mc": "24",
+  "time_n": "300",
+  "max_train": "0",
+  "max_test": "0",
+  "select": "last",
+  "max_levels": "0",
+  "max_nodes": "100000",
+  "device": "cpu",
+  "threads": "8",
+  "lambdas": "{'f': 1.0, 'region': 0.1, 'count': 0.3, 'swap': 1.0, 'wait': 0.3, 'c2': 1.0, 'dur': 1.0, 'final': 1.0, 'decay': 1.0, 'extra': 0.3, 'calib': 1.0}"
+ },
+ "n_cases": 2280,
+ "switch_agreement": 1.0,
+ "duration (dur vs label, relative error)": {
+  "all": {
+   "median": 0.017144796010610253,
+   "p90": 0.033248559952803514,
+   "bias": 0.9828552039893897,
+   "n": 2280
+  },
+  "routed": {
+   "median": 0.06860102629429066,
+   "p90": 0.11295040239179045,
+   "bias": 0.9313989737057093,
+   "n": 40
+  },
+  "routing-free": {
+   "median": 0.01640644743417713,
+   "p90": 0.031528350572697816,
+   "bias": 0.9837713968145589,
+   "n": 2240
+  },
+  "routed_by_2q": {
+   "0-20": {
+    "median": 0.06860102629429066,
+    "p90": 0.11295040239179045,
+    "bias": 0.9313989737057093,
+    "n": 40
+   }
+  }
+ },
+ "duration (dur_mc vs label, relative error)": {
+  "all": {
+   "median": 0.017144796010610253,
+   "p90": 0.033248559952803514,
+   "bias": 0.9828552039893897,
+   "n": 2280
+  },
+  "routed": {
+   "median": 0.07644402190346011,
+   "p90": 0.11713407916312679,
+   "bias": 0.9235559780965399,
+   "n": 40
+  },
+  "routing-free": {
+   "median": 0.01640644743417713,
+   "p90": 0.031528350572697816,
+   "bias": 0.9837713968145589,
+   "n": 2240
+  },
+  "routed_by_2q": {
+   "0-20": {
+    "median": 0.07644402190346011,
+    "p90": 0.11713407916312679,
+    "bias": 0.9235559780965399,
+    "n": 40
+   }
+  }
+ },
+ "F": {
+  "R2": 0.98249580465953,
+  "abs_dlog_median": 0.03052571415901184
+ },
+ "ESP": {
+  "R2": 0.9885016774031627,
+  "abs_dlog_median_esp_gt_1e-3_routed": null,
+  "abs_dlog_median_esp_gt_1e-3_routing_free": 0.08060312271118164,
+  "abs_dlog_median_esp_gt_1e-3": 0.08060312271118164,
+  "abs_dlog_p90_esp_gt_1e-3": 0.4459652900695801,
+  "R2_log_esp_gt_1e-3": 0.9626055905685698
+ },
+ "device_by_ESP": {
+  "n": 760,
+  "right": 0.5894736842105263,
+  "regret": 0.017248564221562818
+ },
+ "device_by_F": {
+  "n": 760,
+  "right": 0.8131578947368421,
+  "regret": 0.004921869251647594
+ },
+ "timing": {
+  "n": 300,
+  "mc": 24,
+  "by_2q_ms": {
+   "0-20": {
+    "n": 300,
+    "inputs_ms": 29.010072466917336,
+    "model_ms": 27.935747406445444,
+    "total_ms": 56.859001400880516,
+    "light_compile_ms": 19.1,
+    "full_compile_ms": 33.5
+   }
+  }
+ }
+}
